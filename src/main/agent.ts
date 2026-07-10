@@ -1,0 +1,294 @@
+import path from 'path';
+import { z } from 'zod';
+import { nanoid } from 'nanoid';
+import type { CommentThread, Suggestion } from '@shared/types';
+import { resolveQuote, makeAnchor } from '@shared/anchors';
+import type { DocumentSession } from './session';
+
+/**
+ * The Agent SDK ships ESM-only while our main bundle is CJS; a dynamic
+ * import() survives the Rollup CJS transform as a real native import.
+ */
+type AgentSdk = typeof import('@anthropic-ai/claude-agent-sdk');
+let sdkPromise: Promise<AgentSdk> | null = null;
+function loadSdk(): Promise<AgentSdk> {
+  sdkPromise ??= import('@anthropic-ai/claude-agent-sdk');
+  return sdkPromise;
+}
+
+export interface ActiveTurn {
+  done: Promise<string>;
+  cancel: () => Promise<void>;
+}
+
+interface TurnCallbacks {
+  onActivity: (detail: string) => void;
+}
+
+function ok(text: string) {
+  return { content: [{ type: 'text' as const, text }] };
+}
+
+function buildReviewServer(sdk: AgentSdk, session: DocumentSession) {
+  const { tool, createSdkMcpServer } = sdk;
+  return createSdkMcpServer({
+    name: 'review',
+    version: '1.0.0',
+    tools: [
+      tool(
+        'read_document',
+        'Read the full current contents of the markdown document under review.',
+        {},
+        async () => ok(session.content),
+      ),
+
+      tool(
+        'list_review_state',
+        'List all comment threads and suggestions on the document, including resolved/rejected ones from earlier rounds. Rejected suggestions may carry a decisionComment explaining why the author declined them — read those before proposing similar changes.',
+        {},
+        async () =>
+          ok(
+            JSON.stringify(
+              {
+                round: session.review.round,
+                comments: session.review.comments,
+                suggestions: session.review.suggestions.map((s) => ({
+                  ...s,
+                  // The anchor offsets are internal bookkeeping; the quote is what matters.
+                  anchor: { quote: s.anchor.quote, orphaned: s.anchor.orphaned },
+                })),
+              },
+              null,
+              2,
+            ),
+          ),
+      ),
+
+      tool(
+        'reply_to_comment',
+        'Reply to an existing comment thread. Use this to respond to the author\'s comments (including TK notes surfaced as comments). Do not resolve threads — only the author resolves.',
+        {
+          comment_id: z.string().describe('The id of the comment thread to reply to'),
+          text: z.string().describe('Your reply, in plain prose'),
+        },
+        async (args) => {
+          const thread = session.review.comments.find((c) => c.id === args.comment_id);
+          if (!thread) return ok(`Error: no comment thread with id ${args.comment_id}`);
+          await session.mutateReview(() => {
+            thread.replies.push({
+              id: nanoid(8),
+              author: 'agent',
+              text: args.text,
+              createdAt: new Date().toISOString(),
+            });
+          });
+          return ok('Reply added.');
+        },
+      ),
+
+      tool(
+        'add_comment',
+        'Open a new comment thread anchored to a passage of the document. Use for observations or questions that are not concrete text changes. The quote must be copied exactly from the document.',
+        {
+          quote: z.string().describe('Exact text from the document to anchor the comment to (keep it short — a phrase or sentence)'),
+          text: z.string().describe('The comment body'),
+        },
+        async (args) => {
+          const found = resolveQuote(session.content, args.quote);
+          if (!found) {
+            return ok(
+              `Error: quote not found in document. Copy the text exactly, including punctuation and whitespace. Quote was: ${JSON.stringify(args.quote)}`,
+            );
+          }
+          const thread: CommentThread = {
+            id: nanoid(8),
+            author: 'agent',
+            createdAt: new Date().toISOString(),
+            text: args.text,
+            anchor: makeAnchor(session.content, found.from, found.to),
+            replies: [],
+            status: 'open',
+          };
+          await session.mutateReview((r) => r.comments.push(thread));
+          return ok(`Comment added with id ${thread.id}.`);
+        },
+      ),
+
+      tool(
+        'suggest_edit',
+        'Propose a concrete text change the author can accept or reject. The quote must be copied exactly from the document; the replacement is the full text that should take its place (empty string to delete). Keep each suggestion focused on one change — prefer several small suggestions over one sweeping rewrite.',
+        {
+          quote: z.string().describe('Exact text from the document to replace'),
+          replacement: z.string().describe('The new text (empty string deletes the quoted text)'),
+          note: z.string().describe('One or two sentences explaining why'),
+        },
+        async (args) => {
+          if (args.quote === args.replacement) {
+            return ok('Error: replacement is identical to the quote.');
+          }
+          const found = resolveQuote(session.content, args.quote);
+          if (!found) {
+            return ok(
+              `Error: quote not found in document. Copy the text exactly, including punctuation and whitespace. Quote was: ${JSON.stringify(args.quote)}`,
+            );
+          }
+          const suggestion: Suggestion = {
+            id: nanoid(8),
+            author: 'agent',
+            createdAt: new Date().toISOString(),
+            anchor: makeAnchor(session.content, found.from, found.to),
+            replacement: args.replacement,
+            note: args.note,
+            status: 'pending',
+          };
+          await session.mutateReview((r) => r.suggestions.push(suggestion));
+          return ok(`Suggestion added with id ${suggestion.id}.`);
+        },
+      ),
+    ],
+  });
+}
+
+const SYSTEM_PROMPT = `You are a writing collaborator reviewing a markdown document inside a review app called Margin. You work in review rounds, like a pull-request review: the author edits, comments, and submits; you review and respond; the author decides what to take.
+
+How to work:
+1. Read the document with read_document, and the existing threads/suggestions with list_review_state.
+2. Address every open comment thread: reply with reply_to_comment. If a comment asks for a change, also propose it concretely with suggest_edit.
+3. Treat inline "(TK: ...)" markers in the document text as author notes to you — respond to them, and when appropriate propose a suggest_edit that replaces the TK marker with real text.
+4. Propose your own improvements as suggestions (suggest_edit) and observations as comments (add_comment).
+
+Ground rules:
+- Never edit files directly. All changes go through suggest_edit so the author can accept or reject each one.
+- Never resolve comment threads; only the author resolves.
+- Respect earlier decisions: if a suggestion was rejected (see decisionComment), don't re-propose it unless the author asked you to revisit it.
+- Prefer several small, focused suggestions over one large rewrite. Quote the smallest span that needs to change.
+- Match the author's voice and register. Don't pad, don't add throat-clearing, don't inflate stakes.
+- If the document is in good shape and you have nothing meaningful to add, say so in your final message rather than inventing busywork.
+- You may read other files in the document's directory (e.g. reference/ material) for context.
+
+When you are done, finish with a short summary of what you reviewed and changed.`;
+
+export async function runReviewTurn(
+  session: DocumentSession,
+  note: string | undefined,
+  callbacks: TurnCallbacks,
+): Promise<ActiveTurn> {
+  const sdk = await loadSdk();
+  const server = buildReviewServer(sdk, session);
+  const dir = path.dirname(session.filePath);
+
+  const promptParts = [
+    `Review round ${session.review.round} for "${session.fileName}".`,
+    'The author has submitted the document for review. Read it, address open comments, and make your suggestions.',
+  ];
+  if (note?.trim()) promptParts.push(`Note from the author for this round:\n${note.trim()}`);
+
+  const q = sdk.query({
+    prompt: promptParts.join('\n\n'),
+    options: {
+      cwd: dir,
+      systemPrompt: SYSTEM_PROMPT,
+      mcpServers: { review: server },
+      allowedTools: [
+        'Read',
+        'Grep',
+        'Glob',
+        'mcp__review__read_document',
+        'mcp__review__list_review_state',
+        'mcp__review__reply_to_comment',
+        'mcp__review__add_comment',
+        'mcp__review__suggest_edit',
+      ],
+      disallowedTools: ['Write', 'Edit', 'NotebookEdit', 'Bash', 'WebFetch', 'WebSearch', 'Task'],
+      permissionMode: 'dontAsk',
+      settingSources: [],
+      maxTurns: 80,
+      // Electron's process.execPath is Electron itself, not Node; make the SDK
+      // spawn its CLI with the system Node instead.
+      executable: 'node',
+      env: cleanEnv(),
+      stderr: (data: string) => {
+        console.error('[agent stderr]', data);
+      },
+    },
+  });
+
+  const done = (async () => {
+    let summary = 'Review complete.';
+    for await (const message of q) {
+      if (message.type === 'assistant') {
+        for (const block of message.message.content) {
+          if (block.type === 'tool_use') {
+            callbacks.onActivity(describeToolUse(block.name, block.input));
+          } else if (block.type === 'text' && block.text.trim()) {
+            callbacks.onActivity(truncate(block.text.trim(), 140));
+          }
+        }
+      } else if (message.type === 'result') {
+        if (message.subtype === 'success') {
+          // Auth failures arrive as a "successful" result carrying the error
+          // text (e.g. "Invalid API key · Please run /login").
+          if (message.is_error) throw new Error(message.result || 'Agent turn failed');
+          summary = message.result || summary;
+        } else {
+          throw new Error(`Agent turn failed (${message.subtype})`);
+        }
+      }
+    }
+    return summary;
+  })();
+
+  return {
+    done,
+    cancel: async () => {
+      try {
+        await q.interrupt();
+      } catch {
+        /* already finished */
+      }
+    },
+  };
+}
+
+/**
+ * Strip Claude-Code-session markers from the child environment. If Margin is
+ * launched from inside a Claude Code session (e.g. `npm run dev` in an agent
+ * terminal), the spawned CLI would otherwise detect a nested session and
+ * refuse to use the stored credentials.
+ */
+function cleanEnv(): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key === 'CLAUDECODE' || key.startsWith('CLAUDE_CODE_') || key.startsWith('CLAUDE_AGENT_')) {
+      delete env[key];
+    }
+  }
+  return env;
+}
+
+function describeToolUse(name: string, input: unknown): string {
+  const args = (input ?? {}) as Record<string, unknown>;
+  switch (name) {
+    case 'mcp__review__read_document':
+      return 'Reading the document…';
+    case 'mcp__review__list_review_state':
+      return 'Reading comments and suggestions…';
+    case 'mcp__review__reply_to_comment':
+      return 'Replying to a comment…';
+    case 'mcp__review__add_comment':
+      return `Adding a comment: ${truncate(String(args.text ?? ''), 80)}`;
+    case 'mcp__review__suggest_edit':
+      return `Suggesting an edit: ${truncate(String(args.note ?? ''), 80)}`;
+    case 'Read':
+      return `Reading ${path.basename(String(args.file_path ?? ''))}…`;
+    case 'Grep':
+    case 'Glob':
+      return 'Searching reference material…';
+    default:
+      return `Using ${name}…`;
+  }
+}
+
+function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}

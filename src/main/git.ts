@@ -1,0 +1,63 @@
+import { execFile } from 'child_process';
+import path from 'path';
+
+function git(cwd: string, args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile('git', args, { cwd, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (err) reject(new Error(stderr.trim() || err.message));
+      else resolve(stdout);
+    });
+  });
+}
+
+export async function isInRepo(filePath: string): Promise<boolean> {
+  try {
+    const out = await git(path.dirname(filePath), ['rev-parse', '--is-inside-work-tree']);
+    return out.trim() === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function initRepo(filePath: string): Promise<void> {
+  await git(path.dirname(filePath), ['init']);
+}
+
+/**
+ * Commit the document and its review sidecar if either changed.
+ * Returns true when a commit was created.
+ */
+export async function commitCheckpoint(filePath: string, message: string): Promise<boolean> {
+  const dir = path.dirname(filePath);
+  const files = [path.basename(filePath), `${path.basename(filePath)}.review.json`];
+  await git(dir, ['add', '--', ...files]);
+  const status = await git(dir, ['status', '--porcelain', '--', ...files]);
+  if (!status.trim()) return false;
+  await git(dir, ['commit', '-m', message, '--', ...files]);
+  return true;
+}
+
+export interface LogEntry {
+  hash: string;
+  date: string;
+  message: string;
+}
+
+export async function fileLog(filePath: string, limit = 50): Promise<LogEntry[]> {
+  const dir = path.dirname(filePath);
+  const out = await git(dir, [
+    'log',
+    `--max-count=${limit}`,
+    '--pretty=format:%h%x1f%aI%x1f%s',
+    '--',
+    path.basename(filePath),
+  ]);
+  if (!out.trim()) return [];
+  return out
+    .trim()
+    .split('\n')
+    .map((line) => {
+      const [hash, date, message] = line.split('\x1f');
+      return { hash, date, message };
+    });
+}
