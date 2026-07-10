@@ -481,6 +481,47 @@ kbd {
 
 .sidebar-archive-toggle { margin-top: 18px; width: 100%; text-align: left; }
 
+.sidebar-tabs {
+  display: flex;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 12px;
+  background: var(--paper-raised);
+}
+.sidebar-tabs .btn-toggle { flex: 1; }
+
+.submit-summary {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+/* discussion */
+
+.discussion { display: flex; flex-direction: column; gap: 10px; }
+
+.msg {
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.msg-agent { border-left: 3px solid var(--agent); }
+.msg-user { border-left: 3px solid var(--user); }
+.msg-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.msg-round, .msg-queued { font-size: 11px; color: var(--ink-faint); }
+.msg-queued { color: var(--comment-edge); font-weight: 600; }
+.msg-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.discussion-composer textarea { min-height: 76px; }
+
 /* cards */
 
 .card {

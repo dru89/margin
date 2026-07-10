@@ -31,9 +31,11 @@ Multiple windows share the single app process.
 
 - The **document** is a plain `.md` file — never contains app metadata.
 - **ReviewData** lives in `<doc>.md.review.json` beside it: comment threads
-  (with replies, open/resolved) and suggestions (pending/accepted/rejected,
-  rejection carries an optional `decisionComment`). Both are keyed to text
-  via **Anchors**.
+  (with replies, open/resolved), suggestions (pending/accepted/rejected,
+  rejection carries an optional `decisionComment`), and the **discussion** —
+  a document-level conversation whose user messages queue (`pending`) and
+  send with the next round; the agent's closing message each round is its
+  reply. Threads and suggestions are keyed to text via **Anchors**.
 - **Anchor** = `{from, to, quote, prefix, suffix, orphaned?}`. Offsets are a
   cache; the quote+context is the durable identity. Resolution logic is in
   `src/shared/anchors.ts` (shared by main and renderer):

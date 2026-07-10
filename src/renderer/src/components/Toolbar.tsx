@@ -15,8 +15,11 @@ export function Toolbar() {
 
   const reviewModel = useStore((s) => s.reviewModel);
   const setReviewModel = useStore((s) => s.setReviewModel);
+  const setSidebarTab = useStore((s) => s.setSidebarTab);
+  const queuedCount = useStore(
+    (s) => s.review?.discussion.filter((m) => m.pending).length ?? 0,
+  );
   const [submitOpen, setSubmitOpen] = useState(false);
-  const [note, setNote] = useState('');
   const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,8 +40,7 @@ export function Toolbar() {
 
   const doSubmit = () => {
     setSubmitOpen(false);
-    void submit(note.trim() || undefined);
-    setNote('');
+    void submit();
   };
 
   if (!doc) return null;
@@ -96,16 +98,20 @@ export function Toolbar() {
           </button>
           {submitOpen && (
             <div className="popover" ref={popoverRef}>
-              <textarea
-                autoFocus
-                value={note}
-                placeholder="Optional note for this round — what should Claude focus on?"
-                onChange={(e) => setNote(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) doSubmit();
-                  if (e.key === 'Escape') setSubmitOpen(false);
-                }}
-              />
+              <p className="submit-summary">
+                {queuedCount > 0
+                  ? `${queuedCount} queued discussion message${queuedCount === 1 ? '' : 's'} will be sent with this round.`
+                  : 'No queued discussion messages.'}{' '}
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setSidebarTab('discussion');
+                    setSubmitOpen(false);
+                  }}
+                >
+                  Write one
+                </button>
+              </p>
               <label className="model-row">
                 Model
                 <select

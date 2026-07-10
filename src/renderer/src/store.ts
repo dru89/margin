@@ -39,7 +39,10 @@ interface MarginState {
   save: () => Promise<void>;
   reviewModel: string | undefined;
   setReviewModel: (model: string | undefined) => void;
-  submit: (note?: string) => Promise<void>;
+  sidebarTab: 'review' | 'discussion';
+  setSidebarTab: (tab: 'review' | 'discussion') => void;
+  addDiscussionMessage: (text: string) => void;
+  submit: () => Promise<void>;
   cancelReview: () => Promise<void>;
 }
 
@@ -284,8 +287,28 @@ export const useStore = create<MarginState>((set, get) => {
 
     reviewModel: undefined,
     setReviewModel: (reviewModel) => set({ reviewModel }),
+    sidebarTab: 'review',
+    setSidebarTab: (sidebarTab) => set({ sidebarTab }),
 
-    submit: async (note) => {
+    addDiscussionMessage: (text) => {
+      if (!text.trim()) return;
+      updateReview((r) => ({
+        ...r,
+        discussion: [
+          ...r.discussion,
+          {
+            id: nanoid(8),
+            author: 'user' as const,
+            text: text.trim(),
+            createdAt: new Date().toISOString(),
+            round: r.round + 1, // sent with the next round
+            pending: true,
+          },
+        ],
+      }));
+    },
+
+    submit: async () => {
       const { doc, content, review, reviewModel } = get();
       if (!doc || !review) return;
       if (saveTimer) {
@@ -299,7 +322,7 @@ export const useStore = create<MarginState>((set, get) => {
         activity: [],
         dirty: false,
       });
-      await window.margin.submitReview(content, refreshed, note, reviewModel);
+      await window.margin.submitReview(content, refreshed, reviewModel);
     },
 
     cancelReview: async () => {

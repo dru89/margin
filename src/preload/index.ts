@@ -12,8 +12,8 @@ const api = {
   getDoc: (): Promise<DocState | null> => ipcRenderer.invoke(IPC.getDoc),
   saveDoc: (content: string): Promise<void> => ipcRenderer.invoke(IPC.saveDoc, content),
   updateReview: (review: ReviewData): Promise<void> => ipcRenderer.invoke(IPC.updateReview, review),
-  submitReview: (content: string, review: ReviewData, note?: string, model?: string): Promise<void> =>
-    ipcRenderer.invoke(IPC.submitReview, content, review, note, model),
+  submitReview: (content: string, review: ReviewData, model?: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.submitReview, content, review, model),
   cancelReview: (): Promise<void> => ipcRenderer.invoke(IPC.cancelReview),
   openFileDialog: (): Promise<void> => ipcRenderer.invoke(IPC.openFileDialog),
   openPath: (filePath: string): Promise<void> => ipcRenderer.invoke(IPC.openPath, filePath),

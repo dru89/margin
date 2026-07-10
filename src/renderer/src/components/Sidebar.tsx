@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { CommentThread, Suggestion } from '@shared/types';
 import { useLocked, useStore } from '@/store';
 import { revealRange } from '@/editorBridge';
+import { Discussion } from '@/components/Discussion';
 
 function AuthorChip({ author }: { author: 'user' | 'agent' }) {
   return <span className={`chip chip-${author}`}>{author === 'user' ? 'You' : 'Claude'}</span>;
@@ -188,7 +189,10 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
 export function Sidebar() {
   const review = useStore((s) => s.review);
   const setThreadStatus = useStore((s) => s.setThreadStatus);
+  const sidebarTab = useStore((s) => s.sidebarTab);
+  const setSidebarTab = useStore((s) => s.setSidebarTab);
   const [showArchive, setShowArchive] = useState(false);
+  const queuedCount = review?.discussion.filter((m) => m.pending).length ?? 0;
 
   const { pendingSuggestions, openThreads, archived } = useMemo(() => {
     const comments = review?.comments ?? [];
@@ -211,7 +215,25 @@ export function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <Composer />
+      <div className="sidebar-tabs" role="tablist">
+        <button
+          className={`btn btn-toggle${sidebarTab === 'review' ? ' on' : ''}`}
+          onClick={() => setSidebarTab('review')}
+        >
+          Review
+        </button>
+        <button
+          className={`btn btn-toggle${sidebarTab === 'discussion' ? ' on' : ''}`}
+          onClick={() => setSidebarTab('discussion')}
+        >
+          Discussion{queuedCount > 0 ? ` · ${queuedCount}` : ''}
+        </button>
+      </div>
+      {sidebarTab === 'discussion' ? (
+        <Discussion />
+      ) : (
+        <>
+          <Composer />
       {pendingSuggestions.length === 0 && openThreads.length === 0 && (
         <div className="sidebar-empty">
           <p>No open threads.</p>
@@ -268,6 +290,8 @@ export function Sidebar() {
             </div>
           )}
         </section>
+      )}
+        </>
       )}
     </aside>
   );

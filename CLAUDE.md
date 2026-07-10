@@ -89,8 +89,11 @@ npx electron . --remote-debugging-port=9224 "path/to/doc.md" &   # background
 
 ## Author preferences that shape this app
 
-- Comments belong in the app, never as `(TK: ...)` markers in the document —
-  no TK special-casing anywhere (DECISIONS.md §8).
+- In-app comments are the primary feedback channel; inline `(TK: ...)`
+  markers are a supported fallback for edits made outside Margin — the agent
+  is prompted to answer them and propose replacements (DECISIONS.md §8).
+- No Sift/vault/work-log integration for this project — Drew tracks it
+  himself.
 - Feature priority (2026-07-10): multi-document workspace → comments in
   preview mode → history browser → model picker → about/auto-update/
   packaging → user-authored suggestions.

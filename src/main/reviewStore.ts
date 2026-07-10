@@ -13,6 +13,7 @@ export async function loadReview(docPath: string, content: string): Promise<Revi
     const raw = await fs.readFile(sidecarPath(docPath), 'utf8');
     const data = JSON.parse(raw) as ReviewData;
     if (data.version !== 1) return emptyReview(name);
+    data.discussion ??= []; // sidecars written before the discussion feature
     // The file may have been edited outside the app since the sidecar was
     // written — re-anchor everything against the current content.
     for (const c of data.comments) c.anchor = reanchor(content, c.anchor);

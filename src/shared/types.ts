@@ -51,6 +51,23 @@ export interface Suggestion {
   decisionComment?: string;
 }
 
+/**
+ * A message in the document-level discussion — framing, goals, general
+ * feedback that isn't anchored to a text range. User messages are composed
+ * any time and sent with the next review round (`pending` until then); the
+ * agent's closing message each round is posted here as its reply.
+ */
+export interface DiscussionMessage {
+  id: string;
+  author: Author;
+  text: string;
+  createdAt: string;
+  /** The round this message was part of. */
+  round: number;
+  /** Composed but not yet submitted with a round. */
+  pending?: boolean;
+}
+
 export interface ReviewData {
   version: 1;
   /** Basename of the document this review belongs to. */
@@ -59,6 +76,7 @@ export interface ReviewData {
   round: number;
   comments: CommentThread[];
   suggestions: Suggestion[];
+  discussion: DiscussionMessage[];
 }
 
 export interface DocState {
@@ -104,5 +122,12 @@ export interface RecentFile {
 }
 
 export function emptyReview(documentName: string): ReviewData {
-  return { version: 1, document: documentName, round: 0, comments: [], suggestions: [] };
+  return {
+    version: 1,
+    document: documentName,
+    round: 0,
+    comments: [],
+    suggestions: [],
+    discussion: [],
+  };
 }

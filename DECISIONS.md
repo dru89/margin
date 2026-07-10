@@ -84,13 +84,16 @@ isn't in a repo, checkpoints are skipped and the toolbar shows a "no repo"
 button that runs `git init` — the app never creates repos unasked (your
 `newdoc` flow already makes one anyway). Manual saves don't commit; rounds do.
 
-## 8. TK markers are NOT special (revised per author feedback)
+## 8. TK markers: fallback channel (revised twice — final)
 
-v0 originally told the agent to treat inline `(TK: ...)` as author notes.
-Removed 2026-07-10 at your direction: comments belong in the app, not in the
-document source. Margin has no TK-specific behavior anywhere now. If a TK
-happens to be in the text, the agent sees it as ordinary text and may still
-react to it like any capable reader would — but nothing instructs it to.
+History: v0 special-cased `(TK: ...)` as author notes → removed on 2026-07-10
+morning feedback ("comments should live in the app") → **reinstated later the
+same day**: TKs are a deliberate fallback for edits made outside Margin
+(another editor, quick terminal edit) that later get pulled up here. Current
+behavior: the agent treats TK markers as author notes — replies via an
+anchored comment and proposes a `suggest_edit` replacing the marker — while
+in-app comments remain the primary channel. No UI treats TK specially; it's
+prompt-level only.
 
 ## 9. Editor: markdown source + preview toggle, not WYSIWYG
 
@@ -208,6 +211,30 @@ The submit popover offers Claude Code default / Opus / Sonnet / Haiku and
 passes the alias to the agent turn's `model` option. No pinned model IDs to
 go stale; anything the CLI accepts works. Choice is per-window session state,
 not persisted — deliberate until real usage says otherwise.
+
+## 23. Document discussion: batched with the round, not live chat
+
+You asked for a place to have the sideband conversation — framing, audience,
+"why this doc exists" — and left the shape to me. I chose the **GitHub-PR
+model over a live chat**: a persistent discussion thread stored in the
+sidecar; user messages queue ("pending") and are sent with the next review
+round alongside inline comments; the agent's closing message each round is
+posted back as its reply.
+
+Why not immediate-turn chat: each round is already a fresh agent session
+with the artifact as its memory — a live chat would need either a parallel
+long-lived session (two sources of agent truth, context drift between chat
+and rounds) or a hidden mini-round per message (surprising token spend,
+and the agent would reply without doing the reading). Batching keeps one
+writer model, one prompt assembly path, and full framing context visible in
+every round. The whole discussion (last 30 messages) goes into each turn
+prompt with this round's messages marked "new".
+
+This replaced the per-round note field in the submit popover — two channels
+for the same job was confusing. The popover now shows how many queued
+messages ride along. Trade-off accepted: no instant answers; if a real
+"ask the agent something right now" need shows up, a lightweight
+question-only turn could be added later without touching the round model.
 
 ## Verification status (honest accounting)
 

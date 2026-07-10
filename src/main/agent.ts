@@ -151,10 +151,18 @@ function buildReviewServer(sdk: AgentSdk, session: DocumentSession) {
 
 const SYSTEM_PROMPT = `You are a writing collaborator reviewing a markdown document inside a review app called Margin. You work in review rounds, like a pull-request review: the author edits, comments, and submits; you review and respond; the author decides what to take.
 
+The author also keeps a document-level discussion with you — framing for why
+the document exists, audience, goals, and general feedback that isn't tied to
+a text range. The discussion so far (with this round's new messages marked)
+is included in your task prompt. **Your final message is posted to that
+discussion as your reply** — answer new discussion messages there, and keep
+it in the author's register.
+
 How to work:
 1. Read the document with read_document, and the existing threads/suggestions with list_review_state.
 2. Address every open comment thread: reply with reply_to_comment. If a comment asks for a change, also propose it concretely with suggest_edit.
-3. Propose your own improvements as suggestions (suggest_edit) and observations as comments (add_comment).
+3. Treat inline "(TK: ...)" markers in the document text as author notes written outside this app — respond to them (add_comment anchored to the marker), and when you can, propose a suggest_edit replacing the marker with real text. In-app comments are the primary channel; TK markers are a fallback.
+4. Propose your own improvements as suggestions (suggest_edit) and observations as comments (add_comment).
 
 Ground rules:
 - Never edit files directly. All changes go through suggest_edit so the author can accept or reject each one.
@@ -165,7 +173,21 @@ Ground rules:
 - If the document is in good shape and you have nothing meaningful to add, say so in your final message rather than inventing busywork.
 - You may read other files in the document's directory (e.g. reference/ material) for context.
 
-When you are done, finish with a short summary of what you reviewed and changed.`;
+When you are done, finish with a message for the discussion thread: respond
+to the author's new discussion messages (if any) and briefly summarize what
+you reviewed and changed.`;
+
+/** Render the discussion for the turn prompt, marking this round's messages. */
+function renderDiscussion(session: DocumentSession): string {
+  const messages = session.review.discussion.slice(-30);
+  if (messages.length === 0) return '';
+  const lines = messages.map((m) => {
+    const who = m.author === 'user' ? 'Author' : 'You';
+    const isNew = m.author === 'user' && m.round === session.review.round;
+    return `${who}${isNew ? ' (new this round)' : ` (round ${m.round})`}: ${m.text}`;
+  });
+  return `Document discussion so far:\n${lines.join('\n\n')}`;
+}
 
 /**
  * Scripted review turn for dev/demo (`MARGIN_FAKE_AGENT=1`). Exercises the
@@ -223,7 +245,6 @@ function runFakeReviewTurn(session: DocumentSession, callbacks: TurnCallbacks): 
 
 export async function runReviewTurn(
   session: DocumentSession,
-  note: string | undefined,
   callbacks: TurnCallbacks,
   model?: string,
 ): Promise<ActiveTurn> {
@@ -238,7 +259,8 @@ export async function runReviewTurn(
     `Review round ${session.review.round} for "${session.fileName}".`,
     'The author has submitted the document for review. Read it, address open comments, and make your suggestions.',
   ];
-  if (note?.trim()) promptParts.push(`Note from the author for this round:\n${note.trim()}`);
+  const discussion = renderDiscussion(session);
+  if (discussion) promptParts.push(discussion);
 
   const q = sdk.query({
     prompt: promptParts.join('\n\n'),

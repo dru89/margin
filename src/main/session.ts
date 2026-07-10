@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import { nanoid } from 'nanoid';
 import type { BrowserWindow } from 'electron';
 import type { AgentStatus, DocState, ReviewData } from '@shared/types';
 import { IPC } from '@shared/ipc';
@@ -73,18 +74,21 @@ export class DocumentSession {
    * Submit the current state for an agent review round:
    * checkpoint via git, run the agent turn, checkpoint again.
    */
-  async submitReview(
-    content: string,
-    review: ReviewData,
-    note: string | undefined,
-    model?: string,
-  ): Promise<void> {
+  async submitReview(content: string, review: ReviewData, model?: string): Promise<void> {
     if (this.activeTurn) throw new Error('A review is already running');
     await this.saveContent(content);
     await this.setReview(review);
 
     this.review.round += 1;
+    // Queued discussion messages become part of this round.
+    for (const m of this.review.discussion) {
+      if (m.pending) {
+        m.pending = false;
+        m.round = this.review.round;
+      }
+    }
     await saveReview(this.filePath, this.review);
+    this.sendToRenderer(IPC.reviewUpdated, this.review);
 
     if (this.inGitRepo) {
       try {
@@ -99,7 +103,6 @@ export class DocumentSession {
     try {
       const turn = await runReviewTurn(
         this,
-        note,
         {
           onActivity: (detail) => {
             this.setAgentStatus({ phase: 'running', detail });
@@ -110,6 +113,16 @@ export class DocumentSession {
       );
       this.activeTurn = turn;
       const summary = await turn.done;
+      // The agent's closing message is its reply in the document discussion.
+      await this.mutateReview((r) => {
+        r.discussion.push({
+          id: nanoid(8),
+          author: 'agent',
+          text: summary,
+          createdAt: new Date().toISOString(),
+          round: r.round,
+        });
+      });
       if (this.inGitRepo) {
         try {
           await commitCheckpoint(this.filePath, `Review round ${this.review.round}: agent review`);
