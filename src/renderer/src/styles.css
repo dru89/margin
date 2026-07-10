@@ -641,6 +641,9 @@ textarea {
 textarea:focus { outline: none; border-color: var(--user); }
 textarea::placeholder { color: var(--ink-faint); }
 
+.composer-modes { margin-bottom: 10px; }
+.composer-replacement { font-family: var(--font-prose); min-height: 84px; }
+
 .card-replybox { margin-top: 8px; }
 .card-replybox textarea { min-height: 38px; }
 

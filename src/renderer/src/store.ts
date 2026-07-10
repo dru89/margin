@@ -32,6 +32,7 @@ interface MarginState {
   openComposer: () => void;
   closeComposer: () => void;
   addComment: (text: string) => void;
+  addSuggestion: (replacement: string, note?: string) => void;
   replyToThread: (threadId: string, text: string) => void;
   setThreadStatus: (threadId: string, status: 'open' | 'resolved') => void;
   acceptSuggestion: (id: string) => void;
@@ -208,6 +209,27 @@ export const useStore = create<MarginState>((set, get) => {
             anchor: makeAnchor(content, composerAnchor.from, composerAnchor.to),
             replies: [],
             status: 'open' as const,
+          },
+        ],
+      }));
+      set({ composerAnchor: null });
+    },
+
+    addSuggestion: (replacement, note) => {
+      const { composerAnchor, content } = get();
+      if (!composerAnchor || replacement === composerAnchor.quote) return;
+      updateReview((r) => ({
+        ...r,
+        suggestions: [
+          ...r.suggestions,
+          {
+            id: nanoid(8),
+            author: 'user' as const,
+            createdAt: new Date().toISOString(),
+            anchor: makeAnchor(content, composerAnchor.from, composerAnchor.to),
+            replacement,
+            note: note?.trim() || undefined,
+            status: 'pending' as const,
           },
         ],
       }));

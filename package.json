@@ -50,17 +50,21 @@
   "build": {
     "appId": "fm.hays.margin",
     "productName": "Margin",
+    "asar": false,
     "files": [
       "out/**/*",
+      "build/*.png",
       "node_modules/**/*"
     ],
     "linux": {
       "target": [
         "AppImage"
       ],
+      "icon": "build/icon.png",
       "category": "Office"
     },
     "mac": {
+      "icon": "build/icon.png",
       "category": "public.app-category.productivity"
     }
   }

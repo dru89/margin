@@ -35,6 +35,7 @@ export function createWindow(filePath?: string): BrowserWindow {
     minWidth: 720,
     minHeight: 480,
     title: filePath ? path.basename(filePath) : 'Margin',
+    icon: path.join(__dirname, '../../build/icon.png'),
     // Catppuccin base: Mocha dark / Latte light, matching styles.css.
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e2e' : '#eff1f5',
     webPreferences: {

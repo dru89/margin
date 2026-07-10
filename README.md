@@ -28,6 +28,14 @@ npm run build && npm start
 npx electron . path/to/doc.md
 ```
 
+Package (Linux AppImage; mac config present but untested):
+
+```bash
+npm run package:linux
+./dist/Margin-*.AppImage            # needs libfuse2; on Arch:
+./dist/Margin-*.AppImage --appimage-extract-and-run   # or pacman -S fuse2
+```
+
 ## The loop
 
 1. Open a markdown file (ideally inside a git repo — `newdoc` projects work

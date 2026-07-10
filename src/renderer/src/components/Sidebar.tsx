@@ -20,28 +20,60 @@ function Quote({ text, orphaned }: { text: string; orphaned?: boolean }) {
 function Composer() {
   const composerAnchor = useStore((s) => s.composerAnchor);
   const addComment = useStore((s) => s.addComment);
+  const addSuggestion = useStore((s) => s.addSuggestion);
   const closeComposer = useStore((s) => s.closeComposer);
+  const [mode, setMode] = useState<'comment' | 'suggest'>('comment');
   const [text, setText] = useState('');
+  const [replacement, setReplacement] = useState<string | null>(null);
   if (!composerAnchor) return null;
+
+  const effectiveReplacement = replacement ?? composerAnchor.quote;
+  const submit = () => {
+    if (mode === 'comment') {
+      addComment(text);
+    } else {
+      addSuggestion(effectiveReplacement, text);
+    }
+    setText('');
+    setReplacement(null);
+  };
+  const canSubmit =
+    mode === 'comment'
+      ? text.trim().length > 0
+      : effectiveReplacement !== composerAnchor.quote;
+
   return (
     <div className="card card-composer">
-      <Quote text={composerAnchor.quote} />
+      <div className="sidebar-tabs composer-modes">
+        <button className={`btn btn-toggle${mode === 'comment' ? ' on' : ''}`} onClick={() => setMode('comment')}>
+          Comment
+        </button>
+        <button className={`btn btn-toggle${mode === 'suggest' ? ' on' : ''}`} onClick={() => setMode('suggest')}>
+          Suggest
+        </button>
+      </div>
+      {mode === 'comment' ? (
+        <Quote text={composerAnchor.quote} />
+      ) : (
+        <textarea
+          className="composer-replacement"
+          value={effectiveReplacement}
+          onChange={(e) => setReplacement(e.target.value)}
+        />
+      )}
       <textarea
         autoFocus
         value={text}
-        placeholder="Comment for Claude…"
+        placeholder={mode === 'comment' ? 'Comment for Claude…' : 'Why? (optional)'}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-            addComment(text);
-            setText('');
-          }
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && canSubmit) submit();
           if (e.key === 'Escape') closeComposer();
         }}
       />
       <div className="card-actions">
-        <button className="btn btn-primary" disabled={!text.trim()} onClick={() => { addComment(text); setText(''); }}>
-          Comment
+        <button className="btn btn-primary" disabled={!canSubmit} onClick={submit}>
+          {mode === 'comment' ? 'Comment' : 'Suggest'}
         </button>
         <button className="btn" onClick={closeComposer}>
           Cancel

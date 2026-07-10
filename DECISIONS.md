@@ -236,6 +236,37 @@ messages ride along. Trade-off accepted: no instant answers; if a real
 "ask the agent something right now" need shows up, a lightweight
 question-only turn could be added later without touching the round model.
 
+## 24. Icon, About, packaging (choices made solo, 2026-07-10 afternoon)
+
+- **Icon**: hand-drawn SVG (`build/icon.svg`) — a manuscript page with a
+  margin rule, comment dot, highlighted line, and dashed suggestion box, in
+  Catppuccin colors. Rendered to PNGs with rsvg-convert; regenerate with the
+  same tool if the SVG changes.
+- **About**: `app.setAboutPanelOptions` + the `about` menu role (works on
+  macOS and Linux). No custom About window yet — the native panel carries
+  name/version/icon, which covers the Netscope requirement's intent.
+- **Packaging**: electron-builder AppImage for Linux; mac config present but
+  untested (no mac here). **`asar: false`** — the Agent SDK spawns its
+  bundled `cli.js` with *system Node*, which cannot read inside an asar
+  archive; disabling asar is the simple correct fix (~194MB AppImage).
+  Revisit with `asarUnpack` + path rewriting if size matters later.
+- AppImages need libfuse2, which Arch-family systems don't ship — on this
+  machine run with `--appimage-extract-and-run`, or `pacman -S fuse2`.
+  Verified the AppImage boots and renders. A pacman/tar.gz target may suit
+  this box better; deferred.
+- **Auto-update: deferred.** electron-updater wants a release channel
+  (GitHub Releases) and the repo has no remote yet; wire it up when the
+  repo is published.
+
+## 25. User-authored suggestions ride the same rails
+
+The selection composer gained a Comment | Suggest toggle: Suggest pre-fills
+the selected text for editing, takes an optional "why", and files a pending
+suggestion authored by "You" — same card, same accept/reject flow (you can
+accept your own; the agent is prompted to weigh in via an anchored comment
+when it has a substantive opinion). No new data model: `author: 'user'`
+suggestions were designed in from v0.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:

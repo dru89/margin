@@ -10,6 +10,13 @@ if (!gotLock) {
   app.quit();
 } else {
   app.setName('Margin');
+  app.setAboutPanelOptions({
+    applicationName: 'Margin',
+    applicationVersion: app.getVersion(),
+    copyright: '© 2026 Drew Hays',
+    website: 'https://github.com/dru89/agent-editor',
+    iconPath: path.join(__dirname, '../../build/icon.png'),
+  });
 
   const fileFromArgv = (argv: string[]): string | undefined =>
     argv
