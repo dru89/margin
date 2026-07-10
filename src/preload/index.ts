@@ -1,5 +1,5 @@
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
-import type { AgentStatus, DocState, ReviewData, WorkspaceState } from '@shared/types';
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
+import type { AgentStatus, DocState, RecentFile, ReviewData, WorkspaceState } from '@shared/types';
 import { IPC } from '@shared/ipc';
 
 function on<T extends unknown[]>(channel: string, cb: (...args: T) => void): () => void {
@@ -22,6 +22,9 @@ const api = {
   gitLog: (): Promise<{ hash: string; date: string; message: string }[]> =>
     ipcRenderer.invoke(IPC.gitLog),
   getWorkspace: (): Promise<WorkspaceState | null> => ipcRenderer.invoke(IPC.getWorkspace),
+  getRecents: (): Promise<RecentFile[]> => ipcRenderer.invoke(IPC.getRecents),
+  /** Resolve a dropped File to its filesystem path (sandbox-safe). */
+  pathForFile: (file: File): string => webUtils.getPathForFile(file),
   openInWindow: (filePath: string): Promise<void> => ipcRenderer.invoke(IPC.openInWindow, filePath),
 
   onDocLoaded: (cb: (doc: DocState) => void) => on(IPC.docLoaded, cb),

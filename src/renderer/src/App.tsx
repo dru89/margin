@@ -15,6 +15,25 @@ export function App() {
 
   useEffect(() => init(), [init]);
 
+  // Drop a markdown file anywhere to open it (Netscope window rules apply).
+  useEffect(() => {
+    const onDragOver = (e: DragEvent) => e.preventDefault();
+    const onDrop = (e: DragEvent) => {
+      e.preventDefault();
+      for (const file of e.dataTransfer?.files ?? []) {
+        if (/\.(md|markdown|mdx|txt)$/i.test(file.name)) {
+          void window.margin.openPath(window.margin.pathForFile(file));
+        }
+      }
+    };
+    window.addEventListener('dragover', onDragOver);
+    window.addEventListener('drop', onDrop);
+    return () => {
+      window.removeEventListener('dragover', onDragOver);
+      window.removeEventListener('drop', onDrop);
+    };
+  }, []);
+
   if (!doc) return <Welcome />;
 
   return (

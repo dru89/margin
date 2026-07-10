@@ -7,6 +7,7 @@ import { attachDocument, createWindow, openFile } from './windows';
 import { showOpenDialog } from './menu';
 import { fileLog, initRepo, isInRepo } from './git';
 import { getWorkspace } from './workspace';
+import { getRecentFiles } from './recents';
 
 function requireSession(webContentsId: number) {
   const session = getSession(webContentsId);
@@ -66,6 +67,10 @@ export function registerIpcHandlers(): void {
     const session = requireSession(event.sender.id);
     if (!session.inGitRepo) return [];
     return fileLog(session.filePath);
+  });
+
+  ipcMain.handle(IPC.getRecents, async () => {
+    return getRecentFiles();
   });
 
   ipcMain.handle(IPC.getWorkspace, async (event) => {

@@ -736,6 +736,33 @@ textarea::placeholder { color: var(--ink-faint); }
   margin: 0 0 32px;
 }
 
+.welcome-recents {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+.welcome-recent {
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  color: var(--ink);
+}
+.welcome-recent:hover { background: var(--user-wash); }
+.welcome-recent-name { display: block; font-weight: 550; }
+.welcome-recent-path {
+  display: block;
+  font-size: 11px;
+  color: var(--ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 380px;
+}
+
 .welcome-hint {
   margin-top: 20px;
   font-size: 12px;
