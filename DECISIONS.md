@@ -186,16 +186,46 @@ Multi-doc workspace, then: comments in preview mode → history browser →
 model picker → about screen/auto-update/packaging → user-authored
 suggestions. TK special-casing removed (see §8).
 
+## 20. Preview-mode comment highlighting = quote search in rendered DOM
+
+Rendered markdown loses source offsets, so preview anchors are re-located by
+searching for the quote text in the rendered text nodes and wrapping it.
+Limitation (documented in `Preview.tsx`): a quote that crosses inline
+formatting boundaries (spans **bold**, a link, etc.) isn't highlighted in
+preview — it stays fully functional in the sidebar. Accepted trade-off over
+a source-map-preserving markdown pipeline, which is a much bigger build.
+
+## 21. History browser is read-only v1; sidecar commits count
+
+Toolbar ▸ History lists `git log` for the document **and its review
+sidecar** (round commits often touch only the sidecar). No diff view or
+restore yet — for those, the repo is right there and `git` does it better;
+revisit if it earns UI.
+
+## 22. Model picker = alias pass-through, per window
+
+The submit popover offers Claude Code default / Opus / Sonnet / Haiku and
+passes the alias to the agent turn's `model` option. No pinned model IDs to
+go stale; anything the CLI accepts works. Choice is per-window session state,
+not persisted — deliberate until real usage says otherwise.
+
 ## Verification status (honest accounting)
 
-- Verified end-to-end: open/edit/save, autosave, comment compose → highlight →
-  sidecar persistence, anchor mapping + re-anchoring (unit-tested), preview
-  toggle, git checkpointing, submit → SDK spawn → live status streaming →
-  error surfacing → editor unlock, light + dark themes.
-- **Not yet verified: a full successful agent round.** The build environment
-  had no CLI-usable Claude credentials (host-managed session), so the turn
-  failed at auth — correctly surfaced in the UI. First submit on a machine
-  with a normal `claude` login exercises the last untested step: the agent
-  actually calling `reply_to_comment`/`suggest_edit`. The tool handlers are
-  the same quote-resolution code that is unit-tested, so risk is contained,
-  but expect to tune the system prompt after the first real rounds.
+Updated 2026-07-10, all verified by driving the built app over CDP:
+
+- Editing: open/edit/save, autosave, comment compose → highlight → sidecar
+  persistence, anchor mapping + re-anchoring (unit-tested), preview toggle
+  with anchor highlighting, both Catppuccin themes.
+- **Full live agent round** (after `/login` + SDK upgrade to 0.3.x): submit →
+  git checkpoint → agent reads doc + review state → replies to the open
+  thread → files a suggestion → adds a comment → summary → checkpoint →
+  unlock. Accepting the suggestion replaced the text, autosaved, and kept
+  the other anchors intact. Note: SDK 0.1.x fails mid-round with
+  `tool_use ids must be unique` API 400s — stay on ≥0.3.
+- Workspace explorer: root detection, nested grouping, modified dots
+  (`git status -uall`), open-item badges, in-window switching, dedupe to
+  other windows.
+- History popover, model picker plumbing (picker UI verified; a non-default
+  model round hasn't been exercised — it's a one-string pass-through).
+- Fake agent mode exists but hasn't been exercised end-to-end in the UI
+  (same code path as the real round minus the SDK; low risk).
