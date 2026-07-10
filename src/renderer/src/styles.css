@@ -1,7 +1,8 @@
 /* ————————————————————————————————————————————————————————————————
-   Margin — paper & ink.
+   Margin — Catppuccin (Latte light / Mocha dark).
    Serif manuscript for the document, quiet sans chrome around it.
-   User accents in ink blue; the agent speaks in verdigris.
+   Author speaks in blue; the agent speaks in teal; comments in yellow.
+   Palette reference: https://catppuccin.com/palette
    ———————————————————————————————————————————————————————————————— */
 
 :root {
@@ -9,45 +10,49 @@
   --font-ui: 'Spline Sans Variable', 'Avenir Next', 'Segoe UI', sans-serif;
   --font-mono: 'Spline Sans Mono Variable', 'SF Mono', 'Cascadia Code', monospace;
 
-  --paper: #f6f2ea;
-  --paper-raised: #fdfbf6;
-  --paper-inset: #eee8dc;
-  --ink: #211d17;
-  --ink-soft: #5c554a;
-  --ink-faint: #97907f;
-  --rule: #ddd5c6;
+  /* Latte */
+  --paper: #eff1f5;         /* base — document + chrome ground */
+  --paper-raised: #ffffff;  /* cards, toolbar, popovers */
+  --paper-inset: #e6e9ef;   /* mantle — sidebar, code, wells */
+  --ink: #4c4f69;           /* text */
+  --ink-soft: #6c6f85;      /* subtext0 */
+  --ink-faint: #8c8fa1;     /* overlay1 */
+  --rule: #ccd0da;          /* surface0 */
 
-  --user: #33459c;        /* ink blue — the author's pen */
-  --user-wash: #33459c14;
-  --agent: #0f7b6c;       /* verdigris — the agent's pen */
-  --agent-wash: #0f7b6c12;
-  --comment-wash: #eab30826;
-  --comment-edge: #c79407;
-  --danger: #a33a2a;
+  --user: #1e66f5;          /* blue — the author's pen */
+  --user-wash: #1e66f514;
+  --agent: #179299;         /* teal — the agent's pen */
+  --agent-wash: #17929914;
+  --comment-wash: #df8e1d26; /* yellow */
+  --comment-edge: #df8e1d;
+  --danger: #d20f39;        /* red */
+  --on-accent: #ffffff;     /* text on filled accent buttons */
 
-  --shadow: 0 1px 2px rgb(33 29 23 / 8%), 0 8px 24px -12px rgb(33 29 23 / 25%);
+  --shadow: 0 1px 2px rgb(76 79 105 / 8%), 0 8px 24px -12px rgb(76 79 105 / 25%);
   --radius: 8px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #1b1813;
-    --paper-raised: #241f19;
-    --paper-inset: #14110d;
-    --ink: #eae3d4;
-    --ink-soft: #b0a793;
-    --ink-faint: #776f5e;
-    --rule: #38322a;
+    /* Mocha */
+    --paper: #1e1e2e;         /* base */
+    --paper-raised: #313244;  /* surface0 */
+    --paper-inset: #181825;   /* mantle */
+    --ink: #cdd6f4;           /* text */
+    --ink-soft: #a6adc8;      /* subtext0 */
+    --ink-faint: #7f849c;     /* overlay1 */
+    --rule: #45475a;          /* surface1 */
 
-    --user: #8d9bee;
-    --user-wash: #8d9bee1c;
-    --agent: #4cc2ae;
-    --agent-wash: #4cc2ae17;
-    --comment-wash: #eab3082e;
-    --comment-edge: #d9a915;
-    --danger: #e07a68;
+    --user: #89b4fa;          /* blue */
+    --user-wash: #89b4fa1c;
+    --agent: #94e2d5;         /* teal */
+    --agent-wash: #94e2d517;
+    --comment-wash: #f9e2af2b; /* yellow */
+    --comment-edge: #f9e2af;
+    --danger: #f38ba8;        /* red */
+    --on-accent: #11111b;     /* crust — Mocha accents are light, text goes dark */
 
-    --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 8px 24px -12px rgb(0 0 0 / 60%);
+    --shadow: 0 1px 2px rgb(17 17 27 / 50%), 0 8px 24px -12px rgb(17 17 27 / 70%);
   }
 }
 

@@ -1,4 +1,4 @@
-import { BrowserWindow, screen, shell } from 'electron';
+import { BrowserWindow, nativeTheme, screen, shell } from 'electron';
 import path from 'path';
 import { IPC } from '@shared/ipc';
 import { DocumentSession, dropSession, findSessionByPath, getSession, setSession } from './session';
@@ -35,7 +35,8 @@ export function createWindow(filePath?: string): BrowserWindow {
     minWidth: 720,
     minHeight: 480,
     title: filePath ? path.basename(filePath) : 'Margin',
-    backgroundColor: '#f6f2ea',
+    // Catppuccin base: Mocha dark / Latte light, matching styles.css.
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e2e' : '#eff1f5',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,

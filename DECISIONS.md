@@ -84,11 +84,13 @@ isn't in a repo, checkpoints are skipped and the toolbar shows a "no repo"
 button that runs `git init` — the app never creates repos unasked (your
 `newdoc` flow already makes one anyway). Manual saves don't commit; rounds do.
 
-## 8. TK markers are first-class
+## 8. TK markers are NOT special (revised per author feedback)
 
-The agent's system prompt tells it to treat inline `(TK: ...)` as author
-notes: respond to them and propose a `suggest_edit` replacing the marker with
-real text. Your existing habit keeps working with zero UI.
+v0 originally told the agent to treat inline `(TK: ...)` as author notes.
+Removed 2026-07-10 at your direction: comments belong in the app, not in the
+document source. Margin has no TK-specific behavior anywhere now. If a TK
+happens to be in the text, the agent sees it as ordinary text and may still
+react to it like any capable reader would — but nothing instructs it to.
 
 ## 9. Editor: markdown source + preview toggle, not WYSIWYG
 
@@ -140,6 +142,49 @@ and refuse stored credentials. Margin strips those vars for the child process.
 `puppeteer-core` is a devDependency used to drive the built app over
 `--remote-debugging-port` for smoke tests (no browser download). The comment
 flow and review-round plumbing were verified this way.
+
+## 16. Catppuccin theme (author request, 2026-07-10)
+
+Latte for light, Mocha for dark (the flagship dark flavor), replacing the
+original paper/ink palette. Mapping: base = ground, mantle = insets/sidebar,
+surface0/1 = raised cards + rules, text/subtext0/overlay1 = ink scale,
+blue = author, teal = agent, yellow = comment anchors, red = danger.
+Accent-filled buttons use `--on-accent` (white on Latte, crust on Mocha)
+since Mocha accents are light. Typography unchanged (Newsreader/Spline Sans).
+Window `backgroundColor` follows `nativeTheme` so pre-paint matches.
+
+## 17. Fake agent mode (`MARGIN_FAKE_AGENT=1`)
+
+A scripted review turn that runs the exact same code path as a real round —
+status streaming, sidecar mutations via the same helpers, git checkpoints —
+without spawning the CLI. Exists because (a) dev/demo shouldn't burn tokens
+or require credentials, and (b) the round pipeline needs to be testable in CI
+or sandboxed sessions. It replies to every open thread, adds one comment,
+and files suggestions against the first paragraphs it finds.
+
+## 18. Multi-document workspace (author request, 2026-07-10)
+
+You often work multiple documents per repo with the same agent. Design:
+
+- **Workspace root** = the document's git repo root when there is one,
+  otherwise the file's own directory. Nested folders included; nothing
+  outside the root is listed. (Matches the `newdoc` project shape.)
+- **Explorer rail** on the left lists `.md` files (`.git`, `node_modules`
+  excluded), with per-file badges: open-comment count (read from sidecars)
+  and a modified-since-HEAD dot (git status).
+- **Clicking switches the document in the same window** (the window's
+  DocumentSession is replaced) rather than tabs or split panes — cheapest
+  model that matches "one doc in focus, quick switching". Cmd/Ctrl+N still
+  opens more windows for side-by-side.
+- Review rounds remain **per-document** for now. A workspace-wide round
+  ("review everything open") is a plausible follow-up but needs UX for
+  cross-file suggestions first.
+
+## 19. Roadmap order (author, 2026-07-10)
+
+Multi-doc workspace, then: comments in preview mode → history browser →
+model picker → about screen/auto-update/packaging → user-authored
+suggestions. TK special-casing removed (see §8).
 
 ## Verification status (honest accounting)
 

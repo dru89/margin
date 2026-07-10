@@ -66,7 +66,7 @@ function buildReviewServer(sdk: AgentSdk, session: DocumentSession) {
 
       tool(
         'reply_to_comment',
-        'Reply to an existing comment thread. Use this to respond to the author\'s comments (including TK notes surfaced as comments). Do not resolve threads — only the author resolves.',
+        'Reply to an existing comment thread. Use this to respond to the author\'s comments. Do not resolve threads — only the author resolves.',
         {
           comment_id: z.string().describe('The id of the comment thread to reply to'),
           text: z.string().describe('Your reply, in plain prose'),
@@ -154,8 +154,7 @@ const SYSTEM_PROMPT = `You are a writing collaborator reviewing a markdown docum
 How to work:
 1. Read the document with read_document, and the existing threads/suggestions with list_review_state.
 2. Address every open comment thread: reply with reply_to_comment. If a comment asks for a change, also propose it concretely with suggest_edit.
-3. Treat inline "(TK: ...)" markers in the document text as author notes to you — respond to them, and when appropriate propose a suggest_edit that replaces the TK marker with real text.
-4. Propose your own improvements as suggestions (suggest_edit) and observations as comments (add_comment).
+3. Propose your own improvements as suggestions (suggest_edit) and observations as comments (add_comment).
 
 Ground rules:
 - Never edit files directly. All changes go through suggest_edit so the author can accept or reject each one.

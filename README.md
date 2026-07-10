@@ -33,7 +33,7 @@ npx electron . path/to/doc.md
 1. Open a markdown file (ideally inside a git repo — `newdoc` projects work
    as-is). Write and edit normally; the app autosaves.
 2. Select text and hit **Cmd/Ctrl+M** (or `+ Comment`) to leave a comment for
-   the agent. Inline `(TK: ...)` notes in the text work too.
+   the agent. Comments live in the app, not in the document text.
 3. **Submit for review** (Cmd/Ctrl+Shift+Enter) with an optional note. The
    round is checkpointed to git, then the agent reads the document (and
    anything else in its folder, e.g. `reference/`), replies to your comments,
