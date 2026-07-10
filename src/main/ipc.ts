@@ -29,9 +29,9 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(
     IPC.submitReview,
-    async (event, content: string, review: ReviewData, note?: string) => {
+    async (event, content: string, review: ReviewData, note?: string, model?: string) => {
       // Fire-and-return: progress flows back through agentStatus events.
-      void requireSession(event.sender.id).submitReview(content, review, note);
+      void requireSession(event.sender.id).submitReview(content, review, note, model);
     },
   );
 

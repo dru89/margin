@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocked, useStore } from '@/store';
+import { History } from '@/components/History';
 
 export function Toolbar() {
   const doc = useStore((s) => s.doc);
@@ -12,6 +13,8 @@ export function Toolbar() {
   const dirty = useStore((s) => s.dirty);
   const locked = useLocked();
 
+  const reviewModel = useStore((s) => s.reviewModel);
+  const setReviewModel = useStore((s) => s.setReviewModel);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [note, setNote] = useState('');
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -72,6 +75,7 @@ export function Toolbar() {
         >
           + Comment
         </button>
+        <History inGitRepo={doc.inGitRepo} />
         <div className="mode-toggle" role="tablist">
           <button
             className={`btn btn-toggle${mode === 'write' ? ' on' : ''}`}
@@ -102,6 +106,18 @@ export function Toolbar() {
                   if (e.key === 'Escape') setSubmitOpen(false);
                 }}
               />
+              <label className="model-row">
+                Model
+                <select
+                  value={reviewModel ?? ''}
+                  onChange={(e) => setReviewModel(e.target.value || undefined)}
+                >
+                  <option value="">Claude Code default</option>
+                  <option value="opus">Opus</option>
+                  <option value="sonnet">Sonnet</option>
+                  <option value="haiku">Haiku</option>
+                </select>
+              </label>
               <div className="card-actions">
                 <button className="btn btn-primary" onClick={doSubmit}>
                   Start round {(review?.round ?? 0) + 1}

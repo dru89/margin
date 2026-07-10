@@ -73,7 +73,12 @@ export class DocumentSession {
    * Submit the current state for an agent review round:
    * checkpoint via git, run the agent turn, checkpoint again.
    */
-  async submitReview(content: string, review: ReviewData, note: string | undefined): Promise<void> {
+  async submitReview(
+    content: string,
+    review: ReviewData,
+    note: string | undefined,
+    model?: string,
+  ): Promise<void> {
     if (this.activeTurn) throw new Error('A review is already running');
     await this.saveContent(content);
     await this.setReview(review);
@@ -92,12 +97,17 @@ export class DocumentSession {
 
     this.setAgentStatus({ phase: 'running', detail: 'Starting review…' });
     try {
-      const turn = await runReviewTurn(this, note, {
-        onActivity: (detail) => {
-          this.setAgentStatus({ phase: 'running', detail });
-          this.sendToRenderer(IPC.agentActivity, detail);
+      const turn = await runReviewTurn(
+        this,
+        note,
+        {
+          onActivity: (detail) => {
+            this.setAgentStatus({ phase: 'running', detail });
+            this.sendToRenderer(IPC.agentActivity, detail);
+          },
         },
-      });
+        model,
+      );
       this.activeTurn = turn;
       const summary = await turn.done;
       if (this.inGitRepo) {

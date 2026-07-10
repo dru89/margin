@@ -45,12 +45,15 @@ export interface LogEntry {
 
 export async function fileLog(filePath: string, limit = 50): Promise<LogEntry[]> {
   const dir = path.dirname(filePath);
+  // The review sidecar is part of the document's history — round commits
+  // often touch only it (comments/suggestions without text edits).
   const out = await git(dir, [
     'log',
     `--max-count=${limit}`,
     '--pretty=format:%h%x1f%aI%x1f%s',
     '--',
     path.basename(filePath),
+    `${path.basename(filePath)}.review.json`,
   ]);
   if (!out.trim()) return [];
   return out

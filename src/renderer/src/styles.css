@@ -221,6 +221,40 @@ kbd {
   padding: 12px;
 }
 
+.model-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-bottom: 10px;
+}
+.model-row select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+.history-popover { max-height: 340px; overflow-y: auto; }
+.history-row {
+  padding: 7px 2px;
+  border-bottom: 1px solid var(--rule);
+}
+.history-row:last-of-type { border-bottom: none; }
+.history-msg { display: block; }
+.history-meta {
+  display: block;
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 2px;
+}
+.history-meta code { font-family: var(--font-mono); }
+.hint { font-size: 12px; color: var(--ink-faint); }
+
 /* ——— editor ——— */
 
 .editor-pane {

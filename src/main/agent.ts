@@ -225,6 +225,7 @@ export async function runReviewTurn(
   session: DocumentSession,
   note: string | undefined,
   callbacks: TurnCallbacks,
+  model?: string,
 ): Promise<ActiveTurn> {
   if (process.env.MARGIN_FAKE_AGENT) {
     return runFakeReviewTurn(session, callbacks);
@@ -243,6 +244,9 @@ export async function runReviewTurn(
     prompt: promptParts.join('\n\n'),
     options: {
       cwd: dir,
+      // undefined = the user's Claude Code default; accepts any model string
+      // or alias ('opus', 'sonnet', 'haiku') the CLI accepts.
+      model,
       systemPrompt: SYSTEM_PROMPT,
       mcpServers: { review: server },
       allowedTools: [

@@ -37,6 +37,8 @@ interface MarginState {
   acceptSuggestion: (id: string) => void;
   rejectSuggestion: (id: string, comment?: string) => void;
   save: () => Promise<void>;
+  reviewModel: string | undefined;
+  setReviewModel: (model: string | undefined) => void;
   submit: (note?: string) => Promise<void>;
   cancelReview: () => Promise<void>;
 }
@@ -280,8 +282,11 @@ export const useStore = create<MarginState>((set, get) => {
       set({ dirty: false });
     },
 
+    reviewModel: undefined,
+    setReviewModel: (reviewModel) => set({ reviewModel }),
+
     submit: async (note) => {
-      const { doc, content, review } = get();
+      const { doc, content, review, reviewModel } = get();
       if (!doc || !review) return;
       if (saveTimer) {
         clearTimeout(saveTimer);
@@ -294,7 +299,7 @@ export const useStore = create<MarginState>((set, get) => {
         activity: [],
         dirty: false,
       });
-      await window.margin.submitReview(content, refreshed, note);
+      await window.margin.submitReview(content, refreshed, note, reviewModel);
     },
 
     cancelReview: async () => {
