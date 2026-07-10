@@ -43,6 +43,13 @@ export function Toolbar() {
   return (
     <header className="toolbar">
       <div className="toolbar-left">
+        <button
+          className="btn btn-ghost"
+          title="Toggle file explorer"
+          onClick={useStore.getState().toggleExplorer}
+        >
+          ☰
+        </button>
         <span className="doc-title">{doc.fileName}</span>
         {dirty && <span className="dirty-dot" title="Unsaved changes" />}
         {review && review.round > 0 && <span className="round-badge">Round {review.round}</span>}

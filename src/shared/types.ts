@@ -78,6 +78,25 @@ export interface AgentStatus {
   detail: string;
 }
 
+export interface WorkspaceFile {
+  path: string;
+  /** Path relative to the workspace root. */
+  rel: string;
+  name: string;
+  /** Containing directory relative to root; '' at root. */
+  dir: string;
+  openComments: number;
+  pendingSuggestions: number;
+  /** Differs from HEAD (git status), including untracked. */
+  modified: boolean;
+}
+
+export interface WorkspaceState {
+  root: string;
+  rootName: string;
+  files: WorkspaceFile[];
+}
+
 export interface RecentFile {
   path: string;
   name: string;

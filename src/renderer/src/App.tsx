@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useStore } from '@/store';
 import { Welcome } from '@/components/Welcome';
+import { Explorer } from '@/components/Explorer';
 import { Toolbar } from '@/components/Toolbar';
 import { EditorPane } from '@/components/EditorPane';
 import { Preview } from '@/components/Preview';
@@ -20,6 +21,7 @@ export function App() {
     <div className="app">
       <Toolbar />
       <div className="workspace">
+        <Explorer />
         <main className="document">{mode === 'write' ? <EditorPane /> : <Preview />}</main>
         <Sidebar />
       </div>

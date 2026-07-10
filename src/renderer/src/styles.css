@@ -342,6 +342,82 @@ kbd {
 }
 .preview-body hr { border: none; border-top: 1px solid var(--rule); margin: 2em 0; }
 
+/* ——— explorer ——— */
+
+.explorer {
+  width: 220px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--rule);
+  background: var(--paper-inset);
+  padding: 12px 8px 24px;
+}
+
+.explorer-head {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: 2px 8px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.explorer-dir {
+  font-size: 11px;
+  color: var(--ink-faint);
+  padding: 8px 8px 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.explorer-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  border-radius: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+  text-align: left;
+}
+.explorer-file:hover:not(:disabled) { background: var(--paper); color: var(--ink); }
+.explorer-file.on { background: var(--user-wash); color: var(--ink); font-weight: 550; }
+.explorer-file:disabled { opacity: 0.5; cursor: default; }
+
+.explorer-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.explorer-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--comment-edge);
+}
+.explorer-dot-spacer { width: 7px; flex-shrink: 0; }
+
+.explorer-badge {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-weight: 650;
+  color: var(--agent);
+  background: var(--agent-wash);
+  border-radius: 99px;
+  padding: 1px 7px;
+}
+
 /* ——— sidebar ——— */
 
 .sidebar {

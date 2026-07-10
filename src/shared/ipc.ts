@@ -11,6 +11,8 @@ export const IPC = {
   newWindow: 'app:new-window',
   gitInit: 'doc:git-init',
   gitLog: 'doc:git-log',
+  getWorkspace: 'workspace:get',
+  openInWindow: 'workspace:open-in-window',
 
   // main -> renderer (send)
   docLoaded: 'doc:loaded',

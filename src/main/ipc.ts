@@ -1,10 +1,12 @@
 import { BrowserWindow, ipcMain } from 'electron';
+import path from 'path';
 import type { ReviewData } from '@shared/types';
 import { IPC } from '@shared/ipc';
-import { getSession } from './session';
+import { findSessionByPath, getSession } from './session';
 import { attachDocument, createWindow, openFile } from './windows';
 import { showOpenDialog } from './menu';
 import { fileLog, initRepo, isInRepo } from './git';
+import { getWorkspace } from './workspace';
 
 function requireSession(webContentsId: number) {
   const session = getSession(webContentsId);
@@ -64,5 +66,27 @@ export function registerIpcHandlers(): void {
     const session = requireSession(event.sender.id);
     if (!session.inGitRepo) return [];
     return fileLog(session.filePath);
+  });
+
+  ipcMain.handle(IPC.getWorkspace, async (event) => {
+    const session = getSession(event.sender.id);
+    if (!session) return null;
+    return getWorkspace(session.filePath);
+  });
+
+  // Switch the sender window to another document. If that document is open
+  // in a different window already, focus it there instead (Netscope rule).
+  ipcMain.handle(IPC.openInWindow, async (event, filePath: string) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    const current = getSession(event.sender.id);
+    const resolved = path.resolve(filePath);
+    if (current?.filePath === resolved) return;
+    const elsewhere = findSessionByPath(resolved);
+    if (elsewhere) {
+      await openFile(resolved); // focuses the existing window
+      return;
+    }
+    await attachDocument(win, resolved);
   });
 }

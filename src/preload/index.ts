@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
-import type { AgentStatus, DocState, ReviewData } from '@shared/types';
+import type { AgentStatus, DocState, ReviewData, WorkspaceState } from '@shared/types';
 import { IPC } from '@shared/ipc';
 
 function on<T extends unknown[]>(channel: string, cb: (...args: T) => void): () => void {
@@ -21,6 +21,8 @@ const api = {
   gitInit: (): Promise<boolean> => ipcRenderer.invoke(IPC.gitInit),
   gitLog: (): Promise<{ hash: string; date: string; message: string }[]> =>
     ipcRenderer.invoke(IPC.gitLog),
+  getWorkspace: (): Promise<WorkspaceState | null> => ipcRenderer.invoke(IPC.getWorkspace),
+  openInWindow: (filePath: string): Promise<void> => ipcRenderer.invoke(IPC.openInWindow, filePath),
 
   onDocLoaded: (cb: (doc: DocState) => void) => on(IPC.docLoaded, cb),
   onReviewUpdated: (cb: (review: ReviewData) => void) => on(IPC.reviewUpdated, cb),

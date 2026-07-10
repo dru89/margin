@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import type { ChangeDesc } from '@codemirror/state';
-import type { AgentStatus, Anchor, DocState, ReviewData } from '@shared/types';
+import type { AgentStatus, Anchor, DocState, ReviewData, WorkspaceState } from '@shared/types';
 import { makeAnchor } from '@shared/anchors';
 import { applyReplacement } from './editorBridge';
 
@@ -18,8 +18,13 @@ interface MarginState {
   activeAnchorId: string | null;
   composerAnchor: { from: number; to: number; quote: string } | null;
   dirty: boolean;
+  workspace: WorkspaceState | null;
+  explorerOpen: boolean;
 
   init: () => void;
+  loadWorkspace: () => Promise<void>;
+  toggleExplorer: () => void;
+  switchToFile: (path: string) => Promise<void>;
   setMode: (mode: ViewMode) => void;
   handleDocChange: (content: string, changes: ChangeDesc) => void;
   setSelection: (sel: { from: number; to: number } | null) => void;
@@ -79,6 +84,22 @@ export const useStore = create<MarginState>((set, get) => {
     activeAnchorId: null,
     composerAnchor: null,
     dirty: false,
+    workspace: null,
+    explorerOpen: true,
+
+    loadWorkspace: async () => {
+      const workspace = await window.margin.getWorkspace();
+      set({ workspace });
+    },
+
+    toggleExplorer: () => set((s) => ({ explorerOpen: !s.explorerOpen })),
+
+    switchToFile: async (path) => {
+      const { doc, save } = get();
+      if (!doc || doc.filePath === path) return;
+      await save(); // flush before the window switches documents
+      await window.margin.openInWindow(path);
+    },
 
     init: () => {
       if (initialized) return;
@@ -97,13 +118,22 @@ export const useStore = create<MarginState>((set, get) => {
           dirty: false,
         });
 
-      void window.margin.getDoc().then((doc) => doc && load(doc));
-      window.margin.onDocLoaded(load);
+      void window.margin.getDoc().then((doc) => {
+        if (doc) {
+          load(doc);
+          void get().loadWorkspace();
+        }
+      });
+      window.margin.onDocLoaded((doc) => {
+        load(doc);
+        void get().loadWorkspace();
+      });
       window.margin.onReviewUpdated((review) => set({ review }));
       window.margin.onAgentStatus((agent) => {
         set({ agent });
         if (agent.phase === 'done' || agent.phase === 'error') {
           set((s) => ({ activity: [...s.activity, agent.detail] }));
+          void get().loadWorkspace();
         }
       });
       window.margin.onAgentActivity((detail) =>
