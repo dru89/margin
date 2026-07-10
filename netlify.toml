@@ -1,0 +1,3 @@
+# Static marketing site — no build step; publish site/ as-is.
+[build]
+  publish = "site"

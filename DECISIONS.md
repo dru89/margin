@@ -267,6 +267,39 @@ accept your own; the agent is prompted to weigh in via an anchored comment
 when it has a substantive opinion). No new data model: `author: 'user'`
 suggestions were designed in from v0.
 
+## 26. Publish + auto-update mirror Netscope's pipeline
+
+Same shape as Dru89/netscope: `make release` bumps the version, commits,
+tags `vX.Y.Z`, and pushes; `.github/workflows/release.yml` runs checks,
+builds per-platform (`--publish never`), and a single publish job attaches
+everything (including the `latest*.yml` update feeds) to one GitHub Release;
+`electron-updater` in the app checks that feed on launch with Netscope's
+exact UX — ask before downloading, Install / Remind Me Later (per-day) /
+Skip This Version (persisted in `updater.json`), taskbar progress, restart
+prompt. Deliberate differences: no Windows target yet, no nightly channel,
+and macOS signing is optional until the CSC secrets exist (unsigned mac
+builds download fine but won't auto-update — same constraint Netscope
+solves with its Developer ID cert).
+
+Verified locally: the Linux build emits `latest-linux.yml` + AppImage +
+pacman (pacman needed `homepage` in package.json — added). **Not verified:
+the Actions run and an in-app update**, because github.com/Dru89/agent-editor
+doesn't exist yet — I didn't create a public repo and push the source
+without you. Once you `gh rc` + push, the first `make release` exercises
+the rest; the workflow is a line-for-line adaptation of Netscope's proven
+one.
+
+## 27. Marketing site: static, no build step
+
+`site/` is plain HTML/CSS (Catppuccin Latte/Mocha via prefers-color-scheme,
+Newsreader/Spline Sans from Google Fonts) — no framework, no build, and
+`netlify.toml` just publishes the directory (Netscope's site is a Vite app;
+a landing page doesn't need one). Screenshots are real app captures at 2×
+against a staged demo document ("Deprecating the Legacy Auth Flow") with a
+hand-crafted review state — hero swaps light/dark with the visitor's theme.
+Regenerate by re-staging a demo folder and driving the app over CDP.
+`make site-dev` serves it locally.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:

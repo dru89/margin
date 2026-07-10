@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Margin — review documents with Claude, like a pull request</title>
+  <meta name="description" content="Margin is a desktop markdown editor where you and Claude review documents in rounds — anchored comments, suggestions you accept or reject, and git checkpoints. Plain files, on your disk." />
+  <link rel="icon" href="favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&family=Spline+Sans:wght@400..700&family=Spline+Sans+Mono:wght@400..600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <meta property="og:title" content="Margin" />
+  <meta property="og:description" content="Write in markdown. Review in the margin. Co-edit documents with Claude in PR-style rounds." />
+  <meta property="og:image" content="img/hero-light.png" />
+</head>
+<body>
+  <header class="nav">
+    <a class="wordmark" href="#top">Margin</a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#rounds">How it works</a>
+      <a href="#download">Download</a>
+      <a href="https://github.com/Dru89/agent-editor" class="nav-github">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <p class="kicker">A markdown editor with a second reader</p>
+      <h1>Write in markdown.<br /><em>Review in the margin.</em></h1>
+      <p class="lede">
+        Margin is a desktop editor where you and Claude work on a document the way
+        engineers review a pull request: anchored comments, concrete suggestions
+        you accept or reject, in deliberate rounds. Your files stay plain
+        markdown — on your disk, in your git history.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#download">Download</a>
+        <a class="btn" href="https://github.com/Dru89/agent-editor">View source</a>
+      </div>
+
+      <figure class="shot shot-hero">
+        <div class="chrome"><span></span><span></span><span></span></div>
+        <picture>
+          <source srcset="img/hero-dark.png" media="(prefers-color-scheme: dark)" />
+          <img src="img/hero-light.png" alt="Margin reviewing a document: the editor shows highlighted passages, and the sidebar shows a pending suggestion with Accept and Reject buttons plus two comment threads between the author and Claude." loading="eager" />
+        </picture>
+      </figure>
+    </section>
+
+    <section class="features" id="features">
+      <h2>Everything is a proposal until you accept it</h2>
+      <div class="grid">
+        <article>
+          <h3>Suggestions, not edits</h3>
+          <p>The agent can't touch your file. Every change it wants arrives as a
+          diff you accept or reject — and rejections carry your reasoning into
+          the next round, so it doesn't ask twice.</p>
+        </article>
+        <article>
+          <h3>Comments that hold on</h3>
+          <p>Threads anchor to exact passages and follow them through edits —
+          yours, or anyone's. If the text disappears, the thread survives in
+          the sidebar instead of silently dying.</p>
+        </article>
+        <article>
+          <h3>A discussion for the big picture</h3>
+          <p>Framing, audience, what good looks like — the sideband conversation
+          lives next to the document and shapes every round, so you set the
+          stage once.</p>
+        </article>
+        <article>
+          <h3>Rounds, checkpointed in git</h3>
+          <p>Submit when you're ready, like sending a review. Each round commits
+          before and after, so the document's history reads like a changelog
+          of decisions.</p>
+        </article>
+        <article>
+          <h3>Whole projects, not just files</h3>
+          <p>The explorer shows every document in the repo with open-thread
+          counts and modified markers. The agent reads your reference material
+          for context, too.</p>
+        </article>
+        <article>
+          <h3>Plain files, forever</h3>
+          <p>The document is a normal <code>.md</code> file; review state lives in a
+          readable JSON sidecar beside it. No database, no lock-in, no sync
+          service. It's your repo.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="rounds" id="rounds">
+      <h2>How a round works</h2>
+      <ol class="steps">
+        <li>
+          <span class="step-n">1</span>
+          <h3>Edit &amp; comment</h3>
+          <p>Write normally. Select a passage and comment on it, queue framing
+          notes in the discussion, or leave a <code>(TK: …)</code> placeholder
+          the old-fashioned way.</p>
+        </li>
+        <li>
+          <span class="step-n">2</span>
+          <h3>Submit for review</h3>
+          <p>Margin checkpoints to git and hands the document to Claude — which
+          reads it (and your reference folder), answers every thread, and files
+          its suggestions.</p>
+        </li>
+        <li>
+          <span class="step-n">3</span>
+          <h3>Decide what lands</h3>
+          <p>Accept or reject each suggestion, reply, resolve what's settled.
+          When neither of you has anything meaningful left to say, the
+          document is done.</p>
+        </li>
+      </ol>
+
+      <div class="shot-pair">
+        <figure class="shot">
+          <div class="chrome"><span></span><span></span><span></span></div>
+          <picture>
+            <source srcset="img/discussion-dark.png" media="(prefers-color-scheme: dark)" />
+            <img src="img/discussion-light.png" alt="The Discussion tab: the author sets the audience and tone for the document; Claude replies with its read and open questions for the next round." loading="lazy" />
+          </picture>
+        </figure>
+        <figure class="shot">
+          <div class="chrome"><span></span><span></span><span></span></div>
+          <img src="img/preview-light.png" alt="Preview mode renders the markdown with comment highlights still visible and clickable." loading="lazy" />
+        </figure>
+      </div>
+    </section>
+
+    <section class="download" id="download">
+      <h2>Download</h2>
+      <p>
+        Margin runs on macOS and Linux. Review rounds use your existing
+        <a href="https://claude.com/claude-code">Claude Code</a> login — no API
+        keys to manage.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://github.com/Dru89/agent-editor/releases/latest">Latest release</a>
+        <a class="btn" href="https://github.com/Dru89/agent-editor#margin">Build from source</a>
+      </div>
+      <p class="fine">AppImage and pacman packages for Linux · dmg for macOS · updates arrive in-app</p>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      <span class="wordmark">Margin</span> · plain files, honest reviews ·
+      <a href="https://github.com/Dru89/agent-editor">GitHub</a> ·
+      MIT © Drew Hays ·
+      built on the <a href="https://platform.claude.com/docs/en/agent-sdk/overview">Claude Agent SDK</a>
+    </p>
+  </footer>
+</body>
+</html>

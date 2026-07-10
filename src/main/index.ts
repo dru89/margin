@@ -3,6 +3,7 @@ import path from 'path';
 import { createWindow, openFile } from './windows';
 import { initMenu } from './menu';
 import { registerIpcHandlers } from './ipc';
+import { initUpdater } from './updater';
 
 // One app process for all windows.
 const gotLock = app.requestSingleInstanceLock();
@@ -53,6 +54,8 @@ if (!gotLock) {
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
+
+    void initUpdater();
   });
 
   app.on('window-all-closed', () => {
