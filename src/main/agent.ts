@@ -167,11 +167,68 @@ Ground rules:
 
 When you are done, finish with a short summary of what you reviewed and changed.`;
 
+/**
+ * Scripted review turn for dev/demo (`MARGIN_FAKE_AGENT=1`). Exercises the
+ * same mutation, streaming, and checkpoint paths as a real round with no
+ * credentials or token spend.
+ */
+function runFakeReviewTurn(session: DocumentSession, callbacks: TurnCallbacks): ActiveTurn {
+  let cancelled = false;
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const done = (async () => {
+    callbacks.onActivity('Reading the document… (fake agent)');
+    await sleep(600);
+    for (const thread of session.review.comments.filter((c) => c.status === 'open')) {
+      if (cancelled) return 'Fake review cancelled.';
+      callbacks.onActivity('Replying to a comment… (fake agent)');
+      await session.mutateReview(() => {
+        thread.replies.push({
+          id: nanoid(8),
+          author: 'agent',
+          text: `(fake agent) Acknowledged: “${thread.text.slice(0, 60)}”. A real round would respond substantively here.`,
+          createdAt: new Date().toISOString(),
+        });
+      });
+      await sleep(400);
+    }
+    // Suggest an edit against the first reasonably long line.
+    const line = session.content.split('\n').find((l) => !l.startsWith('#') && l.trim().length > 40);
+    if (line && !cancelled) {
+      callbacks.onActivity('Suggesting an edit… (fake agent)');
+      const found = resolveQuote(session.content, line);
+      if (found) {
+        await session.mutateReview((r) =>
+          r.suggestions.push({
+            id: nanoid(8),
+            author: 'agent',
+            createdAt: new Date().toISOString(),
+            anchor: makeAnchor(session.content, found.from, found.to),
+            replacement: `${line} (revised by fake agent)`,
+            note: 'Demonstration suggestion from MARGIN_FAKE_AGENT — accept or reject to exercise the flow.',
+            status: 'pending',
+          }),
+        );
+      }
+      await sleep(400);
+    }
+    return 'Fake review round complete (MARGIN_FAKE_AGENT=1) — no model was consulted.';
+  })();
+  return {
+    done,
+    cancel: async () => {
+      cancelled = true;
+    },
+  };
+}
+
 export async function runReviewTurn(
   session: DocumentSession,
   note: string | undefined,
   callbacks: TurnCallbacks,
 ): Promise<ActiveTurn> {
+  if (process.env.MARGIN_FAKE_AGENT) {
+    return runFakeReviewTurn(session, callbacks);
+  }
   const sdk = await loadSdk();
   const server = buildReviewServer(sdk, session);
   const dir = path.dirname(session.filePath);
