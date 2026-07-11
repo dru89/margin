@@ -103,6 +103,8 @@ export interface WorkspaceFile {
   name: string;
   /** Containing directory relative to root; '' at root. */
   dir: string;
+  /** Markdown opens in Margin; anything else opens in its native app. */
+  kind: 'markdown' | 'other';
   openComments: number;
   pendingSuggestions: number;
   /** Differs from HEAD (git status), including untracked. */

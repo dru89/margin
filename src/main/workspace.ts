@@ -24,7 +24,11 @@ export async function findWorkspaceRoot(filePath: string): Promise<string> {
   }
 }
 
-async function walkMarkdown(root: string): Promise<string[]> {
+export function isMarkdown(name: string): boolean {
+  return /\.(md|markdown|mdx)$/i.test(name);
+}
+
+async function walkFiles(root: string): Promise<string[]> {
   const results: string[] = [];
   const stack = [root];
   while (stack.length > 0 && results.length < MAX_FILES) {
@@ -37,12 +41,20 @@ async function walkMarkdown(root: string): Promise<string[]> {
     }
     for (const entry of entries) {
       if (entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) continue;
+      // Review sidecars are Margin internals, not documents.
+      if (entry.name.endsWith('.review.json')) continue;
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) stack.push(full);
-      else if (/\.(md|markdown|mdx)$/i.test(entry.name)) results.push(full);
+      else results.push(full);
     }
   }
   return results.sort();
+}
+
+/** First markdown file under a directory (for "Open Folder…"). */
+export async function firstMarkdownIn(dir: string): Promise<string | null> {
+  const files = await walkFiles(dir);
+  return files.find((f) => isMarkdown(f)) ?? null;
 }
 
 /** Paths (relative to root) that differ from HEAD, per git status. */
@@ -81,16 +93,18 @@ async function openItemCounts(mdPath: string): Promise<{ comments: number; sugge
 
 export async function getWorkspace(filePath: string): Promise<WorkspaceState> {
   const root = await findWorkspaceRoot(filePath);
-  const [mdFiles, modified] = await Promise.all([walkMarkdown(root), modifiedSet(root)]);
+  const [allFiles, modified] = await Promise.all([walkFiles(root), modifiedSet(root)]);
   const files: WorkspaceFile[] = await Promise.all(
-    mdFiles.map(async (p) => {
+    allFiles.map(async (p) => {
       const rel = path.relative(root, p);
-      const counts = await openItemCounts(p);
+      const markdown = isMarkdown(p);
+      const counts = markdown ? await openItemCounts(p) : { comments: 0, suggestions: 0 };
       return {
         path: p,
         rel,
         name: path.basename(p),
         dir: path.dirname(rel) === '.' ? '' : path.dirname(rel),
+        kind: markdown ? ('markdown' as const) : ('other' as const),
         openComments: counts.comments,
         pendingSuggestions: counts.suggestions,
         modified: modified.has(rel),

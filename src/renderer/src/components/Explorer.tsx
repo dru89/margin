@@ -6,12 +6,15 @@ function FileRow({ file, active }: { file: WorkspaceFile; active: boolean }) {
   const switchToFile = useStore((s) => s.switchToFile);
   const locked = useLocked();
   const attention = file.openComments + file.pendingSuggestions;
+  const isMd = file.kind === 'markdown';
   return (
     <button
-      className={`explorer-file${active ? ' on' : ''}`}
+      className={`explorer-file${active ? ' on' : ''}${isMd ? '' : ' explorer-file-other'}`}
       disabled={locked}
-      title={file.rel}
-      onClick={() => void switchToFile(file.path)}
+      title={isMd ? file.rel : `${file.rel} — opens in its default app`}
+      onClick={() =>
+        void (isMd ? switchToFile(file.path) : window.margin.openExternal(file.path))
+      }
     >
       {file.modified ? <span className="explorer-dot" title="Modified since last commit" /> : <span className="explorer-dot-spacer" />}
       <span className="explorer-name">{file.name}</span>

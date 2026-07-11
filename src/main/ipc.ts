@@ -1,10 +1,10 @@
-import { BrowserWindow, ipcMain } from 'electron';
+import { BrowserWindow, ipcMain, shell } from 'electron';
 import path from 'path';
 import type { ReviewData } from '@shared/types';
 import { IPC } from '@shared/ipc';
 import { findSessionByPath, getSession } from './session';
 import { attachDocument, createWindow, openFile } from './windows';
-import { showOpenDialog } from './menu';
+import { showOpenDialog, showOpenFolderDialog } from './menu';
 import { fileLog, initRepo, isInRepo } from './git';
 import { getWorkspace } from './workspace';
 import { getRecentFiles } from './recents';
@@ -71,6 +71,15 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.getRecents, async () => {
     return getRecentFiles();
+  });
+
+  ipcMain.handle(IPC.openExternal, async (_event, filePath: string) => {
+    await shell.openPath(path.resolve(filePath));
+  });
+
+  ipcMain.handle(IPC.openFolderDialog, async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+    await showOpenFolderDialog(win);
   });
 
   ipcMain.handle(IPC.getWorkspace, async (event) => {

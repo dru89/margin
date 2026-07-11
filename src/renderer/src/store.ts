@@ -146,6 +146,7 @@ export const useStore = create<MarginState>((set, get) => {
         set((s) => ({ activity: [...s.activity.slice(-199), detail] })),
       );
       window.margin.onMenuSave(() => void get().save());
+      window.margin.onMenuAddComment(() => get().openComposer());
       window.margin.onMenuTogglePreview(() =>
         set((s) => ({ mode: s.mode === 'write' ? 'preview' : 'write' })),
       );
@@ -178,12 +179,16 @@ export const useStore = create<MarginState>((set, get) => {
     },
 
     setSelection: (selection) => set({ selection }),
-    setActiveAnchor: (activeAnchorId) => set({ activeAnchorId }),
+    // Focusing an anchor always brings the Review tab forward so the card is
+    // actually visible (Sidebar scrolls it into view via activeAnchorId).
+    setActiveAnchor: (activeAnchorId) =>
+      set(activeAnchorId ? { activeAnchorId, sidebarTab: 'review' } : { activeAnchorId }),
 
     openComposer: () => {
       const { selection, content } = get();
       if (!selection || selection.from === selection.to) return;
       set({
+        sidebarTab: 'review',
         composerAnchor: {
           from: selection.from,
           to: selection.to,

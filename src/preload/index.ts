@@ -23,6 +23,8 @@ const api = {
     ipcRenderer.invoke(IPC.gitLog),
   getWorkspace: (): Promise<WorkspaceState | null> => ipcRenderer.invoke(IPC.getWorkspace),
   getRecents: (): Promise<RecentFile[]> => ipcRenderer.invoke(IPC.getRecents),
+  openExternal: (filePath: string): Promise<void> => ipcRenderer.invoke(IPC.openExternal, filePath),
+  openFolderDialog: (): Promise<void> => ipcRenderer.invoke(IPC.openFolderDialog),
   /** Resolve a dropped File to its filesystem path (sandbox-safe). */
   pathForFile: (file: File): string => webUtils.getPathForFile(file),
   openInWindow: (filePath: string): Promise<void> => ipcRenderer.invoke(IPC.openInWindow, filePath),
@@ -34,6 +36,7 @@ const api = {
   onMenuSave: (cb: () => void) => on(IPC.menuSave, cb),
   onMenuSubmit: (cb: () => void) => on(IPC.menuSubmit, cb),
   onMenuTogglePreview: (cb: () => void) => on(IPC.menuTogglePreview, cb),
+  onMenuAddComment: (cb: () => void) => on(IPC.menuAddComment, cb),
 };
 
 export type MarginApi = typeof api;

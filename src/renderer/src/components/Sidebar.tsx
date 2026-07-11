@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { CommentThread, Suggestion } from '@shared/types';
 import { useLocked, useStore } from '@/store';
 import { revealRange } from '@/editorBridge';
 import { Discussion } from '@/components/Discussion';
+import { Md } from '@/components/Md';
 
 function AuthorChip({ author }: { author: 'user' | 'agent' }) {
   return <span className={`chip chip-${author}`}>{author === 'user' ? 'You' : 'Claude'}</span>;
@@ -95,6 +96,7 @@ function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
 
   return (
     <div
+      id={`card-${suggestion.id}`}
       className={`card card-suggestion${isActive ? ' card-active' : ''}`}
       onClick={() => {
         setActiveAnchor(suggestion.id);
@@ -109,7 +111,7 @@ function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
         <del>{suggestion.anchor.quote || '∅'}</del>
         <ins>{suggestion.replacement || '∅ (delete)'}</ins>
       </div>
-      {suggestion.note && <p className="card-note">{suggestion.note}</p>}
+      {suggestion.note && <Md text={suggestion.note} />}
       {!rejecting ? (
         <div className="card-actions">
           <button
@@ -171,6 +173,7 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
 
   return (
     <div
+      id={`card-${thread.id}`}
       className={`card card-thread${isActive ? ' card-active' : ''}`}
       onClick={() => {
         setActiveAnchor(thread.id);
@@ -192,11 +195,11 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
         </button>
       </div>
       <Quote text={thread.anchor.quote} orphaned={thread.anchor.orphaned} />
-      <p className="card-note">{thread.text}</p>
+      <Md text={thread.text} />
       {thread.replies.map((r) => (
         <div key={r.id} className="reply">
           <AuthorChip author={r.author} />
-          <p>{r.text}</p>
+          <Md text={r.text} />
         </div>
       ))}
       <div className="card-replybox" onClick={(e) => e.stopPropagation()}>
@@ -224,7 +227,16 @@ export function Sidebar() {
   const sidebarTab = useStore((s) => s.sidebarTab);
   const setSidebarTab = useStore((s) => s.setSidebarTab);
   const [showArchive, setShowArchive] = useState(false);
+  const activeAnchorId = useStore((s) => s.activeAnchorId);
   const queuedCount = review?.discussion.filter((m) => m.pending).length ?? 0;
+
+  // Bring the focused card into view when an editor highlight is clicked.
+  useEffect(() => {
+    if (!activeAnchorId) return;
+    document
+      .getElementById(`card-${activeAnchorId}`)
+      ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [activeAnchorId]);
 
   const { pendingSuggestions, openThreads, archived } = useMemo(() => {
     const comments = review?.comments ?? [];
@@ -316,7 +328,7 @@ export function Sidebar() {
                       Reopen
                     </button>
                   </div>
-                  <p className="card-note">{c.text}</p>
+                  <Md text={c.text} />
                 </div>
               ))}
             </div>

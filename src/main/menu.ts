@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, Menu, type MenuItemConstructorOptions, shel
 import { IPC } from '@shared/ipc';
 import { clearRecentFiles, getRecentFiles, setRecentsChangedListener } from './recents';
 import { createWindow, openFile } from './windows';
+import { firstMarkdownIn } from './workspace';
 
 const isMac = process.platform === 'darwin';
 
@@ -13,6 +14,26 @@ export async function showOpenDialog(win?: BrowserWindow): Promise<void> {
   });
   if (result.canceled || result.filePaths.length === 0) return;
   await openFile(result.filePaths[0], win);
+}
+
+/** Open a folder: the workspace explorer shows the whole tree, so we open
+ * the folder's first markdown file to seed the window. */
+export async function showOpenFolderDialog(win?: BrowserWindow): Promise<void> {
+  const result = await dialog.showOpenDialog({
+    title: 'Open Folder',
+    properties: ['openDirectory'],
+  });
+  if (result.canceled || result.filePaths.length === 0) return;
+  const first = await firstMarkdownIn(result.filePaths[0]);
+  if (!first) {
+    dialog.showMessageBox({
+      type: 'info',
+      message: 'No markdown files',
+      detail: 'That folder has no markdown documents to open.',
+    });
+    return;
+  }
+  await openFile(first, win);
 }
 
 export async function rebuildMenu(): Promise<void> {
@@ -61,6 +82,12 @@ export async function rebuildMenu(): Promise<void> {
           label: 'Open…',
           accelerator: 'CmdOrCtrl+O',
           click: (_item, win) => void showOpenDialog(win instanceof BrowserWindow ? win : undefined),
+        },
+        {
+          label: 'Open Folder…',
+          accelerator: 'CmdOrCtrl+Shift+O',
+          click: (_item, win) =>
+            void showOpenFolderDialog(win instanceof BrowserWindow ? win : undefined),
         },
         { label: 'Open Recent', submenu: recentItems },
         { type: 'separator' },

@@ -1,7 +1,8 @@
-import { BrowserWindow, nativeTheme, screen, shell } from 'electron';
+import { BrowserWindow, Menu, nativeTheme, screen, shell } from 'electron';
 import path from 'path';
 import { IPC } from '@shared/ipc';
 import { DocumentSession, dropSession, findSessionByPath, getSession, setSession } from './session';
+// (Menu import above is used by the context-menu handler.)
 import { addRecentFile } from './recents';
 
 const CASCADE_OFFSET = 28;
@@ -48,6 +49,31 @@ export function createWindow(filePath?: string): BrowserWindow {
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  // Right-click: native edit actions plus "Add Comment" on a selection.
+  win.webContents.on('context-menu', (_event, params) => {
+    const template: Electron.MenuItemConstructorOptions[] = [];
+    if (params.selectionText.trim() && getSession(win.webContents.id)) {
+      template.push(
+        {
+          label: 'Add Comment',
+          accelerator: 'CmdOrCtrl+M',
+          click: () => win.webContents.send(IPC.menuAddComment),
+        },
+        { type: 'separator' },
+      );
+    }
+    if (params.isEditable || params.selectionText) {
+      template.push(
+        { role: 'cut', enabled: params.editFlags.canCut },
+        { role: 'copy', enabled: params.editFlags.canCopy },
+        { role: 'paste', enabled: params.editFlags.canPaste },
+        { type: 'separator' },
+        { role: 'selectAll' },
+      );
+    }
+    if (template.length > 0) Menu.buildFromTemplate(template).popup({ window: win });
   });
 
   win.on('closed', () => dropSession(win.webContents.id));

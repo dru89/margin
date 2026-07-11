@@ -284,7 +284,11 @@ export async function runReviewTurn(
       ],
       disallowedTools: ['Write', 'Edit', 'NotebookEdit', 'Bash', 'WebFetch', 'WebSearch', 'Task'],
       permissionMode: 'dontAsk',
-      settingSources: [],
+      // 'project' lets a writing project ship its own skills + CLAUDE.md
+      // (<workspace>/.claude/skills, ./CLAUDE.md) without pulling in the
+      // user's global config. User-level skills need 'user' here — see
+      // DECISIONS.md §28.
+      settingSources: ['project'],
       maxTurns: 80,
       // Electron's process.execPath is Electron itself, not Node; make the SDK
       // spawn its CLI with the system Node instead.

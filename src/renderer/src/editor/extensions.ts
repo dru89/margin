@@ -1,7 +1,6 @@
 import {
   Decoration,
   EditorView,
-  drawSelection,
   keymap,
   placeholder,
   type DecorationSet,
@@ -84,7 +83,8 @@ export interface EditorCallbacks {
 export function createExtensions(callbacks: EditorCallbacks) {
   return [
     history(),
-    drawSelection(),
+    // Native caret (blinks; drawSelection's layer-drawn cursor didn't) —
+    // selection styling comes from ::selection / caret-color in styles.css.
     highlightSelectionMatches(),
     EditorState.allowMultipleSelections.of(true),
     keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),

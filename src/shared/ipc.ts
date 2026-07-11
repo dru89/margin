@@ -13,6 +13,8 @@ export const IPC = {
   gitLog: 'doc:git-log',
   getWorkspace: 'workspace:get',
   getRecents: 'app:get-recents',
+  openExternal: 'app:open-external',
+  openFolderDialog: 'app:open-folder-dialog',
   openInWindow: 'workspace:open-in-window',
 
   // main -> renderer (send)
@@ -23,4 +25,5 @@ export const IPC = {
   menuSave: 'menu:save',
   menuSubmit: 'menu:submit',
   menuTogglePreview: 'menu:toggle-preview',
+  menuAddComment: 'menu:add-comment',
 } as const;
