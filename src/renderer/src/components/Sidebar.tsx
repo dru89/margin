@@ -228,7 +228,7 @@ export function Sidebar() {
   const setSidebarTab = useStore((s) => s.setSidebarTab);
   const [showArchive, setShowArchive] = useState(false);
   const activeAnchorId = useStore((s) => s.activeAnchorId);
-  const queuedCount = review?.discussion.filter((m) => m.pending).length ?? 0;
+  const queuedCount = useStore((s) => s.discussion.filter((m) => m.pending).length);
 
   // Bring the focused card into view when an editor highlight is clicked.
   useEffect(() => {

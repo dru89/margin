@@ -1,7 +1,14 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import type { ChangeDesc } from '@codemirror/state';
-import type { AgentStatus, Anchor, DocState, ReviewData, WorkspaceState } from '@shared/types';
+import type {
+  AgentStatus,
+  Anchor,
+  DiscussionMessage,
+  DocState,
+  ReviewData,
+  WorkspaceState,
+} from '@shared/types';
 import { makeAnchor } from '@shared/anchors';
 import { applyReplacement } from './editorBridge';
 
@@ -11,6 +18,7 @@ interface MarginState {
   doc: DocState | null;
   content: string;
   review: ReviewData | null;
+  discussion: DiscussionMessage[];
   mode: ViewMode;
   agent: AgentStatus;
   activity: string[];
@@ -83,6 +91,7 @@ export const useStore = create<MarginState>((set, get) => {
     doc: null,
     content: '',
     review: null,
+    discussion: [],
     mode: 'write',
     agent: { phase: 'idle', detail: '' },
     activity: [],
@@ -116,6 +125,7 @@ export const useStore = create<MarginState>((set, get) => {
           doc,
           content: doc.content,
           review: doc.review,
+          discussion: doc.discussion,
           agent: { phase: 'idle', detail: '' },
           activity: [],
           selection: null,
@@ -135,6 +145,7 @@ export const useStore = create<MarginState>((set, get) => {
         void get().loadWorkspace();
       });
       window.margin.onReviewUpdated((review) => set({ review }));
+      window.margin.onDiscussionUpdated((discussion) => set({ discussion }));
       window.margin.onAgentStatus((agent) => {
         set({ agent });
         if (agent.phase === 'done' || agent.phase === 'error') {
@@ -319,20 +330,18 @@ export const useStore = create<MarginState>((set, get) => {
 
     addDiscussionMessage: (text) => {
       if (!text.trim()) return;
-      updateReview((r) => ({
-        ...r,
-        discussion: [
-          ...r.discussion,
-          {
-            id: nanoid(8),
-            author: 'user' as const,
-            text: text.trim(),
-            createdAt: new Date().toISOString(),
-            round: r.round + 1, // sent with the next round
-            pending: true,
-          },
-        ],
-      }));
+      const discussion = [
+        ...get().discussion,
+        {
+          id: nanoid(8),
+          author: 'user' as const,
+          text: text.trim(),
+          createdAt: new Date().toISOString(),
+          pending: true,
+        },
+      ];
+      set({ discussion });
+      void window.margin.updateDiscussion(discussion);
     },
 
     submit: async () => {

@@ -300,6 +300,51 @@ hand-crafted review state — hero swaps light/dark with the visitor's theme.
 Regenerate by re-staging a demo folder and driving the app over CDP.
 `make site-dev` serves it locally.
 
+## 28. Skills come from the writing project, not the user account
+
+Empirically (tested via `claude -p --setting-sources`): with `settingSources:
+[]` only built-in skills load; user skills (`~/.claude/skills`, e.g. a
+`deslop` install) need `'user'`. Margin now runs review turns with
+`settingSources: ['project']` — a writing project can carry its own
+`.claude/skills/` and a project `CLAUDE.md` with per-project review
+instructions, without dragging in the global config. The agent triggers a
+skill from its description like any Claude Code session, or when you name it
+in the discussion ("run deslop before this round"). To use user-level skills
+without copying them into the project, flip this to `['user', 'project']` in
+`agent.ts` — the trade-off is your global CLAUDE.md entering review turns.
+
+## 29. Discussion is project-scoped
+
+Per your feedback: the discussion now lives at
+`<workspaceRoot>/.margin/discussion.json`, shared by every document in the
+workspace, surviving file switches. Legacy per-doc sidecar discussions are
+migrated in on first open. Messages lose their round number (rounds are
+per-document; the discussion isn't) — pending/queued semantics are unchanged
+and the agent's per-round closing message still posts here. Review turns now
+run with **cwd = workspace root**, the prompt names the document by relative
+path, and `@path/to/file.md` in discussion messages is documented to the
+agent as "read this file". Rounds themselves remain per-document ("Start
+round 1" on a fresh file is honest: that file's first round) — a
+project-wide round is a future step that needs cross-file suggestion UX.
+
+## 30. Suggestions render inline (Google Docs style); track-changes mode deferred
+
+Pending suggestions now display in the document itself: original struck
+through (red wash), replacement inserted after it (teal, underlined),
+clickable through to the sidebar card where Accept/Reject lives. This is
+display-only decoration — the file content is untouched until accept.
+
+The other half of your ask — a **suggesting-mode toggle where your own edits
+are captured as suggestions** (replacing the composer's Suggest tab, which
+you rightly don't love) — is deferred as the next significant editor work.
+Design sketch: a CM6 transaction filter that, when the toggle is on, lets
+insertions through but marks them as suggestion-insert ranges, cancels
+deletions and marks the range struck instead, then packages contiguous
+marked regions into `author: 'user'` suggestions on submit. The tricky parts
+are undo, edits inside your own pending insertions, and re-anchoring — it
+deserves a fresh session, not the tail of this one. The composer Suggest tab
+stays as a stopgap until then.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:

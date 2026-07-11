@@ -16,9 +16,7 @@ export function Toolbar() {
   const reviewModel = useStore((s) => s.reviewModel);
   const setReviewModel = useStore((s) => s.setReviewModel);
   const setSidebarTab = useStore((s) => s.setSidebarTab);
-  const queuedCount = useStore(
-    (s) => s.review?.discussion.filter((m) => m.pending).length ?? 0,
-  );
+  const queuedCount = useStore((s) => s.discussion.filter((m) => m.pending).length);
   const [submitOpen, setSubmitOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 

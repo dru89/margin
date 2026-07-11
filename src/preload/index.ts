@@ -1,5 +1,12 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
-import type { AgentStatus, DocState, RecentFile, ReviewData, WorkspaceState } from '@shared/types';
+import type {
+  AgentStatus,
+  DiscussionMessage,
+  DocState,
+  RecentFile,
+  ReviewData,
+  WorkspaceState,
+} from '@shared/types';
 import { IPC } from '@shared/ipc';
 
 function on<T extends unknown[]>(channel: string, cb: (...args: T) => void): () => void {
@@ -12,6 +19,8 @@ const api = {
   getDoc: (): Promise<DocState | null> => ipcRenderer.invoke(IPC.getDoc),
   saveDoc: (content: string): Promise<void> => ipcRenderer.invoke(IPC.saveDoc, content),
   updateReview: (review: ReviewData): Promise<void> => ipcRenderer.invoke(IPC.updateReview, review),
+  updateDiscussion: (messages: DiscussionMessage[]): Promise<void> =>
+    ipcRenderer.invoke(IPC.updateDiscussion, messages),
   submitReview: (content: string, review: ReviewData, model?: string): Promise<void> =>
     ipcRenderer.invoke(IPC.submitReview, content, review, model),
   cancelReview: (): Promise<void> => ipcRenderer.invoke(IPC.cancelReview),
@@ -31,6 +40,8 @@ const api = {
 
   onDocLoaded: (cb: (doc: DocState) => void) => on(IPC.docLoaded, cb),
   onReviewUpdated: (cb: (review: ReviewData) => void) => on(IPC.reviewUpdated, cb),
+  onDiscussionUpdated: (cb: (messages: DiscussionMessage[]) => void) =>
+    on(IPC.discussionUpdated, cb),
   onAgentStatus: (cb: (status: AgentStatus) => void) => on(IPC.agentStatus, cb),
   onAgentActivity: (cb: (detail: string) => void) => on(IPC.agentActivity, cb),
   onMenuSave: (cb: () => void) => on(IPC.menuSave, cb),

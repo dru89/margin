@@ -151,12 +151,14 @@ function buildReviewServer(sdk: AgentSdk, session: DocumentSession) {
 
 const SYSTEM_PROMPT = `You are a writing collaborator reviewing a markdown document inside a review app called Margin. You work in review rounds, like a pull-request review: the author edits, comments, and submits; you review and respond; the author decides what to take.
 
-The author also keeps a document-level discussion with you — framing for why
-the document exists, audience, goals, and general feedback that isn't tied to
-a text range. The discussion so far (with this round's new messages marked)
-is included in your task prompt. **Your final message is posted to that
-discussion as your reply** — answer new discussion messages there, and keep
-it in the author's register.
+The author also keeps a project-level discussion with you — framing for why
+these documents exist, audience, goals, and general feedback that isn't tied
+to a text range. It spans every document in the workspace; the author may
+reference files as @path (relative to the workspace root) — read them with
+the Read tool when they do. The discussion so far (with this round's new
+messages marked) is included in your task prompt. **Your final message is
+posted to that discussion as your reply** — answer new discussion messages
+there, and keep it in the author's register.
 
 How to work:
 1. Read the document with read_document, and the existing threads/suggestions with list_review_state.
@@ -178,16 +180,16 @@ When you are done, finish with a message for the discussion thread: respond
 to the author's new discussion messages (if any) and briefly summarize what
 you reviewed and changed.`;
 
-/** Render the discussion for the turn prompt, marking this round's messages. */
+/** Render the project discussion for the turn prompt, marking new messages. */
 function renderDiscussion(session: DocumentSession): string {
-  const messages = session.review.discussion.slice(-30);
+  const messages = session.discussion.messages.filter((m) => !m.pending).slice(-30);
   if (messages.length === 0) return '';
   const lines = messages.map((m) => {
     const who = m.author === 'user' ? 'Author' : 'You';
-    const isNew = m.author === 'user' && m.round === session.review.round;
-    return `${who}${isNew ? ' (new this round)' : ` (round ${m.round})`}: ${m.text}`;
+    const isNew = session.lastSubmittedMessageIds.has(m.id);
+    return `${who}${isNew ? ' (new this round)' : ' (earlier)'}: ${m.text}`;
   });
-  return `Document discussion so far:\n${lines.join('\n\n')}`;
+  return `Project discussion so far (spans all documents in this workspace):\n${lines.join('\n\n')}`;
 }
 
 /**
@@ -254,11 +256,12 @@ export async function runReviewTurn(
   }
   const sdk = await loadSdk();
   const server = buildReviewServer(sdk, session);
-  const dir = path.dirname(session.filePath);
+  const dir = session.workspaceRoot;
+  const relPath = path.relative(session.workspaceRoot, session.filePath);
 
   const promptParts = [
-    `Review round ${session.review.round} for "${session.fileName}".`,
-    'The author has submitted the document for review. Read it, address open comments, and make your suggestions.',
+    `Review round ${session.review.round} for "${relPath}" (your working directory is the workspace root).`,
+    'The author has submitted this document for review. Read it, address open comments, and make your suggestions.',
   ];
   const discussion = renderDiscussion(session);
   if (discussion) promptParts.push(discussion);

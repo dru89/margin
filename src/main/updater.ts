@@ -36,11 +36,25 @@ async function writePrefs(prefs: UpdaterPrefs): Promise<void> {
 }
 
 export async function initUpdater(): Promise<void> {
+  try {
+    await initUpdaterInner();
+  } catch {
+    // Updates are never worth breaking the app over.
+  }
+}
+
+async function initUpdaterInner(): Promise<void> {
   // electron-updater has no feed in dev and would just log errors.
   if (!app.isPackaged) return;
 
-  // ESM-only sibling of the Agent SDK situation — load dynamically.
-  const { autoUpdater } = await import('electron-updater');
+  // electron-updater is CJS with `autoUpdater` defined as a lazy getter, so
+  // a dynamic import only exposes it on the `default` namespace.
+  const mod = (await import('electron-updater')) as unknown as {
+    autoUpdater?: import('electron-updater').AppUpdater;
+    default?: { autoUpdater?: import('electron-updater').AppUpdater };
+  };
+  const autoUpdater = mod.default?.autoUpdater ?? mod.autoUpdater;
+  if (!autoUpdater) return;
 
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;

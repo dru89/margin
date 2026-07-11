@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '@/store';
+import { Md } from '@/components/Md';
 
 /**
- * Document-level conversation: framing, goals, general feedback. User
- * messages queue ("pending") and are sent with the next review round; the
- * agent's closing message each round appears here as its reply.
+ * Project-level conversation: framing, goals, general feedback, spanning all
+ * documents in the workspace. User messages queue ("pending") and are sent
+ * with the next review round; the agent's closing message each round appears
+ * here as its reply.
  */
 export function Discussion() {
-  const review = useStore((s) => s.review);
+  const messages = useStore((s) => s.discussion);
+  const rootName = useStore((s) => s.workspace?.rootName);
   const addDiscussionMessage = useStore((s) => s.addDiscussionMessage);
   const [text, setText] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
-
-  const messages = review?.discussion ?? [];
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
@@ -25,12 +26,16 @@ export function Discussion() {
 
   return (
     <div className="discussion">
+      <p className="discussion-scope">
+        Project discussion{rootName ? ` · ${rootName}` : ''} — shared across every document here.
+        Reference files as <code>@path/to/file.md</code>.
+      </p>
       {messages.length === 0 && (
         <div className="sidebar-empty">
           <p>No discussion yet.</p>
           <p className="hint">
-            Set the stage here — what this document is, who it's for, what good looks like.
-            Messages are sent with your next review round.
+            Set the stage — what this project is, who it's for, what good looks like. Messages
+            are sent with your next review round.
           </p>
         </div>
       )}
@@ -40,12 +45,17 @@ export function Discussion() {
             <div className="msg-head">
               <span className={`chip chip-${m.author}`}>{m.author === 'user' ? 'You' : 'Claude'}</span>
               {m.pending ? (
-                <span className="msg-queued">queued for round {m.round}</span>
+                <span className="msg-queued">queued for next round</span>
               ) : (
-                <span className="msg-round">round {m.round}</span>
+                <span className="msg-round">
+                  {new Date(m.createdAt).toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </span>
               )}
             </div>
-            <p className="msg-text">{m.text}</p>
+            <Md text={m.text} />
           </div>
         ))}
         <div ref={endRef} />

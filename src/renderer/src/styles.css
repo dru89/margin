@@ -314,12 +314,30 @@ kbd {
   background: var(--comment-wash);
   border-bottom: 2px solid var(--comment-edge);
 }
+/* preview-mode suggestion highlight (no inline diff there) */
 .anchor-suggestion {
   background: var(--agent-wash);
   border-bottom: 2px dotted var(--agent);
 }
+/* inline suggestion, Google-Docs style: struck original + inserted text */
+.anchor-suggestion-del {
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 60%, transparent);
+  text-decoration-thickness: 1.5px;
+}
+.anchor-suggestion-ins {
+  background: var(--agent-wash);
+  color: color-mix(in srgb, var(--agent) 70%, var(--ink));
+  border-bottom: 2px solid var(--agent);
+  border-radius: 2px;
+  padding: 0 1px;
+  cursor: pointer;
+}
 .anchor-active.anchor-comment { background: color-mix(in srgb, var(--comment-edge) 30%, transparent); }
 .anchor-active.anchor-suggestion { background: color-mix(in srgb, var(--agent) 25%, transparent); }
+.anchor-active.anchor-suggestion-del { background: color-mix(in srgb, var(--danger) 18%, transparent); }
+.anchor-active.anchor-suggestion-ins { background: color-mix(in srgb, var(--agent) 25%, transparent); }
 
 /* ——— preview ——— */
 
@@ -799,3 +817,10 @@ textarea::placeholder { color: var(--ink-faint); }
   background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover { background-color: var(--ink-faint); }
+
+.discussion-scope {
+  margin: 0 0 10px;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+.discussion-scope code { font-size: 0.95em; }

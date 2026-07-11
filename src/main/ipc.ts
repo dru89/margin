@@ -1,6 +1,6 @@
 import { BrowserWindow, ipcMain, shell } from 'electron';
 import path from 'path';
-import type { ReviewData } from '@shared/types';
+import type { DiscussionMessage, ReviewData } from '@shared/types';
 import { IPC } from '@shared/ipc';
 import { findSessionByPath, getSession } from './session';
 import { attachDocument, createWindow, openFile } from './windows';
@@ -26,6 +26,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.updateReview, async (event, review: ReviewData) => {
     await requireSession(event.sender.id).setReview(review);
+  });
+
+  ipcMain.handle(IPC.updateDiscussion, async (event, messages: DiscussionMessage[]) => {
+    await requireSession(event.sender.id).setDiscussion(messages);
   });
 
   ipcMain.handle(

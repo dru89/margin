@@ -1,6 +1,7 @@
 import {
   Decoration,
   EditorView,
+  WidgetType,
   keymap,
   placeholder,
   type DecorationSet,
@@ -17,10 +18,39 @@ export interface EditorAnnotation {
   from: number;
   to: number;
   kind: 'comment' | 'suggestion';
+  /** Suggestions render inline: original struck through, replacement after. */
+  replacement?: string;
   active: boolean;
 }
 
 export const setAnnotations = StateEffect.define<EditorAnnotation[]>();
+
+/** The inserted-text half of an inline suggestion (Google-Docs style). */
+class ReplacementWidget extends WidgetType {
+  constructor(
+    private readonly id: string,
+    private readonly text: string,
+    private readonly active: boolean,
+  ) {
+    super();
+  }
+
+  eq(other: ReplacementWidget): boolean {
+    return other.id === this.id && other.text === this.text && other.active === this.active;
+  }
+
+  toDOM(): HTMLElement {
+    const span = document.createElement('span');
+    span.className = `anchor anchor-suggestion-ins${this.active ? ' anchor-active' : ''}`;
+    span.dataset.anchorId = this.id;
+    span.textContent = this.text;
+    return span;
+  }
+
+  ignoreEvent(): boolean {
+    return false; // let mousedown reach the anchor-click handler
+  }
+}
 
 function buildDecorations(annotations: EditorAnnotation[], docLength: number): DecorationSet {
   const valid = annotations
@@ -28,15 +58,37 @@ function buildDecorations(annotations: EditorAnnotation[], docLength: number): D
     .filter((a) => a.from < a.to)
     .sort((a, b) => a.from - b.from || a.to - b.to);
   const builder = new RangeSetBuilder<Decoration>();
+  let lastEnd = -1;
   for (const a of valid) {
-    builder.add(
-      a.from,
-      a.to,
-      Decoration.mark({
-        class: `anchor anchor-${a.kind}${a.active ? ' anchor-active' : ''}`,
-        attributes: { 'data-anchor-id': a.id },
-      }),
-    );
+    if (a.from < lastEnd) continue; // overlapping anchors: first one wins
+    const active = a.active ? ' anchor-active' : '';
+    if (a.kind === 'suggestion') {
+      builder.add(
+        a.from,
+        a.to,
+        Decoration.mark({
+          class: `anchor anchor-suggestion-del${active}`,
+          attributes: { 'data-anchor-id': a.id },
+        }),
+      );
+      if (a.replacement) {
+        builder.add(
+          a.to,
+          a.to,
+          Decoration.widget({ widget: new ReplacementWidget(a.id, a.replacement, a.active), side: 1 }),
+        );
+      }
+    } else {
+      builder.add(
+        a.from,
+        a.to,
+        Decoration.mark({
+          class: `anchor anchor-comment${active}`,
+          attributes: { 'data-anchor-id': a.id },
+        }),
+      );
+    }
+    lastEnd = a.to;
   }
   return builder.finish();
 }

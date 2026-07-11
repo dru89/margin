@@ -64,6 +64,7 @@ export function EditorPane() {
           from: s.anchor.from,
           to: s.anchor.to,
           kind: 'suggestion',
+          replacement: s.replacement,
           active: s.id === activeAnchorId,
         });
       }

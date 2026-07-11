@@ -67,6 +67,11 @@ npx electron . --remote-debugging-port=9224 "path/to/doc.md" &   # background
 - IPC channel names live in `src/shared/ipc.ts`; payload types in
   `src/shared/types.ts`. Preload exposes everything as `window.margin`
   (typed via `src/preload/index.d.ts`). Add new channels in all three places.
+- **Discussion is project-scoped** (`<workspaceRoot>/.margin/discussion.json`,
+  shared across documents); review threads/suggestions are per-document
+  sidecars. Review turns run with cwd = workspace root and
+  `settingSources: ['project']` (project skills + CLAUDE.md load; user-level
+  config does not — DECISIONS.md §28-29).
 - **Review-state ownership:** the renderer owns `content` + `review` while
   the user edits (autosave persists through IPC); the main process owns them
   during an agent round (renderer locks itself via `agent.phase ===

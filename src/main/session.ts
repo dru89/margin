@@ -2,9 +2,17 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { nanoid } from 'nanoid';
 import type { BrowserWindow } from 'electron';
-import type { AgentStatus, DocState, ReviewData } from '@shared/types';
+import type {
+  AgentStatus,
+  DiscussionData,
+  DiscussionMessage,
+  DocState,
+  ReviewData,
+} from '@shared/types';
 import { IPC } from '@shared/ipc';
 import { loadReview, saveReview } from './reviewStore';
+import { loadDiscussion, saveDiscussion } from './discussionStore';
+import { findWorkspaceRoot } from './workspace';
 import { commitCheckpoint, isInRepo } from './git';
 import { runReviewTurn, type ActiveTurn } from './agent';
 
@@ -15,11 +23,15 @@ import { runReviewTurn, type ActiveTurn } from './agent';
  */
 export class DocumentSession {
   private activeTurn: ActiveTurn | null = null;
+  /** Ids of discussion messages submitted with the round in flight. */
+  public lastSubmittedMessageIds: Set<string> = new Set();
 
   private constructor(
     public readonly filePath: string,
+    public readonly workspaceRoot: string,
     public content: string,
     public review: ReviewData,
+    public discussion: DiscussionData,
     public inGitRepo: boolean,
     private readonly win: BrowserWindow,
   ) {}
@@ -28,7 +40,10 @@ export class DocumentSession {
     const content = await fs.readFile(filePath, 'utf8');
     const review = await loadReview(filePath, content);
     const inRepo = await isInRepo(filePath);
-    return new DocumentSession(filePath, content, review, inRepo, win);
+    const root = await findWorkspaceRoot(filePath);
+    // Migrate any legacy per-doc discussion into the project-scoped store.
+    const discussion = await loadDiscussion(root, review.discussion);
+    return new DocumentSession(filePath, root, content, review, discussion, inRepo, win);
   }
 
   get fileName(): string {
@@ -41,8 +56,21 @@ export class DocumentSession {
       fileName: this.fileName,
       content: this.content,
       review: this.review,
+      discussion: this.discussion.messages,
+      workspaceRoot: this.workspaceRoot,
       inGitRepo: this.inGitRepo,
     };
+  }
+
+  async setDiscussion(messages: DiscussionMessage[]): Promise<void> {
+    this.discussion.messages = messages;
+    await saveDiscussion(this.workspaceRoot, this.discussion);
+  }
+
+  async mutateDiscussion(fn: (d: DiscussionData) => void): Promise<void> {
+    fn(this.discussion);
+    await saveDiscussion(this.workspaceRoot, this.discussion);
+    this.sendToRenderer(IPC.discussionUpdated, this.discussion.messages);
   }
 
   async saveContent(content: string): Promise<void> {
@@ -80,14 +108,16 @@ export class DocumentSession {
     await this.setReview(review);
 
     this.review.round += 1;
-    // Queued discussion messages become part of this round.
-    for (const m of this.review.discussion) {
-      if (m.pending) {
-        m.pending = false;
-        m.round = this.review.round;
-      }
-    }
     await saveReview(this.filePath, this.review);
+    // Queued project-discussion messages ride along with this round.
+    this.lastSubmittedMessageIds = new Set(
+      this.discussion.messages.filter((m) => m.pending).map((m) => m.id),
+    );
+    await this.mutateDiscussion((d) => {
+      for (const m of d.messages) {
+        if (m.pending) m.pending = false;
+      }
+    });
     this.sendToRenderer(IPC.reviewUpdated, this.review);
 
     if (this.inGitRepo) {
@@ -113,14 +143,13 @@ export class DocumentSession {
       );
       this.activeTurn = turn;
       const summary = await turn.done;
-      // The agent's closing message is its reply in the document discussion.
-      await this.mutateReview((r) => {
-        r.discussion.push({
+      // The agent's closing message is its reply in the project discussion.
+      await this.mutateDiscussion((d) => {
+        d.messages.push({
           id: nanoid(8),
           author: 'agent',
           text: summary,
           createdAt: new Date().toISOString(),
-          round: r.round,
         });
       });
       if (this.inGitRepo) {

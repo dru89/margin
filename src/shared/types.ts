@@ -62,10 +62,16 @@ export interface DiscussionMessage {
   author: Author;
   text: string;
   createdAt: string;
-  /** The round this message was part of. */
-  round: number;
+  /** Legacy (pre project-scope): the per-document round it was sent with. */
+  round?: number;
   /** Composed but not yet submitted with a round. */
   pending?: boolean;
+}
+
+/** Project-scoped discussion, stored at <workspaceRoot>/.margin/discussion.json. */
+export interface DiscussionData {
+  version: 1;
+  messages: DiscussionMessage[];
 }
 
 export interface ReviewData {
@@ -76,6 +82,7 @@ export interface ReviewData {
   round: number;
   comments: CommentThread[];
   suggestions: Suggestion[];
+  /** Legacy location — discussion is project-scoped now (DiscussionData). */
   discussion: DiscussionMessage[];
 }
 
@@ -84,6 +91,9 @@ export interface DocState {
   fileName: string;
   content: string;
   review: ReviewData;
+  /** Project-scoped discussion (shared across all documents in the workspace). */
+  discussion: DiscussionMessage[];
+  workspaceRoot: string;
   /** True when the document lives inside a git repository. */
   inGitRepo: boolean;
 }

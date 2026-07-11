@@ -4,6 +4,7 @@ export const IPC = {
   getDoc: 'doc:get',
   saveDoc: 'doc:save',
   updateReview: 'doc:update-review',
+  updateDiscussion: 'doc:update-discussion',
   submitReview: 'doc:submit-review',
   cancelReview: 'doc:cancel-review',
   openFileDialog: 'app:open-file-dialog',
@@ -20,6 +21,7 @@ export const IPC = {
   // main -> renderer (send)
   docLoaded: 'doc:loaded',
   reviewUpdated: 'doc:review-updated',
+  discussionUpdated: 'doc:discussion-updated',
   agentStatus: 'agent:status',
   agentActivity: 'agent:activity',
   menuSave: 'menu:save',
