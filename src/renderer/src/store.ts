@@ -9,7 +9,7 @@ import type {
   ReviewData,
   WorkspaceState,
 } from '@shared/types';
-import { makeAnchor } from '@shared/anchors';
+import { makeAnchor, resolveQuote } from '@shared/anchors';
 import { applyReplacement } from './editorBridge';
 
 export type ViewMode = 'write' | 'preview';
@@ -36,6 +36,9 @@ interface MarginState {
   setMode: (mode: ViewMode) => void;
   handleDocChange: (content: string, changes: ChangeDesc) => void;
   setSelection: (sel: { from: number; to: number } | null) => void;
+  /** Text selected in rendered preview (mapped to source by quote). */
+  previewQuote: string | null;
+  setPreviewQuote: (quote: string | null) => void;
   setActiveAnchor: (id: string | null) => void;
   openComposer: () => void;
   closeComposer: () => void;
@@ -190,13 +193,27 @@ export const useStore = create<MarginState>((set, get) => {
     },
 
     setSelection: (selection) => set({ selection }),
+    previewQuote: null,
+    setPreviewQuote: (previewQuote) => set({ previewQuote }),
     // Focusing an anchor always brings the Review tab forward so the card is
     // actually visible (Sidebar scrolls it into view via activeAnchorId).
     setActiveAnchor: (activeAnchorId) =>
       set(activeAnchorId ? { activeAnchorId, sidebarTab: 'review' } : { activeAnchorId }),
 
     openComposer: () => {
-      const { selection, content } = get();
+      const { selection, content, mode, previewQuote } = get();
+      if (mode === 'preview') {
+        // Rendered text loses source offsets — re-locate the quote in the
+        // source. Selections that cross markdown formatting won't resolve.
+        const quote = previewQuote?.trim();
+        const found = quote ? resolveQuote(content, quote) : null;
+        if (!found) return;
+        set({
+          sidebarTab: 'review',
+          composerAnchor: { from: found.from, to: found.to, quote: content.slice(found.from, found.to) },
+        });
+        return;
+      }
       if (!selection || selection.from === selection.to) return;
       set({
         sidebarTab: 'review',

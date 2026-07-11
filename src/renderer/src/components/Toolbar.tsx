@@ -8,6 +8,7 @@ export function Toolbar() {
   const mode = useStore((s) => s.mode);
   const setMode = useStore((s) => s.setMode);
   const selection = useStore((s) => s.selection);
+  const previewQuote = useStore((s) => s.previewQuote);
   const openComposer = useStore((s) => s.openComposer);
   const submit = useStore((s) => s.submit);
   const dirty = useStore((s) => s.dirty);
@@ -69,7 +70,7 @@ export function Toolbar() {
       <div className="toolbar-right">
         <button
           className="btn"
-          disabled={!selection || locked || mode !== 'write'}
+          disabled={locked || (mode === 'write' ? !selection : !previewQuote)}
           title="Comment on selection (Cmd/Ctrl+M)"
           onClick={openComposer}
         >

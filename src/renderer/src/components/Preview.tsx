@@ -15,6 +15,7 @@ export function Preview() {
   const review = useStore((s) => s.review);
   const activeAnchorId = useStore((s) => s.activeAnchorId);
   const setActiveAnchor = useStore((s) => s.setActiveAnchor);
+  const setPreviewQuote = useStore((s) => s.setPreviewQuote);
   const ref = useRef<HTMLDivElement>(null);
 
   const anchors = useMemo(() => {
@@ -72,6 +73,7 @@ export function Preview() {
           const hit = (e.target as HTMLElement).closest<HTMLElement>('[data-anchor-id]');
           if (hit) setActiveAnchor(hit.dataset.anchorId!);
         }}
+        onMouseUp={() => setPreviewQuote(window.getSelection()?.toString() ?? null)}
       >
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
       </article>
