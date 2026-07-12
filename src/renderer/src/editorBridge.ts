@@ -22,7 +22,8 @@ export function revealRange(from: number, to: number): void {
   const b = Math.min(to, len);
   view.dispatch({
     selection: { anchor: a, head: b },
-    effects: EditorView.scrollIntoView(a, { y: 'center' }),
+    // Spec §2 scroll choreography: anchor lands 96px from the top.
+    effects: EditorView.scrollIntoView(a, { y: 'start', yMargin: 96 }),
   });
   view.focus();
 }

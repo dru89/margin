@@ -122,7 +122,10 @@ export class DocumentSession {
 
     if (this.inGitRepo) {
       try {
-        await commitCheckpoint(this.filePath, `Review round ${this.review.round}: submitted`);
+        await commitCheckpoint(
+          this.filePath,
+          `Review round ${this.review.round} (${this.fileName}): submitted`,
+        );
       } catch (err) {
         // A failed checkpoint shouldn't block the review; surface it as activity.
         this.sendToRenderer(IPC.agentActivity, `git checkpoint failed: ${String(err)}`);
@@ -154,7 +157,10 @@ export class DocumentSession {
       });
       if (this.inGitRepo) {
         try {
-          await commitCheckpoint(this.filePath, `Review round ${this.review.round}: agent review`);
+          await commitCheckpoint(
+            this.filePath,
+            `Review round ${this.review.round} (${this.fileName}): agent review`,
+          );
         } catch {
           /* nothing new to commit is fine */
         }

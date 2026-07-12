@@ -61,6 +61,9 @@ npx electron . --remote-debugging-port=9224 "path/to/doc.md" &   # background
 - **CodeMirror theme injection wins over the stylesheet** for same-specificity
   rules (CM injects later). If a CM default style won't die, remove the
   extension (as done for `highlightActiveLine`) or raise specificity.
+- **Never return a fresh array/object from a zustand selector**
+  (`useStore((s) => s.x.filter(...))`) — it re-renders forever and blanks the
+  app with React #185. Select the stable reference, derive after.
 
 ## Conventions
 

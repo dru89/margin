@@ -5,7 +5,7 @@ import { IPC } from '@shared/ipc';
 import { findSessionByPath, getSession } from './session';
 import { attachDocument, createWindow, openFile } from './windows';
 import { showOpenDialog, showOpenFolderDialog } from './menu';
-import { fileLog, initRepo, isInRepo } from './git';
+import { commitCheckpoint, fileLog, initRepo, isInRepo, restoreFromCommit } from './git';
 import { getWorkspace } from './workspace';
 import { getRecentFiles } from './recents';
 
@@ -84,6 +84,20 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.openFolderDialog, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;
     await showOpenFolderDialog(win);
+  });
+
+  // Restore doc + sidecar to a commit; checkpoint first so it's reversible.
+  ipcMain.handle(IPC.gitRestore, async (event, hash: string) => {
+    const session = requireSession(event.sender.id);
+    if (!session.inGitRepo) throw new Error('Not in a git repository');
+    try {
+      await commitCheckpoint(session.filePath, `Checkpoint before restoring ${hash}`);
+    } catch {
+      /* nothing to checkpoint is fine */
+    }
+    await restoreFromCommit(session.filePath, hash);
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) await attachDocument(win, session.filePath); // reload from disk
   });
 
   ipcMain.handle(IPC.getWorkspace, async (event) => {

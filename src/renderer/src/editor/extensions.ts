@@ -6,10 +6,16 @@ import {
   placeholder,
   type DecorationSet,
 } from '@codemirror/view';
-import { EditorState, RangeSetBuilder, StateEffect, StateField, Compartment } from '@codemirror/state';
+import {
+  EditorState,
+  RangeSetBuilder,
+  StateEffect,
+  StateField,
+  Compartment,
+} from '@codemirror/state';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
-import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
 import { tags as t } from '@lezer/highlight';
 
@@ -20,39 +26,96 @@ export interface EditorAnnotation {
   kind: 'comment' | 'suggestion';
   /** Suggestions render inline: original struck through, replacement after. */
   replacement?: string;
+  /** Pinned (clicked) — the spec's "active" step. */
   active: boolean;
+  /** Hovered on either side of the pair — the spec's "hot" step. */
+  hot: boolean;
 }
 
 export const setAnnotations = StateEffect.define<EditorAnnotation[]>();
 
-/** The inserted-text half of an inline suggestion (Google-Docs style). */
+function pairClasses(a: EditorAnnotation): string {
+  return `${a.active ? ' pair-active' : ''}${a.hot ? ' pair-hot' : ''}`;
+}
+
+/**
+ * Markdown context classes at a position (heading level, emphasis), so the
+ * inserted half of an inline suggestion renders like the text it replaces.
+ */
+function contextClasses(state: EditorState, pos: number): string {
+  let classes = '';
+  const tree = syntaxTree(state);
+  let node: ReturnType<typeof tree.resolveInner> | null = tree.resolveInner(pos, 1);
+  while (node) {
+    const m = /^(ATXHeading|SetextHeading)([1-6])/.exec(node.name);
+    if (m) classes += ` md-h${m[2]}`;
+    if (node.name === 'StrongEmphasis') classes += ' md-strong';
+    if (node.name === 'Emphasis') classes += ' md-em';
+    if (node.name === 'Blockquote') classes += ' md-quote';
+    node = node.parent;
+  }
+  return classes;
+}
+
+/**
+ * The inserted-text half of an inline suggestion, with the in-situ
+ * accept/reject pill (spec §3). Buttons carry data-action; the editor's
+ * mousedown handler routes them.
+ */
 class ReplacementWidget extends WidgetType {
   constructor(
     private readonly id: string,
     private readonly text: string,
-    private readonly active: boolean,
+    private readonly stateClasses: string,
+    private readonly mdClasses: string,
   ) {
     super();
   }
 
   eq(other: ReplacementWidget): boolean {
-    return other.id === this.id && other.text === this.text && other.active === this.active;
+    return (
+      other.id === this.id &&
+      other.text === this.text &&
+      other.stateClasses === this.stateClasses &&
+      other.mdClasses === this.mdClasses
+    );
   }
 
   toDOM(): HTMLElement {
-    const span = document.createElement('span');
-    span.className = `anchor anchor-suggestion-ins${this.active ? ' anchor-active' : ''}`;
-    span.dataset.anchorId = this.id;
-    span.textContent = this.text;
-    return span;
+    const wrap = document.createElement('span');
+    wrap.className = `suggest-ins-wrap${this.stateClasses}`;
+    wrap.dataset.anchorId = this.id;
+
+    const ins = document.createElement('span');
+    ins.className = `anchor anchor-suggestion-ins${this.mdClasses}${this.stateClasses}`;
+    ins.dataset.anchorId = this.id;
+    ins.textContent = this.text;
+    wrap.appendChild(ins);
+
+    const pill = document.createElement('span');
+    pill.className = 'suggest-pill';
+    const accept = document.createElement('button');
+    accept.className = 'pill-accept';
+    accept.textContent = 'Accept';
+    accept.dataset.anchorId = this.id;
+    accept.dataset.action = 'accept';
+    const reject = document.createElement('button');
+    reject.className = 'pill-reject';
+    reject.textContent = 'Reject';
+    reject.dataset.anchorId = this.id;
+    reject.dataset.action = 'reject';
+    pill.append(accept, reject);
+    wrap.appendChild(pill);
+    return wrap;
   }
 
   ignoreEvent(): boolean {
-    return false; // let mousedown reach the anchor-click handler
+    return false; // route clicks through the editor's dom handlers
   }
 }
 
-function buildDecorations(annotations: EditorAnnotation[], docLength: number): DecorationSet {
+function buildDecorations(annotations: EditorAnnotation[], state: EditorState): DecorationSet {
+  const docLength = state.doc.length;
   const valid = annotations
     .map((a) => ({ ...a, from: Math.max(0, a.from), to: Math.min(a.to, docLength) }))
     .filter((a) => a.from < a.to)
@@ -61,13 +124,13 @@ function buildDecorations(annotations: EditorAnnotation[], docLength: number): D
   let lastEnd = -1;
   for (const a of valid) {
     if (a.from < lastEnd) continue; // overlapping anchors: first one wins
-    const active = a.active ? ' anchor-active' : '';
+    const stateCls = pairClasses(a);
     if (a.kind === 'suggestion') {
       builder.add(
         a.from,
         a.to,
         Decoration.mark({
-          class: `anchor anchor-suggestion-del${active}`,
+          class: `anchor anchor-suggestion-del${stateCls}`,
           attributes: { 'data-anchor-id': a.id },
         }),
       );
@@ -75,7 +138,10 @@ function buildDecorations(annotations: EditorAnnotation[], docLength: number): D
         builder.add(
           a.to,
           a.to,
-          Decoration.widget({ widget: new ReplacementWidget(a.id, a.replacement, a.active), side: 1 }),
+          Decoration.widget({
+            widget: new ReplacementWidget(a.id, a.replacement, stateCls, contextClasses(state, a.from)),
+            side: 1,
+          }),
         );
       }
     } else {
@@ -83,7 +149,7 @@ function buildDecorations(annotations: EditorAnnotation[], docLength: number): D
         a.from,
         a.to,
         Decoration.mark({
-          class: `anchor anchor-comment${active}`,
+          class: `anchor anchor-comment${stateCls}`,
           attributes: { 'data-anchor-id': a.id },
         }),
       );
@@ -93,18 +159,24 @@ function buildDecorations(annotations: EditorAnnotation[], docLength: number): D
   return builder.finish();
 }
 
-const annotationsField = StateField.define<DecorationSet>({
-  create: () => Decoration.none,
-  update(deco, tr) {
+const annotationsField = StateField.define<{ anns: EditorAnnotation[]; deco: DecorationSet }>({
+  create: () => ({ anns: [], deco: Decoration.none }),
+  update(value, tr) {
+    let { anns, deco } = value;
     deco = deco.map(tr.changes);
+    let rebuilt = false;
     for (const effect of tr.effects) {
       if (effect.is(setAnnotations)) {
-        deco = buildDecorations(effect.value, tr.state.doc.length);
+        anns = effect.value;
+        rebuilt = true;
       }
     }
-    return deco;
+    if (rebuilt || tr.docChanged) {
+      deco = buildDecorations(anns, tr.state);
+    }
+    return { anns, deco };
   },
-  provide: (f) => EditorView.decorations.from(f),
+  provide: (f) => EditorView.decorations.from(f, (v) => v.deco),
 });
 
 const markdownHighlight = HighlightStyle.define([
@@ -129,7 +201,9 @@ export const readOnlyCompartment = new Compartment();
 export interface EditorCallbacks {
   onChange: (content: string, changes: import('@codemirror/state').ChangeDesc) => void;
   onSelectionChange: (sel: { from: number; to: number } | null) => void;
-  onAnchorClick: (id: string) => void;
+  onAnchorClick: (id: string | null) => void;
+  onAnchorHover: (id: string | null) => void;
+  onSuggestionAction: (id: string, action: 'accept' | 'reject') => void;
 }
 
 export function createExtensions(callbacks: EditorCallbacks) {
@@ -157,8 +231,28 @@ export function createExtensions(callbacks: EditorCallbacks) {
     }),
     EditorView.domEventHandlers({
       mousedown: (event) => {
-        const target = (event.target as HTMLElement).closest('[data-anchor-id]');
-        if (target) callbacks.onAnchorClick(target.getAttribute('data-anchor-id')!);
+        const el = event.target as HTMLElement;
+        const action = el.closest<HTMLElement>('[data-action]');
+        if (action) {
+          event.preventDefault();
+          callbacks.onSuggestionAction(
+            action.dataset.anchorId!,
+            action.dataset.action as 'accept' | 'reject',
+          );
+          return true;
+        }
+        const target = el.closest<HTMLElement>('[data-anchor-id]');
+        callbacks.onAnchorClick(target?.dataset.anchorId ?? null);
+        return false;
+      },
+      mouseover: (event) => {
+        const target = (event.target as HTMLElement).closest<HTMLElement>('[data-anchor-id]');
+        if (target) callbacks.onAnchorHover(target.dataset.anchorId!);
+        return false;
+      },
+      mouseout: (event) => {
+        const target = (event.target as HTMLElement).closest<HTMLElement>('[data-anchor-id]');
+        if (target) callbacks.onAnchorHover(null);
         return false;
       },
     }),

@@ -345,6 +345,60 @@ are undo, edits inside your own pending insertions, and re-anchoring — it
 deserves a fresh session, not the tail of this one. The composer Suggest tab
 stays as a stopgap until then.
 
+## 31. Claude Design refresh implemented as specced (2026-07-12)
+
+The "One desk, one queue, one identity per thread" spec is implemented
+nearly verbatim: discussion dock (collapsed preview line, expand-in-place,
+composer always visible, queued-count chip, dashed queued cards with ✕),
+pair model for linked selection (shared hue, 3px card spine, rest/hot/active
+wash steps on both members, Esc/click-away unpins, 96px scroll landing),
+slim suggestion cards (¶-locator from the nearest heading, ellipsized
+context line, no diff block — the document is the diff), in-situ accept
+pill on the inline suggestion, the status-chip grammar (neutral round chip,
+warn "No repo · Initialize", agent/danger chips in a 32px status strip),
+48px identity/actions toolbar, submit-popover manifest ("Goes with this
+round" + "Send round N →" + the nothing-sends-live hint), glyph empty
+states, welcome tweaks. Not implemented from the spec: accept/collapse
+animations (160/240ms transitions — polish later) and per-project dock
+persistence is localStorage keyed by workspace root.
+
+## 32. @file and /skill completions in composers
+
+All prose-to-Claude textareas (dock composer, comment composer, replies,
+reject notes) are a shared MentionTextarea: `@` completes workspace file
+paths, `/` at start of message/line completes project skill names
+(`<root>/.claude/skills/`). These are prompt conventions, not protocol —
+the turn prompt tells the agent @path means "read this file" and /name
+means "invoke this skill".
+
+## 33. Rounds stay — as metadata, not identity
+
+Questioned 2026-07-12: is the round number worth tracking? Kept, three
+reasons: it names the submit contract ("Send round 3 →" is a clearer promise
+than "Submit"), it labels the checkpoint pairs in git history, and it powers
+"new this round" marking in the agent prompt. But it's demoted visually to a
+neutral chip per the design spec — blue was wrong, it's metadata, not
+authorship. Not added: per-file "last reviewed" timestamps (derivable from
+git and the discussion dates; add UI only if the need shows up in use).
+
+## 34. Git usage, stated plainly + restore
+
+How Margin uses git today: **automatic commits happen only around review
+rounds** — one before the agent runs ("Review round N (file.md): submitted",
+now with the filename since discussion went project-wide) and one after
+("… agent review"), both scoped to the document + its sidecar. Manual saves
+never commit; edits between rounds ride along in the next round's
+"submitted" checkpoint. Everything else (other files, pushes) is the
+author's own git.
+
+New: **Restore** in the History popover — checkpoints the current state
+("Checkpoint before restoring <hash>"), then checks out the doc + sidecar
+from the chosen commit and reloads the session, so every restore is
+reversible from the same menu. Known gap for a future session: no file
+watching — if the doc changes on disk outside Margin while it's open, the
+session doesn't notice until reopen (autosave can clobber the external
+edit).
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:

@@ -155,7 +155,9 @@ The author also keeps a project-level discussion with you — framing for why
 these documents exist, audience, goals, and general feedback that isn't tied
 to a text range. It spans every document in the workspace; the author may
 reference files as @path (relative to the workspace root) — read them with
-the Read tool when they do. The discussion so far (with this round's new
+the Read tool when they do. If the author writes /name (e.g. "/deslop this
+before the next round"), that names a skill — invoke the skill with that
+name and apply it as instructed. The discussion so far (with this round's new
 messages marked) is included in your task prompt. **Your final message is
 posted to that discussion as your reply** — answer new discussion messages
 there, and keep it in the author's register.

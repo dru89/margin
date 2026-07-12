@@ -30,6 +30,7 @@ const api = {
   gitInit: (): Promise<boolean> => ipcRenderer.invoke(IPC.gitInit),
   gitLog: (): Promise<{ hash: string; date: string; message: string }[]> =>
     ipcRenderer.invoke(IPC.gitLog),
+  gitRestore: (hash: string): Promise<void> => ipcRenderer.invoke(IPC.gitRestore, hash),
   getWorkspace: (): Promise<WorkspaceState | null> => ipcRenderer.invoke(IPC.getWorkspace),
   getRecents: (): Promise<RecentFile[]> => ipcRenderer.invoke(IPC.getRecents),
   openExternal: (filePath: string): Promise<void> => ipcRenderer.invoke(IPC.openExternal, filePath),

@@ -16,12 +16,21 @@ export function EditorPane() {
   const filePath = useStore((s) => s.doc?.filePath);
   const review = useStore((s) => s.review);
   const activeAnchorId = useStore((s) => s.activeAnchorId);
+  const hoveredAnchorId = useStore((s) => s.hoveredAnchorId);
   const locked = useLocked();
 
   // Create the editor once per document.
   useEffect(() => {
     if (!containerRef.current) return;
-    const { content, handleDocChange, setSelection, setActiveAnchor } = useStore.getState();
+    const {
+      content,
+      handleDocChange,
+      setSelection,
+      setActiveAnchor,
+      setHoveredAnchor,
+      acceptSuggestion,
+      rejectSuggestion,
+    } = useStore.getState();
     const view = new EditorView({
       state: EditorState.create({
         doc: content,
@@ -29,6 +38,12 @@ export function EditorPane() {
           onChange: handleDocChange,
           onSelectionChange: setSelection,
           onAnchorClick: setActiveAnchor,
+          onAnchorHover: setHoveredAnchor,
+          onSuggestionAction: (id, action) => {
+            if (useStore.getState().agent.phase === 'running') return;
+            if (action === 'accept') acceptSuggestion(id);
+            else rejectSuggestion(id);
+          },
         }),
       }),
       parent: containerRef.current,
@@ -43,6 +58,15 @@ export function EditorPane() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filePath]);
 
+  // Esc unpins the active pair (spec §2).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') useStore.getState().setActiveAnchor(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const annotations = useMemo<EditorAnnotation[]>(() => {
     if (!review) return [];
     const anns: EditorAnnotation[] = [];
@@ -54,6 +78,7 @@ export function EditorPane() {
           to: c.anchor.to,
           kind: 'comment',
           active: c.id === activeAnchorId,
+          hot: c.id === hoveredAnchorId,
         });
       }
     }
@@ -66,11 +91,12 @@ export function EditorPane() {
           kind: 'suggestion',
           replacement: s.replacement,
           active: s.id === activeAnchorId,
+          hot: s.id === hoveredAnchorId,
         });
       }
     }
     return anns;
-  }, [review, activeAnchorId]);
+  }, [review, activeAnchorId, hoveredAnchorId]);
 
   useEffect(() => {
     viewRef.current?.dispatch({ effects: setAnnotations.of(annotations) });

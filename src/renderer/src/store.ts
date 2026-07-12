@@ -51,9 +51,13 @@ interface MarginState {
   save: () => Promise<void>;
   reviewModel: string | undefined;
   setReviewModel: (model: string | undefined) => void;
-  sidebarTab: 'review' | 'discussion';
-  setSidebarTab: (tab: 'review' | 'discussion') => void;
+  hoveredAnchorId: string | null;
+  setHoveredAnchor: (id: string | null) => void;
+  /** Discussion dock expanded/collapsed (persisted per workspace). */
+  dockOpen: boolean;
+  toggleDock: () => void;
   addDiscussionMessage: (text: string) => void;
+  removeDiscussionMessage: (id: string) => void;
   submit: () => Promise<void>;
   cancelReview: () => Promise<void>;
 }
@@ -125,6 +129,7 @@ export const useStore = create<MarginState>((set, get) => {
 
       const load = (doc: DocState) =>
         set({
+          dockOpen: localStorage.getItem(`margin-dock-open:${doc.workspaceRoot}`) === 'true',
           doc,
           content: doc.content,
           review: doc.review,
@@ -195,10 +200,7 @@ export const useStore = create<MarginState>((set, get) => {
     setSelection: (selection) => set({ selection }),
     previewQuote: null,
     setPreviewQuote: (previewQuote) => set({ previewQuote }),
-    // Focusing an anchor always brings the Review tab forward so the card is
-    // actually visible (Sidebar scrolls it into view via activeAnchorId).
-    setActiveAnchor: (activeAnchorId) =>
-      set(activeAnchorId ? { activeAnchorId, sidebarTab: 'review' } : { activeAnchorId }),
+    setActiveAnchor: (activeAnchorId) => set({ activeAnchorId }),
 
     openComposer: () => {
       const { selection, content, mode, previewQuote } = get();
@@ -209,14 +211,12 @@ export const useStore = create<MarginState>((set, get) => {
         const found = quote ? resolveQuote(content, quote) : null;
         if (!found) return;
         set({
-          sidebarTab: 'review',
           composerAnchor: { from: found.from, to: found.to, quote: content.slice(found.from, found.to) },
         });
         return;
       }
       if (!selection || selection.from === selection.to) return;
       set({
-        sidebarTab: 'review',
         composerAnchor: {
           from: selection.from,
           to: selection.to,
@@ -342,8 +342,21 @@ export const useStore = create<MarginState>((set, get) => {
 
     reviewModel: undefined,
     setReviewModel: (reviewModel) => set({ reviewModel }),
-    sidebarTab: 'review',
-    setSidebarTab: (sidebarTab) => set({ sidebarTab }),
+    hoveredAnchorId: null,
+    setHoveredAnchor: (hoveredAnchorId) => set({ hoveredAnchorId }),
+    dockOpen: false,
+    toggleDock: () => {
+      const { doc, dockOpen } = get();
+      const next = !dockOpen;
+      set({ dockOpen: next });
+      if (doc) localStorage.setItem(`margin-dock-open:${doc.workspaceRoot}`, String(next));
+    },
+
+    removeDiscussionMessage: (id) => {
+      const discussion = get().discussion.filter((m) => !(m.id === id && m.pending));
+      set({ discussion });
+      void window.margin.updateDiscussion(discussion);
+    },
 
     addDiscussionMessage: (text) => {
       if (!text.trim()) return;

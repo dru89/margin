@@ -125,6 +125,8 @@ export interface WorkspaceState {
   root: string;
   rootName: string;
   files: WorkspaceFile[];
+  /** Project skill names from <root>/.claude/skills/. */
+  skills: string[];
 }
 
 export interface RecentFile {

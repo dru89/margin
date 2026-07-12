@@ -12,6 +12,7 @@ export const IPC = {
   newWindow: 'app:new-window',
   gitInit: 'doc:git-init',
   gitLog: 'doc:git-log',
+  gitRestore: 'doc:git-restore',
   getWorkspace: 'workspace:get',
   getRecents: 'app:get-recents',
   openExternal: 'app:open-external',

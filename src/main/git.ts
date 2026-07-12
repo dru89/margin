@@ -37,6 +37,22 @@ export async function commitCheckpoint(filePath: string, message: string): Promi
   return true;
 }
 
+/**
+ * Restore the document (and its review sidecar, when present in that commit)
+ * to the given commit. Callers checkpoint first so this is always reversible.
+ */
+export async function restoreFromCommit(filePath: string, hash: string): Promise<void> {
+  const dir = path.dirname(filePath);
+  const files = [path.basename(filePath), `${path.basename(filePath)}.review.json`];
+  for (const f of files) {
+    try {
+      await git(dir, ['checkout', hash, '--', f]);
+    } catch {
+      // The sidecar may not exist at that commit — the doc restore stands.
+    }
+  }
+}
+
 export interface LogEntry {
   hash: string;
   date: string;

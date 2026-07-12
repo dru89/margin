@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import type { CommentThread, Suggestion } from '@shared/types';
 import { useLocked, useStore } from '@/store';
 import { revealRange } from '@/editorBridge';
-import { Discussion } from '@/components/Discussion';
+import { DiscussionDock } from '@/components/DiscussionDock';
+import { MentionTextarea } from '@/components/MentionTextarea';
 import { Md } from '@/components/Md';
 
 function AuthorChip({ author }: { author: 'user' | 'agent' }) {
@@ -12,10 +13,37 @@ function AuthorChip({ author }: { author: 'user' | 'agent' }) {
 function Quote({ text, orphaned }: { text: string; orphaned?: boolean }) {
   return (
     <blockquote className={`card-quote${orphaned ? ' card-quote-orphaned' : ''}`}>
-      {text.length > 160 ? `${text.slice(0, 159)}…` : text}
+      “{text.length > 90 ? `${text.slice(0, 89)}…` : text}”
       {orphaned && <span className="orphan-note">text no longer found</span>}
     </blockquote>
   );
+}
+
+/** "¶ <nearest heading above the anchor>" — the spec's card locator. */
+function locatorFor(content: string, from: number): string {
+  const before = content.slice(0, Math.max(0, from));
+  const match = [...before.matchAll(/^#{1,6}\s+(.+)$/gm)].pop();
+  const label = match ? match[1].trim() : 'top';
+  return `¶ ${label.length > 24 ? `${label.slice(0, 23)}…` : label}`;
+}
+
+/** Shared pair-state classes + hover/click wiring for anchored cards. */
+function usePair(id: string, anchor: { from: number; to: number; orphaned?: boolean }) {
+  const setActiveAnchor = useStore((s) => s.setActiveAnchor);
+  const setHoveredAnchor = useStore((s) => s.setHoveredAnchor);
+  const active = useStore((s) => s.activeAnchorId === id);
+  const hot = useStore((s) => s.hoveredAnchorId === id);
+  return {
+    classes: `${active ? ' pair-active' : ''}${hot ? ' pair-hot' : ''}`,
+    props: {
+      onMouseEnter: () => setHoveredAnchor(id),
+      onMouseLeave: () => setHoveredAnchor(null),
+      onClick: () => {
+        setActiveAnchor(id);
+        if (!anchor.orphaned) revealRange(anchor.from, anchor.to);
+      },
+    },
+  };
 }
 
 function Composer() {
@@ -30,26 +58,27 @@ function Composer() {
 
   const effectiveReplacement = replacement ?? composerAnchor.quote;
   const submit = () => {
-    if (mode === 'comment') {
-      addComment(text);
-    } else {
-      addSuggestion(effectiveReplacement, text);
-    }
+    if (mode === 'comment') addComment(text);
+    else addSuggestion(effectiveReplacement, text);
     setText('');
     setReplacement(null);
   };
   const canSubmit =
-    mode === 'comment'
-      ? text.trim().length > 0
-      : effectiveReplacement !== composerAnchor.quote;
+    mode === 'comment' ? text.trim().length > 0 : effectiveReplacement !== composerAnchor.quote;
 
   return (
     <div className="card card-composer">
-      <div className="sidebar-tabs composer-modes">
-        <button className={`btn btn-toggle${mode === 'comment' ? ' on' : ''}`} onClick={() => setMode('comment')}>
+      <div className="composer-modes">
+        <button
+          className={`btn btn-toggle${mode === 'comment' ? ' on' : ''}`}
+          onClick={() => setMode('comment')}
+        >
           Comment
         </button>
-        <button className={`btn btn-toggle${mode === 'suggest' ? ' on' : ''}`} onClick={() => setMode('suggest')}>
+        <button
+          className={`btn btn-toggle${mode === 'suggest' ? ' on' : ''}`}
+          onClick={() => setMode('suggest')}
+        >
           Suggest
         </button>
       </div>
@@ -62,15 +91,13 @@ function Composer() {
           onChange={(e) => setReplacement(e.target.value)}
         />
       )}
-      <textarea
+      <MentionTextarea
         autoFocus
         value={text}
         placeholder={mode === 'comment' ? 'Comment for Claude…' : 'Why? (optional)'}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && canSubmit) submit();
-          if (e.key === 'Escape') closeComposer();
-        }}
+        onChange={setText}
+        onSubmit={() => canSubmit && submit()}
+        onEscape={closeComposer}
       />
       <div className="card-actions">
         <button className="btn btn-primary" disabled={!canSubmit} onClick={submit}>
@@ -86,32 +113,34 @@ function Composer() {
 
 function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
   const locked = useLocked();
+  const content = useStore((s) => s.content);
   const accept = useStore((s) => s.acceptSuggestion);
   const reject = useStore((s) => s.rejectSuggestion);
-  const setActiveAnchor = useStore((s) => s.setActiveAnchor);
-  const activeAnchorId = useStore((s) => s.activeAnchorId);
+  const pair = usePair(suggestion.id, suggestion.anchor);
   const [rejecting, setRejecting] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
-  const isActive = activeAnchorId === suggestion.id;
+
+  // One ellipsized context line: the tail of what lands (or leaves).
+  const context = suggestion.replacement
+    ? `→ …${suggestion.replacement.slice(-70)}`
+    : `− …${suggestion.anchor.quote.slice(-70)}`;
 
   return (
     <div
       id={`card-${suggestion.id}`}
-      className={`card card-suggestion${isActive ? ' card-active' : ''}`}
-      onClick={() => {
-        setActiveAnchor(suggestion.id);
-        if (!suggestion.anchor.orphaned) revealRange(suggestion.anchor.from, suggestion.anchor.to);
-      }}
+      className={`card card-suggestion${pair.classes}`}
+      aria-label="suggestion"
+      {...pair.props}
     >
       <div className="card-head">
         <AuthorChip author={suggestion.author} />
-        <span className="card-kind">suggests</span>
+        <span className="card-locator">{locatorFor(content, suggestion.anchor.from)}</span>
       </div>
-      <div className="diff">
-        <del>{suggestion.anchor.quote || '∅'}</del>
-        <ins>{suggestion.replacement || '∅ (delete)'}</ins>
-      </div>
+      <p className="card-context">{context}</p>
       {suggestion.note && <Md text={suggestion.note} />}
+      {suggestion.anchor.orphaned && (
+        <p className="orphan-note">anchor text no longer found — accept is disabled</p>
+      )}
       {!rejecting ? (
         <div className="card-actions">
           <button
@@ -125,7 +154,7 @@ function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
             Accept
           </button>
           <button
-            className="btn"
+            className="btn btn-reject"
             disabled={locked}
             onClick={(e) => {
               e.stopPropagation();
@@ -137,11 +166,13 @@ function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
         </div>
       ) : (
         <div className="card-reject" onClick={(e) => e.stopPropagation()}>
-          <textarea
+          <MentionTextarea
             autoFocus
             value={rejectNote}
             placeholder="Why? (optional — Claude reads this next round)"
-            onChange={(e) => setRejectNote(e.target.value)}
+            onChange={setRejectNote}
+            onSubmit={() => reject(suggestion.id, rejectNote)}
+            onEscape={() => setRejecting(false)}
           />
           <div className="card-actions">
             <button className="btn btn-danger" onClick={() => reject(suggestion.id, rejectNote)}>
@@ -161,10 +192,8 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
   const locked = useLocked();
   const replyTo = useStore((s) => s.replyToThread);
   const setThreadStatus = useStore((s) => s.setThreadStatus);
-  const setActiveAnchor = useStore((s) => s.setActiveAnchor);
-  const activeAnchorId = useStore((s) => s.activeAnchorId);
+  const pair = usePair(thread.id, thread.anchor);
   const [reply, setReply] = useState('');
-  const isActive = activeAnchorId === thread.id;
 
   const sendReply = () => {
     replyTo(thread.id, reply);
@@ -174,11 +203,9 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
   return (
     <div
       id={`card-${thread.id}`}
-      className={`card card-thread${isActive ? ' card-active' : ''}`}
-      onClick={() => {
-        setActiveAnchor(thread.id);
-        if (!thread.anchor.orphaned) revealRange(thread.anchor.from, thread.anchor.to);
-      }}
+      className={`card card-comment${pair.classes}`}
+      aria-label="comment thread"
+      {...pair.props}
     >
       <div className="card-head">
         <AuthorChip author={thread.author} />
@@ -203,13 +230,11 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
         </div>
       ))}
       <div className="card-replybox" onClick={(e) => e.stopPropagation()}>
-        <textarea
+        <MentionTextarea
           value={reply}
           placeholder="Reply…"
-          onChange={(e) => setReply(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) sendReply();
-          }}
+          onChange={setReply}
+          onSubmit={sendReply}
         />
         {reply.trim() && (
           <button className="btn btn-primary" disabled={locked} onClick={sendReply}>
@@ -224,11 +249,8 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
 export function Sidebar() {
   const review = useStore((s) => s.review);
   const setThreadStatus = useStore((s) => s.setThreadStatus);
-  const sidebarTab = useStore((s) => s.sidebarTab);
-  const setSidebarTab = useStore((s) => s.setSidebarTab);
   const [showArchive, setShowArchive] = useState(false);
   const activeAnchorId = useStore((s) => s.activeAnchorId);
-  const queuedCount = useStore((s) => s.discussion.filter((m) => m.pending).length);
 
   // Bring the focused card into view when an editor highlight is clicked.
   useEffect(() => {
@@ -259,84 +281,70 @@ export function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-tabs" role="tablist">
-        <button
-          className={`btn btn-toggle${sidebarTab === 'review' ? ' on' : ''}`}
-          onClick={() => setSidebarTab('review')}
-        >
-          Review
-        </button>
-        <button
-          className={`btn btn-toggle${sidebarTab === 'discussion' ? ' on' : ''}`}
-          onClick={() => setSidebarTab('discussion')}
-        >
-          Discussion{queuedCount > 0 ? ` · ${queuedCount}` : ''}
-        </button>
+      <div className="review-scroll">
+        <Composer />
+        {pendingSuggestions.length === 0 && openThreads.length === 0 && (
+          <div className="sidebar-empty">
+            <div className="empty-glyph">¶</div>
+            <p>Nothing to review yet.</p>
+            <p className="hint">
+              Claude's suggestions and your threads appear here after you submit a round.
+            </p>
+          </div>
+        )}
+        {pendingSuggestions.length > 0 && (
+          <section>
+            <h3 className="sidebar-heading">Suggestions · {pendingSuggestions.length}</h3>
+            {pendingSuggestions.map((s) => (
+              <SuggestionCard key={s.id} suggestion={s} />
+            ))}
+          </section>
+        )}
+        {openThreads.length > 0 && (
+          <section>
+            <h3 className="sidebar-heading">Comments · {openThreads.length}</h3>
+            {openThreads.map((c) => (
+              <ThreadCard key={c.id} thread={c} />
+            ))}
+          </section>
+        )}
+        {archivedCount > 0 && (
+          <section>
+            <button
+              className="btn btn-ghost sidebar-archive-toggle"
+              onClick={() => setShowArchive(!showArchive)}
+            >
+              {showArchive ? '▾' : '▸'} Resolved & decided · {archivedCount}
+            </button>
+            {showArchive && (
+              <div className="archive">
+                {archived.suggestions.map((s) => (
+                  <div key={s.id} className={`card card-archived status-${s.status}`}>
+                    <div className="card-head">
+                      <AuthorChip author={s.author} />
+                      <span className="card-locator">{s.status}</span>
+                    </div>
+                    <Quote text={s.anchor.quote} />
+                    {s.decisionComment && <Md text={`“${s.decisionComment}”`} />}
+                  </div>
+                ))}
+                {archived.threads.map((c) => (
+                  <div key={c.id} className="card card-archived">
+                    <div className="card-head">
+                      <AuthorChip author={c.author} />
+                      <button className="btn btn-ghost" onClick={() => setThreadStatus(c.id, 'open')}>
+                        Reopen
+                      </button>
+                    </div>
+                    <Md text={c.text} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
       </div>
-      {sidebarTab === 'discussion' ? (
-        <Discussion />
-      ) : (
-        <>
-          <Composer />
-      {pendingSuggestions.length === 0 && openThreads.length === 0 && (
-        <div className="sidebar-empty">
-          <p>No open threads.</p>
-          <p className="hint">
-            Select text and press <kbd>⌘M</kbd> / <kbd>Ctrl+M</kbd> to comment, or submit for a
-            review round.
-          </p>
-        </div>
-      )}
-      {pendingSuggestions.length > 0 && (
-        <section>
-          <h3 className="sidebar-heading">Suggestions · {pendingSuggestions.length}</h3>
-          {pendingSuggestions.map((s) => (
-            <SuggestionCard key={s.id} suggestion={s} />
-          ))}
-        </section>
-      )}
-      {openThreads.length > 0 && (
-        <section>
-          <h3 className="sidebar-heading">Comments · {openThreads.length}</h3>
-          {openThreads.map((c) => (
-            <ThreadCard key={c.id} thread={c} />
-          ))}
-        </section>
-      )}
-      {archivedCount > 0 && (
-        <section>
-          <button className="btn btn-ghost sidebar-archive-toggle" onClick={() => setShowArchive(!showArchive)}>
-            {showArchive ? '▾' : '▸'} Resolved & decided · {archivedCount}
-          </button>
-          {showArchive && (
-            <div className="archive">
-              {archived.suggestions.map((s) => (
-                <div key={s.id} className={`card card-archived status-${s.status}`}>
-                  <div className="card-head">
-                    <AuthorChip author={s.author} />
-                    <span className="card-kind">{s.status}</span>
-                  </div>
-                  <Quote text={s.anchor.quote} />
-                  {s.decisionComment && <p className="card-note">“{s.decisionComment}”</p>}
-                </div>
-              ))}
-              {archived.threads.map((c) => (
-                <div key={c.id} className="card card-archived">
-                  <div className="card-head">
-                    <AuthorChip author={c.author} />
-                    <button className="btn btn-ghost" onClick={() => setThreadStatus(c.id, 'open')}>
-                      Reopen
-                    </button>
-                  </div>
-                  <Md text={c.text} />
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-        </>
-      )}
+      <DiscussionDock />
     </aside>
   );
 }

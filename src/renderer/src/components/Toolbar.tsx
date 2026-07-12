@@ -13,18 +13,19 @@ export function Toolbar() {
   const submit = useStore((s) => s.submit);
   const dirty = useStore((s) => s.dirty);
   const locked = useLocked();
-
   const reviewModel = useStore((s) => s.reviewModel);
   const setReviewModel = useStore((s) => s.setReviewModel);
-  const setSidebarTab = useStore((s) => s.setSidebarTab);
-  const queuedCount = useStore((s) => s.discussion.filter((m) => m.pending).length);
+  // Select stable references; derive arrays after (fresh arrays from a
+  // zustand selector re-render forever — React #185).
+  const discussion = useStore((s) => s.discussion);
+  const workspace = useStore((s) => s.workspace);
+  const removeDiscussionMessage = useStore((s) => s.removeDiscussionMessage);
+  const queued = discussion.filter((m) => m.pending);
+  const modifiedDocs = workspace?.files.filter((f) => f.modified && f.kind === 'markdown') ?? [];
   const [submitOpen, setSubmitOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const unsub = window.margin.onMenuSubmit(() => setSubmitOpen(true));
-    return unsub;
-  }, []);
+  useEffect(() => window.margin.onMenuSubmit(() => setSubmitOpen(true)), []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -43,6 +44,7 @@ export function Toolbar() {
   };
 
   if (!doc) return null;
+  const nextRound = (review?.round ?? 0) + 1;
 
   return (
     <header className="toolbar">
@@ -56,27 +58,11 @@ export function Toolbar() {
         </button>
         <span className="doc-title">{doc.fileName}</span>
         {dirty && <span className="dirty-dot" title="Unsaved changes" />}
-        {review && review.round > 0 && <span className="round-badge">Round {review.round}</span>}
-        {!doc.inGitRepo && (
-          <button
-            className="btn btn-ghost git-warn"
-            title="No git repository — checkpoints are disabled. Click to run git init."
-            onClick={() => void window.margin.gitInit()}
-          >
-            ⚠ no repo
-          </button>
+        {review && review.round > 0 && (
+          <span className="status-chip status-neutral">Round {review.round}</span>
         )}
       </div>
       <div className="toolbar-right">
-        <button
-          className="btn"
-          disabled={locked || (mode === 'write' ? !selection : !previewQuote)}
-          title="Comment on selection (Cmd/Ctrl+M)"
-          onClick={openComposer}
-        >
-          + Comment
-        </button>
-        <History inGitRepo={doc.inGitRepo} />
         <div className="mode-toggle" role="tablist">
           <button
             className={`btn btn-toggle${mode === 'write' ? ' on' : ''}`}
@@ -91,26 +77,37 @@ export function Toolbar() {
             Preview
           </button>
         </div>
+        <span className="tb-divider" />
+        <button
+          className="btn btn-ghost"
+          disabled={locked || (mode === 'write' ? !selection : !previewQuote)}
+          title="Comment on selection (Cmd/Ctrl+M)"
+          onClick={openComposer}
+        >
+          + Comment
+        </button>
+        <History inGitRepo={doc.inGitRepo} />
+        {!doc.inGitRepo && (
+          <button
+            className="status-chip status-warn"
+            title="Checkpoints are disabled without a git repository."
+            onClick={() => void window.margin.gitInit()}
+          >
+            No repo · Initialize
+          </button>
+        )}
+        <span className="tb-divider" />
         <div className="submit-wrap">
-          <button className="btn btn-primary" disabled={locked} onClick={() => setSubmitOpen(!submitOpen)}>
+          <button
+            className="btn btn-primary"
+            disabled={locked}
+            onClick={() => setSubmitOpen(!submitOpen)}
+          >
             Submit for review
+            {queued.length > 0 && <span className="queue-count">+{queued.length}</span>}
           </button>
           {submitOpen && (
             <div className="popover" ref={popoverRef}>
-              <p className="submit-summary">
-                {queuedCount > 0
-                  ? `${queuedCount} queued discussion message${queuedCount === 1 ? '' : 's'} will be sent with this round.`
-                  : 'No queued discussion messages.'}{' '}
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => {
-                    setSidebarTab('discussion');
-                    setSubmitOpen(false);
-                  }}
-                >
-                  Write one
-                </button>
-              </p>
               <label className="model-row">
                 Model
                 <select
@@ -123,14 +120,38 @@ export function Toolbar() {
                   <option value="haiku">Haiku</option>
                 </select>
               </label>
+              <h4 className="sidebar-heading popover-manifest-head">Goes with this round</h4>
+              {modifiedDocs.length > 0 && (
+                <p className="manifest-files">
+                  Your edits · {modifiedDocs.map((f) => f.name).join(', ')}
+                </p>
+              )}
+              {queued.map((m) => (
+                <div key={m.id} className="queued-item">
+                  <span className="queued-text">{m.text}</span>
+                  <button
+                    className="remove"
+                    title="Remove queued message"
+                    onClick={() => removeDiscussionMessage(m.id)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              {modifiedDocs.length === 0 && queued.length === 0 && (
+                <p className="manifest-files">Comments and review state for {doc.fileName}.</p>
+              )}
               <div className="card-actions">
                 <button className="btn btn-primary" onClick={doSubmit}>
-                  Start round {(review?.round ?? 0) + 1}
+                  Send round {nextRound} →
                 </button>
                 <button className="btn" onClick={() => setSubmitOpen(false)}>
                   Cancel
                 </button>
               </div>
+              <p className="popover-hint">
+                Queued messages only travel with a round — nothing is sent live.
+              </p>
             </div>
           )}
         </div>

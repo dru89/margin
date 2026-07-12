@@ -91,9 +91,34 @@ async function openItemCounts(mdPath: string): Promise<{ comments: number; sugge
   }
 }
 
+/** Names of project skills (<root>/.claude/skills/<name>/SKILL.md). */
+async function listProjectSkills(root: string): Promise<string[]> {
+  try {
+    const dir = path.join(root, '.claude', 'skills');
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const names: string[] = [];
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      try {
+        await fs.access(path.join(dir, e.name, 'SKILL.md'));
+        names.push(e.name);
+      } catch {
+        /* not a skill */
+      }
+    }
+    return names.sort();
+  } catch {
+    return [];
+  }
+}
+
 export async function getWorkspace(filePath: string): Promise<WorkspaceState> {
   const root = await findWorkspaceRoot(filePath);
-  const [allFiles, modified] = await Promise.all([walkFiles(root), modifiedSet(root)]);
+  const [allFiles, modified, skills] = await Promise.all([
+    walkFiles(root),
+    modifiedSet(root),
+    listProjectSkills(root),
+  ]);
   const files: WorkspaceFile[] = await Promise.all(
     allFiles.map(async (p) => {
       const rel = path.relative(root, p);
@@ -111,5 +136,5 @@ export async function getWorkspace(filePath: string): Promise<WorkspaceState> {
       };
     }),
   );
-  return { root, rootName: path.basename(root), files };
+  return { root, rootName: path.basename(root), files, skills };
 }
