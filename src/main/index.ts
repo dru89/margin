@@ -15,7 +15,7 @@ if (!gotLock) {
     applicationName: 'Margin',
     applicationVersion: app.getVersion(),
     copyright: '© 2026 Drew Hays',
-    website: 'https://github.com/dru89/agent-editor',
+    website: 'https://github.com/Dru89/margin',
     iconPath: path.join(__dirname, '../../build/icon.png'),
   });
 

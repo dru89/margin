@@ -145,7 +145,7 @@ export async function rebuildMenu(): Promise<void> {
       submenu: [
         {
           label: 'Report an Issue',
-          click: () => void shell.openExternal('https://github.com/dru89/agent-editor/issues'),
+          click: () => void shell.openExternal('https://github.com/Dru89/margin/issues'),
         },
         ...(isMac ? [] : ([{ type: 'separator' }, { role: 'about' }] as MenuItemConstructorOptions[])),
       ],

@@ -105,7 +105,7 @@ release:
 	git push origin "v$$NEXT"; \
 	echo ""; \
 	echo "Tagged and pushed v$$NEXT. GitHub Actions will handle the rest."; \
-	echo "https://github.com/Dru89/agent-editor/actions"
+	echo "https://github.com/Dru89/margin/actions"
 
 # Serve the static marketing site locally.
 site-dev:

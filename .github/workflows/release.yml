@@ -51,14 +51,20 @@ jobs:
         if: matrix.platform == 'linux'
         run: sudo apt-get install -y libarchive-tools
 
-      # macOS signing is optional until certificates are configured: with no
-      # CSC_LINK secret, electron-builder produces an unsigned build (fine
-      # for direct download; auto-update on macOS requires signing).
+      # macOS signing + notarization are optional until the secrets exist:
+      # with no CSC_LINK, electron-builder produces an unsigned build (fine
+      # for direct download; auto-update on macOS requires signing). With no
+      # APPLE_* credentials, notarization is skipped. The same Developer ID
+      # certificate used for Netscope works here — it signs any app from the
+      # same team.
       - name: Build (macOS)
         if: matrix.platform == 'mac'
         env:
           CSC_LINK: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npx electron-vite build && npx electron-builder --mac --publish never
 
       - name: Build (Linux)

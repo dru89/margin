@@ -283,7 +283,7 @@ solves with its Developer ID cert).
 
 Verified locally: the Linux build emits `latest-linux.yml` + AppImage +
 pacman (pacman needed `homepage` in package.json — added). **Not verified:
-the Actions run and an in-app update**, because github.com/Dru89/agent-editor
+the Actions run and an in-app update**, because github.com/Dru89/margin
 doesn't exist yet — I didn't create a public repo and push the source
 without you. Once you `gh rc` + push, the first `make release` exercises
 the rest; the workflow is a line-for-line adaptation of Netscope's proven
