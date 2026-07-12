@@ -14,6 +14,7 @@ export function EditorPane() {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const filePath = useStore((s) => s.doc?.filePath);
+  const loadedAt = useStore((s) => s.doc?.loadedAt);
   const review = useStore((s) => s.review);
   const activeAnchorId = useStore((s) => s.activeAnchorId);
   const hoveredAnchorId = useStore((s) => s.hoveredAnchorId);
@@ -56,7 +57,7 @@ export function EditorPane() {
       viewRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filePath]);
+  }, [filePath, loadedAt]);
 
   // Esc unpins the active pair (spec §2).
   useEffect(() => {

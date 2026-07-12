@@ -1,4 +1,4 @@
-import { promises as fs } from 'fs';
+import { promises as fs, watch, type FSWatcher } from 'fs';
 import path from 'path';
 import { nanoid } from 'nanoid';
 import type { BrowserWindow } from 'electron';
@@ -23,6 +23,8 @@ import { runReviewTurn, type ActiveTurn } from './agent';
  */
 export class DocumentSession {
   private activeTurn: ActiveTurn | null = null;
+  private watchers: FSWatcher[] = [];
+  private watchDebounce: ReturnType<typeof setTimeout> | null = null;
   /** Ids of discussion messages submitted with the round in flight. */
   public lastSubmittedMessageIds: Set<string> = new Set();
 
@@ -43,7 +45,81 @@ export class DocumentSession {
     const root = await findWorkspaceRoot(filePath);
     // Migrate any legacy per-doc discussion into the project-scoped store.
     const discussion = await loadDiscussion(root, review.discussion);
-    return new DocumentSession(filePath, root, content, review, discussion, inRepo, win);
+    const session = new DocumentSession(filePath, root, content, review, discussion, inRepo, win);
+    session.startWatching();
+    return session;
+  }
+
+  /**
+   * Watch for external changes: the document itself (watch the directory —
+   * editors save via atomic rename, which kills single-file watchers) and
+   * the project discussion (another Margin window may write it).
+   */
+  private startWatching(): void {
+    try {
+      const dir = path.dirname(this.filePath);
+      const base = path.basename(this.filePath);
+      this.watchers.push(
+        watch(dir, (_event, filename) => {
+          if (filename === base) this.onExternalChange();
+        }),
+      );
+    } catch {
+      /* watching is best-effort */
+    }
+    try {
+      const discussionDir = path.join(this.workspaceRoot, '.margin');
+      this.watchers.push(
+        watch(discussionDir, (_event, filename) => {
+          if (filename === 'discussion.json') this.onExternalChange();
+        }),
+      );
+    } catch {
+      /* .margin/ may not exist yet — created on first save; doc watcher covers the common case */
+    }
+  }
+
+  dispose(): void {
+    for (const w of this.watchers) w.close();
+    this.watchers = [];
+    if (this.watchDebounce) clearTimeout(this.watchDebounce);
+  }
+
+  private onExternalChange(): void {
+    if (this.watchDebounce) clearTimeout(this.watchDebounce);
+    this.watchDebounce = setTimeout(() => void this.checkExternalChange(), 250);
+  }
+
+  private async checkExternalChange(): Promise<void> {
+    // Discussion: reload and push if it differs (last writer wins; both
+    // windows converge instead of silently diverging).
+    try {
+      const raw = await fs.readFile(
+        path.join(this.workspaceRoot, '.margin', 'discussion.json'),
+        'utf8',
+      );
+      const onDisk = JSON.parse(raw) as DiscussionData;
+      if (JSON.stringify(onDisk.messages) !== JSON.stringify(this.discussion.messages)) {
+        this.discussion = onDisk;
+        this.sendToRenderer(IPC.discussionUpdated, this.discussion.messages);
+      }
+    } catch {
+      /* no discussion file yet */
+    }
+
+    // Document: our own saves write session.content first, so identical
+    // content means the event was ours (or a no-op) — ignore it.
+    let onDisk: string;
+    try {
+      onDisk = await fs.readFile(this.filePath, 'utf8');
+    } catch {
+      return; // transient (atomic rename mid-flight) — next event will catch up
+    }
+    if (onDisk === this.content) return;
+    if (this.activeTurn) return; // never interrupt a running round
+    // The renderer knows whether it has unsaved edits; it either reloads
+    // immediately or shows the conflict banner.
+    this.sendToRenderer(IPC.docChangedOnDisk);
   }
 
   get fileName(): string {
@@ -54,6 +130,7 @@ export class DocumentSession {
     return {
       filePath: this.filePath,
       fileName: this.fileName,
+      loadedAt: Date.now(),
       content: this.content,
       review: this.review,
       discussion: this.discussion.messages,
@@ -186,10 +263,12 @@ export function getSession(webContentsId: number): DocumentSession | undefined {
 }
 
 export function setSession(webContentsId: number, session: DocumentSession): void {
+  sessions.get(webContentsId)?.dispose(); // switching documents replaces the session
   sessions.set(webContentsId, session);
 }
 
 export function dropSession(webContentsId: number): void {
+  sessions.get(webContentsId)?.dispose();
   sessions.delete(webContentsId);
 }
 

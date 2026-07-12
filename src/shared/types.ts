@@ -89,6 +89,8 @@ export interface ReviewData {
 export interface DocState {
   filePath: string;
   fileName: string;
+  /** Bumps on every (re)load so the editor remounts even for the same path. */
+  loadedAt: number;
   content: string;
   review: ReviewData;
   /** Project-scoped discussion (shared across all documents in the workspace). */

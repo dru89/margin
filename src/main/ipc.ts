@@ -86,6 +86,13 @@ export function registerIpcHandlers(): void {
     await showOpenFolderDialog(win);
   });
 
+  // Re-read the document from disk (external change accepted by the user).
+  ipcMain.handle(IPC.reloadDoc, async (event) => {
+    const session = requireSession(event.sender.id);
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) await attachDocument(win, session.filePath);
+  });
+
   // Restore doc + sidecar to a commit; checkpoint first so it's reversible.
   ipcMain.handle(IPC.gitRestore, async (event, hash: string) => {
     const session = requireSession(event.sender.id);

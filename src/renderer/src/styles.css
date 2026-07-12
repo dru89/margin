@@ -1081,3 +1081,16 @@ button.status-chip:active { transform: translateY(1px); }
 
 .history-restore { color: var(--user); padding: 0 4px; }
 .history-restore:hover:not(:disabled) { background: var(--user-wash); }
+
+/* ——— disk conflict banner ——— */
+.conflict-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--comment-edge) 45%, var(--rule));
+  background: var(--comment-wash);
+  font-size: 12.5px;
+}
+.conflict-text { flex: 1; color: var(--ink-soft); }
+.conflict-actions { display: flex; gap: 8px; }

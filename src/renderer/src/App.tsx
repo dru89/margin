@@ -7,6 +7,7 @@ import { EditorPane } from '@/components/EditorPane';
 import { Preview } from '@/components/Preview';
 import { Sidebar } from '@/components/Sidebar';
 import { AgentBar } from '@/components/AgentBar';
+import { ConflictBar } from '@/components/ConflictBar';
 
 export function App() {
   const doc = useStore((s) => s.doc);
@@ -39,6 +40,7 @@ export function App() {
   return (
     <div className="app">
       <Toolbar />
+      <ConflictBar />
       <div className="workspace">
         <Explorer />
         <main className="document">{mode === 'write' ? <EditorPane /> : <Preview />}</main>

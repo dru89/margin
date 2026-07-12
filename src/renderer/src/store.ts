@@ -56,6 +56,9 @@ interface MarginState {
   /** Discussion dock expanded/collapsed (persisted per workspace). */
   dockOpen: boolean;
   toggleDock: () => void;
+  /** The file changed on disk while we have unsaved edits. */
+  diskConflict: boolean;
+  resolveConflict: (choice: 'reload' | 'keep') => Promise<void>;
   addDiscussionMessage: (text: string) => void;
   removeDiscussionMessage: (id: string) => void;
   submit: () => Promise<void>;
@@ -140,6 +143,7 @@ export const useStore = create<MarginState>((set, get) => {
           activeAnchorId: null,
           composerAnchor: null,
           dirty: false,
+          diskConflict: false,
         });
 
       void window.margin.getDoc().then((doc) => {
@@ -154,6 +158,12 @@ export const useStore = create<MarginState>((set, get) => {
       });
       window.margin.onReviewUpdated((review) => set({ review }));
       window.margin.onDiscussionUpdated((discussion) => set({ discussion }));
+      window.margin.onDocChangedOnDisk(() => {
+        // Clean editor: adopt the external change silently (anchors
+        // re-resolve on load). Dirty editor: the user decides.
+        if (!get().dirty) void window.margin.reloadDoc();
+        else set({ diskConflict: true });
+      });
       window.margin.onAgentStatus((agent) => {
         set({ agent });
         if (agent.phase === 'done' || agent.phase === 'error') {
@@ -344,6 +354,17 @@ export const useStore = create<MarginState>((set, get) => {
     setReviewModel: (reviewModel) => set({ reviewModel }),
     hoveredAnchorId: null,
     setHoveredAnchor: (hoveredAnchorId) => set({ hoveredAnchorId }),
+    diskConflict: false,
+    resolveConflict: async (choice) => {
+      set({ diskConflict: false });
+      if (choice === 'reload') {
+        set({ dirty: false }); // discard local edits deliberately
+        await window.margin.reloadDoc();
+      } else {
+        await get().save(); // assert our version on disk
+      }
+    },
+
     dockOpen: false,
     toggleDock: () => {
       const { doc, dockOpen } = get();

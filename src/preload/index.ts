@@ -31,6 +31,7 @@ const api = {
   gitLog: (): Promise<{ hash: string; date: string; message: string }[]> =>
     ipcRenderer.invoke(IPC.gitLog),
   gitRestore: (hash: string): Promise<void> => ipcRenderer.invoke(IPC.gitRestore, hash),
+  reloadDoc: (): Promise<void> => ipcRenderer.invoke(IPC.reloadDoc),
   getWorkspace: (): Promise<WorkspaceState | null> => ipcRenderer.invoke(IPC.getWorkspace),
   getRecents: (): Promise<RecentFile[]> => ipcRenderer.invoke(IPC.getRecents),
   openExternal: (filePath: string): Promise<void> => ipcRenderer.invoke(IPC.openExternal, filePath),
@@ -43,6 +44,7 @@ const api = {
   onReviewUpdated: (cb: (review: ReviewData) => void) => on(IPC.reviewUpdated, cb),
   onDiscussionUpdated: (cb: (messages: DiscussionMessage[]) => void) =>
     on(IPC.discussionUpdated, cb),
+  onDocChangedOnDisk: (cb: () => void) => on(IPC.docChangedOnDisk, cb),
   onAgentStatus: (cb: (status: AgentStatus) => void) => on(IPC.agentStatus, cb),
   onAgentActivity: (cb: (detail: string) => void) => on(IPC.agentActivity, cb),
   onMenuSave: (cb: () => void) => on(IPC.menuSave, cb),

@@ -394,10 +394,20 @@ author's own git.
 New: **Restore** in the History popover — checkpoints the current state
 ("Checkpoint before restoring <hash>"), then checks out the doc + sidecar
 from the chosen commit and reloads the session, so every restore is
-reversible from the same menu. Known gap for a future session: no file
-watching — if the doc changes on disk outside Margin while it's open, the
-session doesn't notice until reopen (autosave can clobber the external
-edit).
+reversible from the same menu.
+
+## 35. File watching + conflict handling (closes §34's known gap)
+
+Sessions watch the document's directory (directory, not file — editors save
+via atomic rename, which kills single-file watchers) and the workspace's
+`.margin/discussion.json`. External change with a clean editor → silent
+reload, anchors re-resolve. With unsaved edits → a warn banner: "Reload
+theirs" (discard local) or "Keep mine" (save immediately, asserting our
+version). Our own saves are distinguished by content comparison, not
+timing. Discussion changes from another window are adopted last-writer-wins
+so multi-window use converges. Found and fixed along the way: reloading the
+same path didn't remount the editor (it was keyed on file path only — now a
+`loadedAt` nonce).
 
 ## Verification status (honest accounting)
 
