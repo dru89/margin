@@ -94,6 +94,7 @@ jobs:
             dist/*.pacman
             dist/*.yml
             dist/*.yaml
+            !dist/builder-debug.yml
           if-no-files-found: error
           retention-days: 1
 
