@@ -1,7 +1,7 @@
 {
   "name": "margin",
   "productName": "Margin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Agent-assisted writing app — co-edit markdown documents with Claude in review rounds",
   "main": "./out/main/index.js",
   "author": "Drew Hays <drew@hays.fm>",
@@ -83,11 +83,17 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["arm64", "x64"]
+          "arch": [
+            "arm64",
+            "x64"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["arm64", "x64"]
+          "arch": [
+            "arm64",
+            "x64"
+          ]
         }
       ]
     }
