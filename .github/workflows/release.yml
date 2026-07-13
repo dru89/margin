@@ -65,7 +65,19 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npx electron-vite build && npx electron-builder --mac --publish never
+        # Missing secrets arrive as EMPTY env vars, and electron-builder treats
+        # an empty CSC_LINK as a certificate path ("<projectDir> not a file").
+        # Unset the whole signing/notarization group when unconfigured.
+        run: |
+          if [ -z "$CSC_LINK" ]; then
+            echo "No signing certificate configured — building unsigned."
+            unset CSC_LINK CSC_KEY_PASSWORD
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+          fi
+          if [ -z "$APPLE_ID" ]; then
+            unset APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
+          fi
+          npx electron-vite build && npx electron-builder --mac --publish never
 
       - name: Build (Linux)
         if: matrix.platform == 'linux'
