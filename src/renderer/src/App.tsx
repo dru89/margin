@@ -8,10 +8,12 @@ import { Preview } from '@/components/Preview';
 import { Sidebar } from '@/components/Sidebar';
 import { AgentBar } from '@/components/AgentBar';
 import { ConflictBar } from '@/components/ConflictBar';
+import { ProposalView } from '@/components/ProposalView';
 
 export function App() {
   const doc = useStore((s) => s.doc);
   const mode = useStore((s) => s.mode);
+  const viewingProposalId = useStore((s) => s.viewingProposalId);
   const init = useStore((s) => s.init);
 
   useEffect(() => init(), [init]);
@@ -43,7 +45,15 @@ export function App() {
       <ConflictBar />
       <div className="workspace">
         <Explorer />
-        <main className="document">{mode === 'write' ? <EditorPane /> : <Preview />}</main>
+        <main className="document">
+          {viewingProposalId ? (
+            <ProposalView id={viewingProposalId} />
+          ) : mode === 'write' ? (
+            <EditorPane />
+          ) : (
+            <Preview />
+          )}
+        </main>
         <Sidebar />
       </div>
       <AgentBar />

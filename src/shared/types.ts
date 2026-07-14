@@ -131,6 +131,35 @@ export interface WorkspaceState {
   skills: string[];
   /** Path to the agent's notes file, when it exists (.margin/agent-notes.md). */
   agentNotesPath?: string;
+  /** Agent file proposals (all statuses; the explorer shows pending ones). */
+  proposals: FileProposal[];
+}
+
+export type ProposalStatus = 'pending' | 'accepted' | 'rejected';
+
+/**
+ * An agent-proposed new file. Content is staged at
+ * `.margin/proposed/<path>` until the author accepts (file materializes at
+ * `path`, folders created as needed) or rejects (staged content is removed;
+ * the record survives so the agent respects the decision).
+ */
+export interface FileProposal {
+  id: string;
+  /** Intended location, relative to the workspace root. */
+  path: string;
+  /** The agent's rationale for creating this file. */
+  note: string;
+  createdAt: string;
+  status: ProposalStatus;
+  decidedAt?: string;
+  /** Optional comment the author left when rejecting. */
+  decisionComment?: string;
+}
+
+/** Project-scoped, stored at <workspaceRoot>/.margin/proposals.json. */
+export interface ProposalsData {
+  version: 1;
+  proposals: FileProposal[];
 }
 
 export interface RecentFile {

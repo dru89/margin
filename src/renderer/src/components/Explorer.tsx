@@ -65,8 +65,39 @@ export function Explorer() {
           ))}
         </div>
       ))}
+      <ProposedRows />
       {workspace.agentNotesPath && <AgentNotesRow path={workspace.agentNotesPath} />}
     </nav>
+  );
+}
+
+/** Pending agent file proposals — visible but unmistakably not-yet-real. */
+function ProposedRows() {
+  const workspace = useStore((s) => s.workspace);
+  const openProposal = useStore((s) => s.openProposal);
+  const viewingProposalId = useStore((s) => s.viewingProposalId);
+  const locked = useLocked();
+  const pending = useMemo(
+    () => workspace?.proposals.filter((p) => p.status === 'pending') ?? [],
+    [workspace],
+  );
+  if (pending.length === 0) return null;
+  return (
+    <div className="explorer-group explorer-proposed-group">
+      <div className="explorer-dir">proposed by Claude</div>
+      {pending.map((p) => (
+        <button
+          key={p.id}
+          className={`explorer-file explorer-proposed${p.id === viewingProposalId ? ' on' : ''}`}
+          disabled={locked}
+          title={`${p.path} — ${p.note}`}
+          onClick={() => openProposal(p.id)}
+        >
+          <span className="explorer-dot-spacer" />
+          <span className="explorer-name">{p.path}</span>
+        </button>
+      ))}
+    </div>
   );
 }
 

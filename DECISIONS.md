@@ -444,6 +444,27 @@ ever — reformatting the user's text without being asked is how editors lose
 trust. A modal grid editor remains a possible later layer (would warrant a
 Claude Design round); this closes the day-to-day gap.
 
+## 38. File proposals: staged content + one explicit accept (issue #1, part A)
+
+The agent can now propose new files (`propose_file`: path + complete
+content + note), but a proposal is a question, not an act — content is
+staged at `.margin/proposed/<path>` with an index in
+`.margin/proposals.json`, and nothing exists at the real path until the
+author clicks **Accept file** (Margin creates intermediate folders; the
+agent never touches the real tree). This is Drew's refined model from the
+day-one discussion: atomic create-with-content, decided in ONE explicit
+action — and deliberately *not* the implicit accept-by-commenting he first
+floated, because a comment on a proposal should be conversation, not
+consent. Pending proposals appear in the explorer under "proposed by
+Claude" (teal italic, `+` prefix — visible but unmistakably not-yet-real);
+clicking one opens a read-only preview with Accept/Reject and an optional
+"why not" the agent reads next round. Reject keeps the record and drops
+the staged content (round checkpoints already committed it, so git
+retains what was proposed). Guards: workspace-relative paths only, no
+`..`, no hidden segments, never an existing path — new files only.
+Proposals ride the existing `.margin` checkpoint pathspec and feed the
+next round's prompt (pending + rejected with comments).
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:

@@ -2,6 +2,7 @@ import { execFile } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
 import type { WorkspaceFile, WorkspaceState } from '@shared/types';
+import { loadProposals } from './proposalsStore';
 
 const SKIP_DIRS = new Set(['.git', 'node_modules', 'out', 'dist', '.obsidian']);
 const MAX_FILES = 500;
@@ -114,10 +115,11 @@ async function listProjectSkills(root: string): Promise<string[]> {
 
 export async function getWorkspace(filePath: string): Promise<WorkspaceState> {
   const root = await findWorkspaceRoot(filePath);
-  const [allFiles, modified, skills] = await Promise.all([
+  const [allFiles, modified, skills, proposalsData] = await Promise.all([
     walkFiles(root),
     modifiedSet(root),
     listProjectSkills(root),
+    loadProposals(root),
   ]);
   const files: WorkspaceFile[] = await Promise.all(
     allFiles.map(async (p) => {
@@ -144,5 +146,12 @@ export async function getWorkspace(filePath: string): Promise<WorkspaceState> {
   } catch {
     /* no notes yet */
   }
-  return { root, rootName: path.basename(root), files, skills, agentNotesPath };
+  return {
+    root,
+    rootName: path.basename(root),
+    files,
+    skills,
+    agentNotesPath,
+    proposals: proposalsData.proposals,
+  };
 }

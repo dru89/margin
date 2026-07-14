@@ -3,6 +3,7 @@ import type {
   AgentStatus,
   DiscussionMessage,
   DocState,
+  FileProposal,
   RecentFile,
   ReviewData,
   WorkspaceState,
@@ -41,6 +42,11 @@ const api = {
   openInWindow: (filePath: string): Promise<void> => ipcRenderer.invoke(IPC.openInWindow, filePath),
   /** Fire-and-forget caret context so the native right-click menu stays relevant. */
   setCaretContext: (ctx: { inTable: boolean }): void => ipcRenderer.send(IPC.caretContext, ctx),
+  readProposal: (id: string): Promise<{ proposal: FileProposal; content: string } | null> =>
+    ipcRenderer.invoke(IPC.readProposal, id),
+  acceptProposal: (id: string): Promise<string> => ipcRenderer.invoke(IPC.acceptProposal, id),
+  rejectProposal: (id: string, comment?: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.rejectProposal, id, comment),
 
   onDocLoaded: (cb: (doc: DocState) => void) => on(IPC.docLoaded, cb),
   onReviewUpdated: (cb: (review: ReviewData) => void) => on(IPC.reviewUpdated, cb),

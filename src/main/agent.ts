@@ -4,6 +4,7 @@ import { nanoid } from 'nanoid';
 import type { CommentThread, Suggestion } from '@shared/types';
 import { resolveQuote, makeAnchor } from '@shared/anchors';
 import type { DocumentSession } from './session';
+import { addProposal, loadProposals, validateProposalPath } from './proposalsStore';
 
 /**
  * The Agent SDK ships ESM-only while our main bundle is CJS; a dynamic
@@ -127,6 +128,22 @@ function buildReviewServer(sdk: AgentSdk, session: DocumentSession) {
       ),
 
       tool(
+        'propose_file',
+        'Propose a new file for the workspace, with its full content. The file does NOT exist until the author explicitly accepts the proposal — it is staged for their review, like a suggestion. Only for new files (never existing paths), and only when a new file clearly serves the project or the author asked for one. Re-proposing the same path updates the pending proposal.',
+        {
+          path: z.string().describe('Where the file should live, relative to the workspace root (e.g. "docs/rollout-plan.md")'),
+          content: z.string().describe('The complete initial contents of the file'),
+          note: z.string().describe('One or two sentences on why this file should exist'),
+        },
+        async (args) => {
+          const check = await validateProposalPath(session.workspaceRoot, args.path);
+          if ('error' in check) return ok(`Error: ${check.error}`);
+          const proposal = await addProposal(session.workspaceRoot, check.rel, args.content, args.note);
+          return ok(`File proposal staged with id ${proposal.id} for ${proposal.path}. The author will see it in the explorer and decide.`);
+        },
+      ),
+
+      tool(
         'suggest_edit',
         'Propose a concrete text change the author can accept or reject. The quote must be copied exactly from the document; the replacement is the full text that should take its place (empty string to delete). Keep each suggestion focused on one change — prefer several small suggestions over one sweeping rewrite.',
         {
@@ -184,6 +201,14 @@ How to work:
 2. Address every open comment thread: reply with reply_to_comment. If a comment asks for a change, also propose it concretely with suggest_edit.
 3. Treat inline "(TK: ...)" markers in the document text as author notes written outside this app — respond to them (add_comment anchored to the marker), and when you can, propose a suggest_edit replacing the marker with real text. In-app comments are the primary channel; TK markers are a fallback.
 4. Propose your own improvements as suggestions (suggest_edit) and observations as comments (add_comment).
+
+You may propose new files with propose_file (path + complete content). The
+file exists only if the author accepts it, so a proposal is a question, not
+an act — use it when a document should be split, when the author asks for a
+new file, or when the project clearly needs one. Never propose files for
+paths that already exist, and don't scatter files the author didn't ask
+about. If a proposal was rejected (see its decisionComment in your task
+prompt), don't re-propose it unless asked.
 
 Ground rules:
 - Never edit files directly. All changes go through suggest_edit so the author can accept or reject each one.
@@ -260,6 +285,18 @@ function runFakeReviewTurn(session: DocumentSession, callbacks: TurnCallbacks): 
     await session.setAgentNotes(
       `${prior.trimEnd()}${prior ? '\n' : ''}- (fake agent) notes path exercised ${new Date().toISOString()}`,
     );
+    if (!cancelled) {
+      callbacks.onActivity('Proposing a new file… (fake agent)');
+      const check = await validateProposalPath(session.workspaceRoot, 'notes/fake-proposal.md');
+      if ('rel' in check) {
+        await addProposal(
+          session.workspaceRoot,
+          check.rel,
+          '# Fake proposal\n\nStaged by MARGIN_FAKE_AGENT to exercise the accept/reject flow.\n',
+          'Demonstration proposal from the fake agent — accept to materialize it, reject to record the decision.',
+        );
+      }
+    }
     return 'Fake review round complete (MARGIN_FAKE_AGENT=1) — no model was consulted.';
   })();
   return {
@@ -293,6 +330,18 @@ export async function runReviewTurn(
   if (notes.trim()) {
     promptParts.push(`Your working notes from earlier rounds:\n${notes.trim()}`);
   }
+  const { proposals } = await loadProposals(session.workspaceRoot);
+  const undecided = proposals.filter((p) => p.status === 'pending');
+  const rejected = proposals.filter((p) => p.status === 'rejected');
+  if (undecided.length > 0 || rejected.length > 0) {
+    const lines = [
+      ...undecided.map((p) => `- ${p.path} (pending since ${p.createdAt}): ${p.note}`),
+      ...rejected.map(
+        (p) => `- ${p.path} (REJECTED${p.decisionComment ? `: "${p.decisionComment}"` : ''}): ${p.note}`,
+      ),
+    ];
+    promptParts.push(`Your file proposals so far:\n${lines.join('\n')}`);
+  }
 
   const q = sdk.query({
     prompt: promptParts.join('\n\n'),
@@ -313,6 +362,7 @@ export async function runReviewTurn(
         'mcp__review__add_comment',
         'mcp__review__suggest_edit',
         'mcp__review__update_notes',
+        'mcp__review__propose_file',
       ],
       disallowedTools: ['Write', 'Edit', 'NotebookEdit', 'Bash', 'WebFetch', 'WebSearch', 'Task'],
       permissionMode: 'dontAsk',
@@ -398,6 +448,10 @@ function describeToolUse(name: string, input: unknown): string {
       return `Adding a comment: ${truncate(String(args.text ?? ''), 80)}`;
     case 'mcp__review__suggest_edit':
       return `Suggesting an edit: ${truncate(String(args.note ?? ''), 80)}`;
+    case 'mcp__review__propose_file':
+      return `Proposing a new file: ${truncate(String(args.path ?? ''), 80)}`;
+    case 'mcp__review__update_notes':
+      return 'Updating working notes…';
     case 'Read':
       return `Reading ${path.basename(String(args.file_path ?? ''))}…`;
     case 'Grep':

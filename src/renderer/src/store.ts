@@ -61,6 +61,12 @@ interface MarginState {
   resolveConflict: (choice: 'reload' | 'keep') => Promise<void>;
   addDiscussionMessage: (text: string) => void;
   removeDiscussionMessage: (id: string) => void;
+  /** Agent file proposal being viewed in the main pane (null = document). */
+  viewingProposalId: string | null;
+  openProposal: (id: string) => void;
+  closeProposal: () => void;
+  acceptProposal: (id: string) => Promise<void>;
+  rejectProposal: (id: string, comment?: string) => Promise<void>;
   submit: () => Promise<void>;
   cancelReview: () => Promise<void>;
 }
@@ -117,10 +123,28 @@ export const useStore = create<MarginState>((set, get) => {
       set({ workspace });
     },
 
+    viewingProposalId: null,
+    openProposal: (id) => set({ viewingProposalId: id }),
+    closeProposal: () => set({ viewingProposalId: null }),
+
+    acceptProposal: async (id) => {
+      const absPath = await window.margin.acceptProposal(id);
+      set({ viewingProposalId: null });
+      await get().loadWorkspace();
+      if (/\.(md|markdown|mdx)$/i.test(absPath)) await get().switchToFile(absPath);
+    },
+
+    rejectProposal: async (id, comment) => {
+      await window.margin.rejectProposal(id, comment);
+      set({ viewingProposalId: null });
+      await get().loadWorkspace();
+    },
+
     toggleExplorer: () => set((s) => ({ explorerOpen: !s.explorerOpen })),
 
     switchToFile: async (path) => {
       const { doc, save } = get();
+      set({ viewingProposalId: null });
       if (!doc || doc.filePath === path) return;
       await save(); // flush before the window switches documents
       await window.margin.openInWindow(path);
@@ -144,6 +168,7 @@ export const useStore = create<MarginState>((set, get) => {
           composerAnchor: null,
           dirty: false,
           diskConflict: false,
+          viewingProposalId: null,
         });
 
       void window.margin.getDoc().then((doc) => {

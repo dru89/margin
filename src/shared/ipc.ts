@@ -19,6 +19,9 @@ export const IPC = {
   openExternal: 'app:open-external',
   openFolderDialog: 'app:open-folder-dialog',
   openInWindow: 'workspace:open-in-window',
+  readProposal: 'proposal:read',
+  acceptProposal: 'proposal:accept',
+  rejectProposal: 'proposal:reject',
 
   // renderer -> main (send)
   caretContext: 'doc:caret-context',

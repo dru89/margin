@@ -1136,6 +1136,82 @@ button.status-chip:active { transform: translateY(1px); }
 }
 .cm-frontmatter .md-hr, .cm-frontmatter .md-h2 { color: var(--ink-faint); font-size: 1em; font-weight: 400; }
 
+/* ——— agent file proposals ——— */
+
+.explorer-proposed-group { border-top: 1px solid var(--rule); margin-top: 6px; padding-top: 6px; }
+.explorer-proposed .explorer-name {
+  color: var(--agent);
+  font-style: italic;
+}
+.explorer-proposed .explorer-name::before { content: '+ '; color: var(--ink-faint); }
+
+.proposal-view {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.proposal-head {
+  width: 100%;
+  max-width: 860px;
+  padding: 40px 56px 20px;
+  border-bottom: 1px solid var(--rule);
+}
+.proposal-title { display: flex; align-items: baseline; gap: 12px; }
+.proposal-chip {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--agent);
+  background: var(--agent-wash);
+  border: 1px solid color-mix(in srgb, var(--agent) 40%, transparent);
+  border-radius: 999px;
+  padding: 1px 10px;
+}
+.proposal-path { font-family: var(--font-mono); font-size: 15px; color: var(--ink); }
+.proposal-note {
+  font-family: var(--font-ui);
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  margin: 10px 0 14px;
+}
+.proposal-actions { display: flex; align-items: center; gap: 10px; }
+.proposal-reject-comment {
+  flex: 1;
+  min-width: 120px;
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  color: var(--ink);
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 5px 10px;
+}
+.proposal-error { color: var(--danger); font-family: var(--font-ui); font-size: 12.5px; margin: 10px 0 0; }
+.proposal-gone {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  color: var(--ink-soft);
+  font-family: var(--font-ui);
+}
+.proposal-body {
+  width: 100%;
+  max-width: 860px;
+  padding: 28px 56px 40vh;
+}
+.proposal-raw {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
 /* preview: list breathing room (issue #7) */
 .preview-body li { margin: 0.35em 0; }
 .preview-body li > p { margin: 0.35em 0; }

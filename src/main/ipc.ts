@@ -8,6 +8,12 @@ import { showOpenDialog, showOpenFolderDialog } from './menu';
 import { commitCheckpoint, fileLog, initRepo, isInRepo, restoreFromCommit } from './git';
 import { getWorkspace } from './workspace';
 import { getRecentFiles } from './recents';
+import {
+  acceptProposal,
+  loadProposals,
+  readProposalContent,
+  rejectProposal,
+} from './proposalsStore';
 
 function requireSession(webContentsId: number) {
   const session = getSession(webContentsId);
@@ -132,5 +138,25 @@ export function registerIpcHandlers(): void {
   ipcMain.on(IPC.caretContext, (event, ctx: { inTable: boolean }) => {
     const session = getSession(event.sender.id);
     if (session) session.caretInTable = !!ctx?.inTable;
+  });
+
+  ipcMain.handle(IPC.readProposal, async (event, id: string) => {
+    const session = requireSession(event.sender.id);
+    const { proposals } = await loadProposals(session.workspaceRoot);
+    const proposal = proposals.find((p) => p.id === id);
+    if (!proposal) return null;
+    const content = await readProposalContent(session.workspaceRoot, proposal);
+    return { proposal, content };
+  });
+
+  ipcMain.handle(IPC.acceptProposal, async (event, id: string) => {
+    const session = requireSession(event.sender.id);
+    const { absPath } = await acceptProposal(session.workspaceRoot, id);
+    return absPath;
+  });
+
+  ipcMain.handle(IPC.rejectProposal, async (event, id: string, comment?: string) => {
+    const session = requireSession(event.sender.id);
+    await rejectProposal(session.workspaceRoot, id, comment);
   });
 }
