@@ -424,6 +424,26 @@ last property decided it: Drew works across machines. If notes prove
 insufficient for genuine conversational texture, per-project session resume
 can layer on later as an opt-in; revisit after the dogfooding week.
 
+## 37. Table formatter: no soft wrap + explicit pad-cells command (issue #5)
+
+Tables never soft-wrap (`white-space: pre` on `.cm-table-line`; wide tables
+scroll the editor horizontally) — a wrapped table row is unreadable and
+uneditable, which Drew knows painfully from Obsidian Live Preview. Alignment
+is the user's explicit act, not an on-save side effect: a ghost pill
+("⌁ Format table") appears on the table's first line when the caret is
+inside a table **and formatting would change something** — so it disappears
+after formatting, doubling as done-feedback — plus a Format Table item in
+the native context menu (renderer reports caret-in-table over a
+fire-and-forget IPC channel). The transform (`src/shared/tables.ts`, pure
+and script-testable) pads cells to column width, honors delimiter alignment
+colons (center/right justify content), preserves `\|` escapes and indent,
+and is idempotent. It dispatches per-line **minimal-span** changes through
+the CM view so anchors inside the table survive the reflow. Cell width is
+code points; CJK double-width rendering is accepted slop. No format-on-save,
+ever — reformatting the user's text without being asked is how editors lose
+trust. A modal grid editor remains a possible later layer (would warrant a
+Claude Design round); this closes the day-to-day gap.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:

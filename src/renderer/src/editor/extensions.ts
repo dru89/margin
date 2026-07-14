@@ -20,6 +20,7 @@ import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
 import { tags as t } from '@lezer/highlight';
+import { formatTableLines, isTableLine } from '@shared/tables';
 
 export interface EditorAnnotation {
   id: string;
@@ -267,12 +268,126 @@ const lineStyles = ViewPlugin.fromClass(
   { decorations: (v) => v.decorations },
 );
 
+/* ——— table formatting (issue #5): caret-in-table ghost pill ——— */
+
+interface LineSpan {
+  fromLine: number;
+  toLine: number;
+}
+
+/** Contiguous run of table lines containing `pos`, or null. */
+function tableBlockAt(state: EditorState, pos: number): LineSpan | null {
+  const doc = state.doc;
+  const line = doc.lineAt(pos);
+  if (!isTableLine(line.text)) return null;
+  let fromLine = line.number;
+  while (fromLine > 1 && isTableLine(doc.line(fromLine - 1).text)) fromLine--;
+  let toLine = line.number;
+  while (toLine < doc.lines && isTableLine(doc.line(toLine + 1).text)) toLine++;
+  return { fromLine, toLine };
+}
+
+/**
+ * Per-line minimal changes that would format the table at `pos` (empty when
+ * the table is already formatted, null when `pos` isn't in a table). Minimal
+ * spans so anchors inside the table survive the reflow.
+ */
+function tableFormatChanges(
+  state: EditorState,
+  pos: number,
+): { from: number; to: number; insert: string }[] | null {
+  const block = tableBlockAt(state, pos);
+  if (!block) return null;
+  const doc = state.doc;
+  const oldLines: string[] = [];
+  for (let n = block.fromLine; n <= block.toLine; n++) oldLines.push(doc.line(n).text);
+  const newLines = formatTableLines(oldLines);
+  const changes: { from: number; to: number; insert: string }[] = [];
+  for (let i = 0; i < oldLines.length; i++) {
+    const oldT = oldLines[i];
+    const newT = newLines[i];
+    if (oldT === newT) continue;
+    let a = 0;
+    while (a < oldT.length && a < newT.length && oldT[a] === newT[a]) a++;
+    let b = 0;
+    while (b < oldT.length - a && b < newT.length - a && oldT[oldT.length - 1 - b] === newT[newT.length - 1 - b]) b++;
+    const line = doc.line(block.fromLine + i);
+    changes.push({ from: line.from + a, to: line.to - b, insert: newT.slice(a, newT.length - b) });
+  }
+  return changes;
+}
+
+/** Pad-cell-format the table containing `pos`. Returns false if nothing to do. */
+export function formatTableAt(view: EditorView, pos: number): boolean {
+  const changes = tableFormatChanges(view.state, pos);
+  if (!changes || changes.length === 0) return false;
+  view.dispatch({ changes, userEvent: 'format.table' });
+  return true;
+}
+
+class TablePillWidget extends WidgetType {
+  eq(): boolean {
+    return true;
+  }
+
+  toDOM(): HTMLElement {
+    const btn = document.createElement('button');
+    btn.className = 'table-pill';
+    btn.textContent = '⌁ Format table';
+    btn.dataset.action = 'format-table';
+    return btn;
+  }
+
+  ignoreEvent(): boolean {
+    return false; // route the click through the editor's mousedown handler
+  }
+}
+
+/**
+ * Ghost pill on the first line of the table under the caret, shown only when
+ * formatting would change something (so it doubles as done-feedback).
+ */
+const tablePill = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = this.build(view);
+    }
+
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.selectionSet || update.viewportChanged) {
+        this.decorations = this.build(update.view);
+      }
+    }
+
+    build(view: EditorView): DecorationSet {
+      if (view.state.readOnly) return Decoration.none;
+      const head = view.state.selection.main.head;
+      const changes = tableFormatChanges(view.state, head);
+      if (!changes || changes.length === 0) return Decoration.none;
+      const block = tableBlockAt(view.state, head)!;
+      const firstLine = view.state.doc.line(block.fromLine);
+      const builder = new RangeSetBuilder<Decoration>();
+      builder.add(
+        firstLine.to,
+        firstLine.to,
+        Decoration.widget({ widget: new TablePillWidget(), side: 1 }),
+      );
+      return builder.finish();
+    }
+  },
+  { decorations: (v) => v.decorations },
+);
+
 export interface EditorCallbacks {
   onChange: (content: string, changes: import('@codemirror/state').ChangeDesc) => void;
   onSelectionChange: (sel: { from: number; to: number } | null) => void;
   onAnchorClick: (id: string | null) => void;
   onAnchorHover: (id: string | null) => void;
   onSuggestionAction: (id: string, action: 'accept' | 'reject') => void;
+  /** Fires when the caret enters/leaves a table (context-menu state). */
+  onCaretInTable: (inTable: boolean) => void;
 }
 
 export function createExtensions(callbacks: EditorCallbacks) {
@@ -288,6 +403,7 @@ export function createExtensions(callbacks: EditorCallbacks) {
     EditorView.lineWrapping,
     placeholder('Write…'),
     lineStyles,
+    tablePill,
     annotationsField,
     readOnlyCompartment.of(EditorState.readOnly.of(false)),
     EditorView.updateListener.of((update) => {
@@ -298,11 +414,20 @@ export function createExtensions(callbacks: EditorCallbacks) {
         const range = update.state.selection.main;
         callbacks.onSelectionChange(range.empty ? null : { from: range.from, to: range.to });
       }
+      if (update.selectionSet || update.docChanged) {
+        const head = update.state.selection.main.head;
+        callbacks.onCaretInTable(isTableLine(update.state.doc.lineAt(head).text));
+      }
     }),
     EditorView.domEventHandlers({
-      mousedown: (event) => {
+      mousedown: (event, view) => {
         const el = event.target as HTMLElement;
         const action = el.closest<HTMLElement>('[data-action]');
+        if (action?.dataset.action === 'format-table') {
+          event.preventDefault();
+          formatTableAt(view, view.state.selection.main.head);
+          return true;
+        }
         if (action) {
           event.preventDefault();
           callbacks.onSuggestionAction(

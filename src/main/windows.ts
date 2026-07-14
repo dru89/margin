@@ -54,6 +54,15 @@ export function createWindow(filePath?: string): BrowserWindow {
   // Right-click: native edit actions plus "Add Comment" on a selection.
   win.webContents.on('context-menu', (_event, params) => {
     const template: Electron.MenuItemConstructorOptions[] = [];
+    if (getSession(win.webContents.id)?.caretInTable) {
+      template.push(
+        {
+          label: 'Format Table',
+          click: () => win.webContents.send(IPC.menuFormatTable),
+        },
+        { type: 'separator' },
+      );
+    }
     if (params.selectionText.trim() && getSession(win.webContents.id)) {
       template.push(
         {

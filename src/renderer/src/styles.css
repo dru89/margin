@@ -1102,6 +1102,30 @@ button.status-chip:active { transform: translateY(1px); }
   font-family: var(--font-mono);
   font-size: 0.78em;
   line-height: 1.9;
+  /* Columns never soft-wrap; wide tables scroll the editor horizontally. */
+  white-space: pre;
+}
+
+/* Ghost pill: absolute so it never disturbs table layout; the widget's
+   static position puts it on the table's first line, right edge. */
+.table-pill {
+  position: absolute;
+  right: 16px;
+  padding: 1px 10px;
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--ink-faint);
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  cursor: pointer;
+  opacity: 0.8;
+}
+.table-pill:hover {
+  color: var(--user);
+  border-color: color-mix(in srgb, var(--user) 55%, var(--rule));
+  opacity: 1;
 }
 .cm-frontmatter {
   font-family: var(--font-mono);

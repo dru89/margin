@@ -27,6 +27,8 @@ export class DocumentSession {
   private watchDebounce: ReturnType<typeof setTimeout> | null = null;
   /** Ids of discussion messages submitted with the round in flight. */
   public lastSubmittedMessageIds: Set<string> = new Set();
+  /** Renderer-reported caret context, consumed by the native context menu. */
+  public caretInTable = false;
 
   private constructor(
     public readonly filePath: string,

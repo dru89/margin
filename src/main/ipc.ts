@@ -128,4 +128,9 @@ export function registerIpcHandlers(): void {
     }
     await attachDocument(win, resolved);
   });
+
+  ipcMain.on(IPC.caretContext, (event, ctx: { inTable: boolean }) => {
+    const session = getSession(event.sender.id);
+    if (session) session.caretInTable = !!ctx?.inTable;
+  });
 }

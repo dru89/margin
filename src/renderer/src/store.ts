@@ -10,7 +10,7 @@ import type {
   WorkspaceState,
 } from '@shared/types';
 import { makeAnchor, resolveQuote } from '@shared/anchors';
-import { applyReplacement } from './editorBridge';
+import { applyReplacement, formatTableAtCaret } from './editorBridge';
 
 export type ViewMode = 'write' | 'preview';
 
@@ -176,6 +176,9 @@ export const useStore = create<MarginState>((set, get) => {
       );
       window.margin.onMenuSave(() => void get().save());
       window.margin.onMenuAddComment(() => get().openComposer());
+      window.margin.onMenuFormatTable(() => {
+        if (get().agent.phase !== 'running') formatTableAtCaret();
+      });
       window.margin.onMenuTogglePreview(() =>
         set((s) => ({ mode: s.mode === 'write' ? 'preview' : 'write' })),
       );

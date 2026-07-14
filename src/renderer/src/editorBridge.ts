@@ -1,4 +1,5 @@
 import { EditorView } from '@codemirror/view';
+import { formatTableAt } from '@/editor/extensions';
 
 /** One editor per window; a module-level handle keeps store actions simple. */
 let view: EditorView | null = null;
@@ -13,6 +14,11 @@ export function getEditorView(): EditorView | null {
 
 export function applyReplacement(from: number, to: number, insert: string): void {
   view?.dispatch({ changes: { from, to, insert } });
+}
+
+/** Format the table under the caret (context-menu entry point). */
+export function formatTableAtCaret(): void {
+  if (view) formatTableAt(view, view.state.selection.main.head);
 }
 
 export function revealRange(from: number, to: number): void {

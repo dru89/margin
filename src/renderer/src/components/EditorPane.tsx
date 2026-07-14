@@ -32,6 +32,7 @@ export function EditorPane() {
       acceptSuggestion,
       rejectSuggestion,
     } = useStore.getState();
+    let lastCaretInTable = false; // per-editor; a fresh session starts false too
     const view = new EditorView({
       state: EditorState.create({
         doc: content,
@@ -44,6 +45,12 @@ export function EditorPane() {
             if (useStore.getState().agent.phase === 'running') return;
             if (action === 'accept') acceptSuggestion(id);
             else rejectSuggestion(id);
+          },
+          onCaretInTable: (inTable) => {
+            if (inTable !== lastCaretInTable) {
+              lastCaretInTable = inTable;
+              window.margin.setCaretContext({ inTable });
+            }
           },
         }),
       }),

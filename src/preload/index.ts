@@ -39,6 +39,8 @@ const api = {
   /** Resolve a dropped File to its filesystem path (sandbox-safe). */
   pathForFile: (file: File): string => webUtils.getPathForFile(file),
   openInWindow: (filePath: string): Promise<void> => ipcRenderer.invoke(IPC.openInWindow, filePath),
+  /** Fire-and-forget caret context so the native right-click menu stays relevant. */
+  setCaretContext: (ctx: { inTable: boolean }): void => ipcRenderer.send(IPC.caretContext, ctx),
 
   onDocLoaded: (cb: (doc: DocState) => void) => on(IPC.docLoaded, cb),
   onReviewUpdated: (cb: (review: ReviewData) => void) => on(IPC.reviewUpdated, cb),
@@ -51,6 +53,7 @@ const api = {
   onMenuSubmit: (cb: () => void) => on(IPC.menuSubmit, cb),
   onMenuTogglePreview: (cb: () => void) => on(IPC.menuTogglePreview, cb),
   onMenuAddComment: (cb: () => void) => on(IPC.menuAddComment, cb),
+  onMenuFormatTable: (cb: () => void) => on(IPC.menuFormatTable, cb),
 };
 
 export type MarginApi = typeof api;

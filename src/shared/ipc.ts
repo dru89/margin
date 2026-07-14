@@ -20,6 +20,9 @@ export const IPC = {
   openFolderDialog: 'app:open-folder-dialog',
   openInWindow: 'workspace:open-in-window',
 
+  // renderer -> main (send)
+  caretContext: 'doc:caret-context',
+
   // main -> renderer (send)
   docLoaded: 'doc:loaded',
   reviewUpdated: 'doc:review-updated',
@@ -31,4 +34,5 @@ export const IPC = {
   menuSubmit: 'menu:submit',
   menuTogglePreview: 'menu:toggle-preview',
   menuAddComment: 'menu:add-comment',
+  menuFormatTable: 'menu:format-table',
 } as const;
