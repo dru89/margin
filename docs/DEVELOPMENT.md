@@ -35,6 +35,23 @@ make package-mac       # dmg + zip (run on macOS)
 AppImages need libfuse2; on Arch-family systems run with
 `--appimage-extract-and-run` or `pacman -S fuse2`.
 
+## Opening from the command line
+
+Margin accepts a markdown file **or a folder** as its argument (a folder
+opens its first markdown document; the explorer shows the rest). Both routes
+into the running instance via the single-instance lock.
+
+- **Linux (pacman install):** `margin <folder-or-file>` works out of the box
+  (`/usr/bin/margin`).
+- **AppImage:** alias it — `alias margin='/path/to/Margin.AppImage'`.
+- **macOS:** add a shell function:
+
+  ```bash
+  margin() { open -a Margin "$(realpath "${1:-.}")"; }
+  ```
+
+- **Dev checkout:** `npx electron . <folder-or-file>` after a build.
+
 ## Release
 
 ```bash

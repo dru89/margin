@@ -3,6 +3,22 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useStore } from '@/store';
 
+/** Split a leading YAML frontmatter block from the document body (issue #4). */
+function splitFrontmatter(content: string): { fields: [string, string][] | null; body: string } {
+  const m = /^---\n([\s\S]*?)\n---\n?/.exec(content);
+  if (!m) return { fields: null, body: content };
+  const fields: [string, string][] = [];
+  for (const line of m[1].split('\n')) {
+    const kv = /^([\w-]+):\s*(.*)$/.exec(line);
+    if (kv) fields.push([kv[1], kv[2].replace(/^["']|["']$/g, '')]);
+    else if (line.trim() && fields.length > 0) {
+      // continuation (multiline values, list items) — append to previous
+      fields[fields.length - 1][1] += ` ${line.trim()}`;
+    }
+  }
+  return { fields, body: content.slice(m[0].length) };
+}
+
 /**
  * Preview with comment/suggestion highlights. Rendered markdown loses source
  * offsets, so anchors are re-located by quote text in the DOM: for each open
@@ -17,6 +33,7 @@ export function Preview() {
   const setActiveAnchor = useStore((s) => s.setActiveAnchor);
   const setPreviewQuote = useStore((s) => s.setPreviewQuote);
   const ref = useRef<HTMLDivElement>(null);
+  const fm = useMemo(() => splitFrontmatter(content), [content]);
 
   const anchors = useMemo(() => {
     if (!review) return [];
@@ -75,7 +92,19 @@ export function Preview() {
         }}
         onMouseUp={() => setPreviewQuote(window.getSelection()?.toString() ?? null)}
       >
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+        {fm.fields && (
+          <aside className="frontmatter-card">
+            <dl>
+              {fm.fields.map(([k, v]) => (
+                <div key={k} style={{ display: 'contents' }}>
+                  <dt>{k}</dt>
+                  <dd>{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </aside>
+        )}
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{fm.body}</ReactMarkdown>
       </article>
     </div>
   );

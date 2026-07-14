@@ -1094,3 +1094,48 @@ button.status-chip:active { transform: translateY(1px); }
 }
 .conflict-text { flex: 1; color: var(--ink-soft); }
 .conflict-actions { display: flex; gap: 8px; }
+
+/* ——— write-mode line typography (issues #4/#5/#7) ——— */
+
+.cm-list-line { padding-top: 0.3em; }
+.cm-table-line {
+  font-family: var(--font-mono);
+  font-size: 0.78em;
+  line-height: 1.9;
+}
+.cm-frontmatter {
+  font-family: var(--font-mono);
+  font-size: 0.75em;
+  line-height: 1.8;
+  color: var(--ink-soft);
+  background: var(--paper-inset);
+}
+.cm-frontmatter .md-hr, .cm-frontmatter .md-h2 { color: var(--ink-faint); font-size: 1em; font-weight: 400; }
+
+/* preview: list breathing room (issue #7) */
+.preview-body li { margin: 0.35em 0; }
+.preview-body li > p { margin: 0.35em 0; }
+
+/* preview: frontmatter card (issue #4) */
+.frontmatter-card {
+  margin: 0 0 24px;
+  padding: 12px 16px;
+  background: var(--paper-inset);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+.frontmatter-card dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 16px;
+  margin: 0;
+}
+.frontmatter-card dt {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  padding-top: 1px;
+}
+.frontmatter-card dd { margin: 0; color: var(--ink-soft); overflow-wrap: anywhere; }

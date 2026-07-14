@@ -1,10 +1,12 @@
 import {
   Decoration,
   EditorView,
+  ViewPlugin,
   WidgetType,
   keymap,
   placeholder,
   type DecorationSet,
+  type ViewUpdate,
 } from '@codemirror/view';
 import {
   EditorState,
@@ -198,6 +200,73 @@ const markdownHighlight = HighlightStyle.define([
 
 export const readOnlyCompartment = new Compartment();
 
+/**
+ * Line-level typography for Write mode (issues #4, #5, #7):
+ * - list items get a hanging indent sized to their marker, plus a little
+ *   breathing room between items
+ * - table lines render in the mono font so pipes align
+ * - a leading YAML frontmatter block renders as subdued mono
+ */
+const lineStyles = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = this.build(view);
+    }
+
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.viewportChanged) {
+        this.decorations = this.build(update.view);
+      }
+    }
+
+    build(view: EditorView): DecorationSet {
+      const builder = new RangeSetBuilder<Decoration>();
+      const doc = view.state.doc;
+
+      // Frontmatter: a '---' first line closed by another '---'.
+      let fmEnd = -1;
+      if (doc.lines > 1 && doc.line(1).text.trim() === '---') {
+        for (let n = 2; n <= Math.min(doc.lines, 50); n++) {
+          if (doc.line(n).text.trim() === '---') {
+            fmEnd = n;
+            break;
+          }
+        }
+      }
+
+      for (const range of view.visibleRanges) {
+        let pos = range.from;
+        while (pos <= range.to) {
+          const line = doc.lineAt(pos);
+          if (fmEnd !== -1 && line.number <= fmEnd) {
+            builder.add(line.from, line.from, Decoration.line({ class: 'cm-frontmatter' }));
+          } else if (/^\s*\|/.test(line.text)) {
+            builder.add(line.from, line.from, Decoration.line({ class: 'cm-table-line' }));
+          } else {
+            const m = /^(\s*)(?:[-*+]|\d{1,3}[.)])\s+/.exec(line.text);
+            if (m) {
+              const w = m[0].length;
+              builder.add(
+                line.from,
+                line.from,
+                Decoration.line({
+                  class: 'cm-list-line',
+                  attributes: { style: `padding-left:${w}ch;text-indent:-${w}ch;` },
+                }),
+              );
+            }
+          }
+          pos = line.to + 1;
+        }
+      }
+      return builder.finish();
+    }
+  },
+  { decorations: (v) => v.decorations },
+);
+
 export interface EditorCallbacks {
   onChange: (content: string, changes: import('@codemirror/state').ChangeDesc) => void;
   onSelectionChange: (sel: { from: number; to: number } | null) => void;
@@ -218,6 +287,7 @@ export function createExtensions(callbacks: EditorCallbacks) {
     syntaxHighlighting(markdownHighlight),
     EditorView.lineWrapping,
     placeholder('Write…'),
+    lineStyles,
     annotationsField,
     readOnlyCompartment.of(EditorState.readOnly.of(false)),
     EditorView.updateListener.of((update) => {
