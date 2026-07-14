@@ -87,9 +87,11 @@ npx electron . --remote-debugging-port=9224 "path/to/doc.md" &   # background
   Programmatic doc edits must go through the CM view
   (`editorBridge.applyReplacement`) so anchors remap — never rewrite
   `content` directly.
-- **The agent never writes files.** All agent tools (`src/main/agent.ts`)
-  mutate the review sidecar only; text changes land exclusively through
-  user-accepted suggestions. Keep `Write`/`Edit`/`Bash` in `disallowedTools`.
+- **The agent never writes files** — with one deliberate exception: its
+  notes file (`.margin/agent-notes.md`, via the `update_notes` tool). All
+  other agent tools (`src/main/agent.ts`) mutate the review sidecar only;
+  text changes land exclusively through user-accepted suggestions. Keep
+  `Write`/`Edit`/`Bash` in `disallowedTools`.
 - **Colors:** Catppuccin only (Latte light / Mocha dark), via the CSS
   variables in `styles.css`. Never hardcode hex values in components.
 - Fonts are bundled Fontsource packages (CSP has no network access):

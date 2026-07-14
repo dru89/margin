@@ -1,4 +1,5 @@
 import { execFile } from 'child_process';
+import { existsSync } from 'fs';
 import path from 'path';
 
 function git(cwd: string, args: string[]): Promise<string> {
@@ -24,12 +25,21 @@ export async function initRepo(filePath: string): Promise<void> {
 }
 
 /**
- * Commit the document and its review sidecar if either changed.
+ * Commit the document, its review sidecar, and any extra paths (e.g. the
+ * workspace's .margin directory — discussion + agent notes) if changed.
  * Returns true when a commit was created.
  */
-export async function commitCheckpoint(filePath: string, message: string): Promise<boolean> {
+export async function commitCheckpoint(
+  filePath: string,
+  message: string,
+  extraPaths: string[] = [],
+): Promise<boolean> {
   const dir = path.dirname(filePath);
-  const files = [path.basename(filePath), `${path.basename(filePath)}.review.json`];
+  const files = [
+    path.basename(filePath),
+    `${path.basename(filePath)}.review.json`,
+    ...extraPaths.filter((p) => existsSync(p)),
+  ];
   await git(dir, ['add', '--', ...files]);
   const status = await git(dir, ['status', '--porcelain', '--', ...files]);
   if (!status.trim()) return false;

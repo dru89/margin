@@ -115,6 +115,18 @@ function buildReviewServer(sdk: AgentSdk, session: DocumentSession) {
       ),
 
       tool(
+        'update_notes',
+        'Replace your persistent working notes for this project. Notes survive between rounds and travel with the repo, so record what future rounds need: decisions made and why, conventions the author prefers, open questions, project context that is not in any document. Keep them concise and structured; do not duplicate document text. This replaces the whole file — carry forward anything still relevant.',
+        {
+          content: z.string().describe('The full new contents of your notes file (markdown)'),
+        },
+        async (args) => {
+          await session.setAgentNotes(args.content);
+          return ok('Notes updated.');
+        },
+      ),
+
+      tool(
         'suggest_edit',
         'Propose a concrete text change the author can accept or reject. The quote must be copied exactly from the document; the replacement is the full text that should take its place (empty string to delete). Keep each suggestion focused on one change — prefer several small suggestions over one sweeping rewrite.',
         {
@@ -162,8 +174,13 @@ messages marked) is included in your task prompt. **Your final message is
 posted to that discussion as your reply** — answer new discussion messages
 there, and keep it in the author's register.
 
+You keep persistent working notes (shown in your task prompt when they
+exist). They are your memory between rounds: update them via update_notes
+when you learn something durable — a decision and its reasoning, a
+convention the author prefers, project context that lives in no document.
+
 How to work:
-1. Read the document with read_document, and the existing threads/suggestions with list_review_state.
+1. Read the document with read_document, and the existing threads/suggestions with list_review_state. Consult your working notes.
 2. Address every open comment thread: reply with reply_to_comment. If a comment asks for a change, also propose it concretely with suggest_edit.
 3. Treat inline "(TK: ...)" markers in the document text as author notes written outside this app — respond to them (add_comment anchored to the marker), and when you can, propose a suggest_edit replacing the marker with real text. In-app comments are the primary channel; TK markers are a fallback.
 4. Propose your own improvements as suggestions (suggest_edit) and observations as comments (add_comment).
@@ -178,7 +195,8 @@ Ground rules:
 - If the document is in good shape and you have nothing meaningful to add, say so in your final message rather than inventing busywork.
 - You may read other files in the document's directory (e.g. reference/ material) for context.
 
-When you are done, finish with a message for the discussion thread: respond
+Before finishing, update your working notes if this round produced anything
+durable. Then finish with a message for the discussion thread: respond
 to the author's new discussion messages (if any) and briefly summarize what
 you reviewed and changed.`;
 
@@ -238,6 +256,10 @@ function runFakeReviewTurn(session: DocumentSession, callbacks: TurnCallbacks): 
       }
       await sleep(400);
     }
+    const prior = await session.readAgentNotes();
+    await session.setAgentNotes(
+      `${prior.trimEnd()}${prior ? '\n' : ''}- (fake agent) notes path exercised ${new Date().toISOString()}`,
+    );
     return 'Fake review round complete (MARGIN_FAKE_AGENT=1) — no model was consulted.';
   })();
   return {
@@ -267,6 +289,10 @@ export async function runReviewTurn(
   ];
   const discussion = renderDiscussion(session);
   if (discussion) promptParts.push(discussion);
+  const notes = await session.readAgentNotes();
+  if (notes.trim()) {
+    promptParts.push(`Your working notes from earlier rounds:\n${notes.trim()}`);
+  }
 
   const q = sdk.query({
     prompt: promptParts.join('\n\n'),
@@ -286,6 +312,7 @@ export async function runReviewTurn(
         'mcp__review__reply_to_comment',
         'mcp__review__add_comment',
         'mcp__review__suggest_edit',
+        'mcp__review__update_notes',
       ],
       disallowedTools: ['Write', 'Edit', 'NotebookEdit', 'Bash', 'WebFetch', 'WebSearch', 'Task'],
       permissionMode: 'dontAsk',

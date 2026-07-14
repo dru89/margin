@@ -136,5 +136,13 @@ export async function getWorkspace(filePath: string): Promise<WorkspaceState> {
       };
     }),
   );
-  return { root, rootName: path.basename(root), files, skills };
+  const notesPath = path.join(root, '.margin', 'agent-notes.md');
+  let agentNotesPath: string | undefined;
+  try {
+    await fs.access(notesPath);
+    agentNotesPath = notesPath;
+  } catch {
+    /* no notes yet */
+  }
+  return { root, rootName: path.basename(root), files, skills, agentNotesPath };
 }

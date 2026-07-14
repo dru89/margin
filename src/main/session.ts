@@ -139,6 +139,24 @@ export class DocumentSession {
     };
   }
 
+  get agentNotesPath(): string {
+    return path.join(this.workspaceRoot, '.margin', 'agent-notes.md');
+  }
+
+  async readAgentNotes(): Promise<string> {
+    try {
+      return await fs.readFile(this.agentNotesPath, 'utf8');
+    } catch {
+      return '';
+    }
+  }
+
+  /** The agent's persistent working memory — its single write surface. */
+  async setAgentNotes(content: string): Promise<void> {
+    await fs.mkdir(path.dirname(this.agentNotesPath), { recursive: true });
+    await fs.writeFile(this.agentNotesPath, content.endsWith('\n') ? content : `${content}\n`, 'utf8');
+  }
+
   async setDiscussion(messages: DiscussionMessage[]): Promise<void> {
     this.discussion.messages = messages;
     await saveDiscussion(this.workspaceRoot, this.discussion);
@@ -202,6 +220,7 @@ export class DocumentSession {
         await commitCheckpoint(
           this.filePath,
           `Review round ${this.review.round} (${this.fileName}): submitted`,
+          [path.join(this.workspaceRoot, '.margin')],
         );
       } catch (err) {
         // A failed checkpoint shouldn't block the review; surface it as activity.
@@ -237,6 +256,7 @@ export class DocumentSession {
           await commitCheckpoint(
             this.filePath,
             `Review round ${this.review.round} (${this.fileName}): agent review`,
+            [path.join(this.workspaceRoot, '.margin')],
           );
         } catch {
           /* nothing new to commit is fine */

@@ -65,6 +65,25 @@ export function Explorer() {
           ))}
         </div>
       ))}
+      {workspace.agentNotesPath && <AgentNotesRow path={workspace.agentNotesPath} />}
     </nav>
+  );
+}
+
+/** Quiet row for the agent's persistent notes — its memory, readable by you. */
+function AgentNotesRow({ path }: { path: string }) {
+  const switchToFile = useStore((s) => s.switchToFile);
+  const doc = useStore((s) => s.doc);
+  const locked = useLocked();
+  return (
+    <button
+      className={`explorer-file explorer-notes${doc?.filePath === path ? ' on' : ''}`}
+      disabled={locked}
+      title="The agent's working notes for this project (.margin/agent-notes.md)"
+      onClick={() => void switchToFile(path)}
+    >
+      <span className="explorer-dot-spacer" />
+      <span className="explorer-name">§ Agent notes</span>
+    </button>
   );
 }

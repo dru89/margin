@@ -409,6 +409,21 @@ so multi-window use converges. Found and fixed along the way: reloading the
 same path didn't remount the editor (it was keyed on file path only — now a
 `loadedAt` nonce).
 
+## 36. Agent notes over session resume (issue #2)
+
+The restart problem is real — the agent's working context (conclusions,
+conventions, reasoning that never landed in a document) evaporated between
+rounds. Chosen fix: a persistent notes file, `.margin/agent-notes.md`,
+written via a dedicated `update_notes` tool — **the single deliberate
+exception to "the agent never writes files," scoped to exactly that path.**
+Notes are fed into every round's prompt, committed with round checkpoints
+(checkpoints now include `.margin/`), readable and editable by the author
+(quiet "§ Agent notes" row at the bottom of the explorer), and they travel
+through git — which SDK session-resume cannot do, being machine-local. That
+last property decided it: Drew works across machines. If notes prove
+insufficient for genuine conversational texture, per-project session resume
+can layer on later as an opt-in; revisit after the dogfooding week.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:

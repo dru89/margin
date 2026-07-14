@@ -1139,3 +1139,12 @@ button.status-chip:active { transform: translateY(1px); }
   padding-top: 1px;
 }
 .frontmatter-card dd { margin: 0; color: var(--ink-soft); overflow-wrap: anywhere; }
+
+.explorer-notes {
+  margin-top: 14px;
+  border-top: 1px solid var(--rule);
+  border-radius: 0 0 6px 6px;
+  padding-top: 9px;
+  color: var(--agent);
+  font-style: italic;
+}

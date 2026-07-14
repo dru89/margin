@@ -129,6 +129,8 @@ export interface WorkspaceState {
   files: WorkspaceFile[];
   /** Project skill names from <root>/.claude/skills/. */
   skills: string[];
+  /** Path to the agent's notes file, when it exists (.margin/agent-notes.md). */
+  agentNotesPath?: string;
 }
 
 export interface RecentFile {
