@@ -465,6 +465,27 @@ retains what was proposed). Guards: workspace-relative paths only, no
 Proposals ride the existing `.margin` checkpoint pathspec and feed the
 next round's prompt (pending + rejected with comments).
 
+## 39. New-project flow: conversation → card → one confirm (issue #1, part B)
+
+The welcome screen gains "Start a new project with Claude": a centered
+conversation (fresh agent session per message, transcript in the prompt —
+same statelessness as review rounds) where the agent's only tool is
+`propose_project`. Its output is a card — title, description, target path,
+seed files — and, matching the proposal model in §38, the card is a
+question: nothing exists until the author clicks Create project, at which
+point the **app** makes the folder, writes the seed files, git-inits and
+makes the first commit, and opens the main draft. The setup transcript
+seeds `.margin/discussion.json`, so the first review round already has the
+framing that produced the project. Projects land under a `projectsDir`
+from `settings.json` in userData (default `~/Documents/Margin`; the file
+is written with defaults on first read so the knob is discoverable — no
+settings UI yet). The setup agent runs with no settingSources, no file
+tools, and maxTurns 6: it's a scoped intake conversation, not a general
+chat. A failed initial commit (e.g. no git identity) does not fail project
+creation — parity with non-fatal round checkpoints. MARGIN_FAKE_AGENT
+scripts a one-message propose so the whole surface tests without
+credentials.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:

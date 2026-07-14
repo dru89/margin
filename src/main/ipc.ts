@@ -1,11 +1,21 @@
 import { BrowserWindow, ipcMain, shell } from 'electron';
+import { promises as fs } from 'fs';
 import path from 'path';
-import type { DiscussionMessage, ReviewData } from '@shared/types';
+import { nanoid } from 'nanoid';
+import type {
+  DiscussionMessage,
+  ProjectProposal,
+  ReviewData,
+  SetupMessage,
+} from '@shared/types';
 import { IPC } from '@shared/ipc';
 import { findSessionByPath, getSession } from './session';
 import { attachDocument, createWindow, openFile } from './windows';
 import { showOpenDialog, showOpenFolderDialog } from './menu';
-import { commitCheckpoint, fileLog, initRepo, isInRepo, restoreFromCommit } from './git';
+import { commitCheckpoint, fileLog, initProjectRepo, initRepo, isInRepo, restoreFromCommit } from './git';
+import { runSetupTurn } from './agent';
+import { getSettings } from './settings';
+import { saveDiscussion } from './discussionStore';
 import { getWorkspace } from './workspace';
 import { getRecentFiles } from './recents';
 import {
@@ -159,4 +169,60 @@ export function registerIpcHandlers(): void {
     const session = requireSession(event.sender.id);
     await rejectProposal(session.workspaceRoot, id, comment);
   });
+
+  ipcMain.handle(IPC.getProjectsDir, async () => (await getSettings()).projectsDir);
+
+  ipcMain.handle(IPC.setupMessage, (_event, transcript: SetupMessage[]) =>
+    runSetupTurn(transcript),
+  );
+
+  // One confirm materializes the whole project: folder, seed files, git
+  // repo, and the setup transcript seeded as the project discussion.
+  ipcMain.handle(
+    IPC.createProject,
+    async (event, proposal: ProjectProposal, transcript: SetupMessage[]) => {
+      const { projectsDir } = await getSettings();
+      const folder = path.basename(path.normalize(proposal.folderName));
+      if (!folder || folder === '.' || folder === '..' || folder.startsWith('.')) {
+        throw new Error(`Invalid project folder name: ${proposal.folderName}`);
+      }
+      const target = path.join(projectsDir, folder);
+      let exists = false;
+      try {
+        await fs.access(target);
+        exists = true;
+      } catch {
+        /* free, as expected */
+      }
+      if (exists) throw new Error(`${target} already exists — pick another name.`);
+
+      await fs.mkdir(target, { recursive: true });
+      let firstMd: string | null = null;
+      for (const file of proposal.files) {
+        const rel = path.normalize(file.path).replace(/^[/\\]+/, '');
+        if (rel.split(/[/\\]/).some((seg) => seg === '..' || seg.startsWith('.'))) {
+          throw new Error(`Invalid file path in proposal: ${file.path}`);
+        }
+        const abs = path.join(target, rel);
+        await fs.mkdir(path.dirname(abs), { recursive: true });
+        await fs.writeFile(abs, file.content.endsWith('\n') ? file.content : `${file.content}\n`, 'utf8');
+        if (!firstMd && /\.(md|markdown|mdx)$/i.test(rel)) firstMd = abs;
+      }
+      // Seed the project discussion with the setup conversation, so the
+      // first review round starts with the framing already in place.
+      const messages: DiscussionMessage[] = transcript.map((m) => ({
+        id: nanoid(8),
+        author: m.author,
+        text: m.text,
+        createdAt: new Date().toISOString(),
+      }));
+      await saveDiscussion(target, { version: 1, messages });
+      await initProjectRepo(target, `New project: ${proposal.title}`);
+
+      if (!firstMd) throw new Error('The proposal contained no markdown file to open.');
+      const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+      await openFile(firstMd, win);
+      return target;
+    },
+  );
 }

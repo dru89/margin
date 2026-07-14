@@ -4,8 +4,11 @@ import type {
   DiscussionMessage,
   DocState,
   FileProposal,
+  ProjectProposal,
   RecentFile,
   ReviewData,
+  SetupMessage,
+  SetupReply,
   WorkspaceState,
 } from '@shared/types';
 import { IPC } from '@shared/ipc';
@@ -47,6 +50,11 @@ const api = {
   acceptProposal: (id: string): Promise<string> => ipcRenderer.invoke(IPC.acceptProposal, id),
   rejectProposal: (id: string, comment?: string): Promise<void> =>
     ipcRenderer.invoke(IPC.rejectProposal, id, comment),
+  getProjectsDir: (): Promise<string> => ipcRenderer.invoke(IPC.getProjectsDir),
+  setupMessage: (transcript: SetupMessage[]): Promise<SetupReply> =>
+    ipcRenderer.invoke(IPC.setupMessage, transcript),
+  createProject: (proposal: ProjectProposal, transcript: SetupMessage[]): Promise<string> =>
+    ipcRenderer.invoke(IPC.createProject, proposal, transcript),
 
   onDocLoaded: (cb: (doc: DocState) => void) => on(IPC.docLoaded, cb),
   onReviewUpdated: (cb: (review: ReviewData) => void) => on(IPC.reviewUpdated, cb),

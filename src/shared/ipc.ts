@@ -22,6 +22,9 @@ export const IPC = {
   readProposal: 'proposal:read',
   acceptProposal: 'proposal:accept',
   rejectProposal: 'proposal:reject',
+  setupMessage: 'setup:message',
+  createProject: 'setup:create-project',
+  getProjectsDir: 'setup:get-projects-dir',
 
   // renderer -> main (send)
   caretContext: 'doc:caret-context',

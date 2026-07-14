@@ -1,7 +1,14 @@
 import path from 'path';
 import { z } from 'zod';
 import { nanoid } from 'nanoid';
-import type { CommentThread, Suggestion } from '@shared/types';
+import os from 'os';
+import type {
+  CommentThread,
+  ProjectProposal,
+  SetupMessage,
+  SetupReply,
+  Suggestion,
+} from '@shared/types';
 import { resolveQuote, makeAnchor } from '@shared/anchors';
 import type { DocumentSession } from './session';
 import { addProposal, loadProposals, validateProposalPath } from './proposalsStore';
@@ -415,6 +422,109 @@ export async function runReviewTurn(
       } catch {
         /* already finished */
       }
+    },
+  };
+}
+
+const SETUP_SYSTEM_PROMPT = `You are helping an author start a new writing project in Margin, a markdown review app. This is a short setup conversation on the welcome screen: understand what they want to write, then propose a project.
+
+How to work:
+- If the goal is clear enough from their message, propose immediately. Ask at most one short clarifying question, and only when you genuinely cannot pick a sensible structure without it.
+- When ready, call propose_project exactly once: a kebab-case folderName, a human title, a one-line description, and 1-3 seed files. The main draft is a markdown file named after the piece (not "draft.md" — give it a real name) containing a skeletal outline in the author's likely register: real section headings, one-line notes of intent, no filler prose. Add a second file only when it clearly earns its place (e.g. notes.md for research-heavy work).
+- Nothing is created until the author confirms the proposal card, so propose confidently — they can ask for changes.
+- Your final text each turn is shown as your chat reply. Keep it to a sentence or two, conversational, no headings or lists. After proposing, briefly say what you set up and invite adjustments.`;
+
+/**
+ * One turn of the welcome-screen "start a new project" conversation. Fresh
+ * session per message (like review rounds); the transcript rides in the
+ * prompt. The propose_project tool only captures the card — the app
+ * materializes it after the author confirms.
+ */
+export async function runSetupTurn(transcript: SetupMessage[]): Promise<SetupReply> {
+  if (process.env.MARGIN_FAKE_AGENT) {
+    return runFakeSetupTurn(transcript);
+  }
+  const sdk = await loadSdk();
+  let proposal: ProjectProposal | undefined;
+  const server = sdk.createSdkMcpServer({
+    name: 'setup',
+    version: '1.0.0',
+    tools: [
+      sdk.tool(
+        'propose_project',
+        'Propose the project: folder name, title, description, and seed files. Shown to the author as a card; created only when they confirm.',
+        {
+          folderName: z.string().describe('kebab-case folder name for the project directory'),
+          title: z.string().describe('Human-readable project title'),
+          description: z.string().describe('One line on what this project is'),
+          files: z
+            .array(
+              z.object({
+                path: z.string().describe('File path relative to the project folder'),
+                content: z.string().describe('Complete initial contents'),
+              }),
+            )
+            .min(1)
+            .max(3),
+        },
+        async (args) => {
+          proposal = args;
+          return ok('Proposal captured — it is now showing to the author as a card.');
+        },
+      ),
+    ],
+  });
+
+  const lines = transcript.map(
+    (m, i) =>
+      `${m.author === 'user' ? 'Author' : 'You'}${i === transcript.length - 1 ? ' (latest)' : ''}: ${m.text}`,
+  );
+  const q = sdk.query({
+    prompt: `New-project conversation so far:\n\n${lines.join('\n\n')}`,
+    options: {
+      cwd: os.homedir(),
+      systemPrompt: SETUP_SYSTEM_PROMPT,
+      mcpServers: { setup: server },
+      allowedTools: ['mcp__setup__propose_project'],
+      disallowedTools: ['Write', 'Edit', 'NotebookEdit', 'Bash', 'WebFetch', 'WebSearch', 'Task', 'Read', 'Grep', 'Glob'],
+      permissionMode: 'dontAsk',
+      settingSources: [],
+      maxTurns: 6,
+      executable: 'node',
+      env: cleanEnv(),
+    },
+  });
+
+  let reply = '';
+  for await (const message of q) {
+    if (message.type === 'result') {
+      if (message.subtype === 'success') {
+        if (message.is_error) throw new Error(message.result || 'Setup turn failed');
+        reply = message.result || reply;
+      } else {
+        throw new Error(`Setup turn failed (${message.subtype})`);
+      }
+    }
+  }
+  return { reply, proposal };
+}
+
+/** Scripted setup turn for MARGIN_FAKE_AGENT — proposes on the first message. */
+function runFakeSetupTurn(transcript: SetupMessage[]): SetupReply {
+  const first = transcript.find((m) => m.author === 'user')?.text ?? 'a demo project';
+  return {
+    reply:
+      '(fake agent) Here is a starter project based on what you described — confirm the card to create it, or tell me what to change.',
+    proposal: {
+      folderName: 'fake-project',
+      title: 'Fake Project',
+      description: `Scripted proposal from MARGIN_FAKE_AGENT (asked for: ${first.slice(0, 60)})`,
+      files: [
+        {
+          path: 'Fake Project.md',
+          content: `# Fake Project\n\nSeeded by the fake agent to exercise the new-project flow.\n\n## Outline\n\n- Opening\n- Middle\n- End\n`,
+        },
+      ],
     },
   };
 }

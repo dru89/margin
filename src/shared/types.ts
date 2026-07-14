@@ -162,6 +162,30 @@ export interface ProposalsData {
   proposals: FileProposal[];
 }
 
+/**
+ * The card the agent produces during the new-project conversation. Nothing
+ * is created until the author confirms; then the app makes the folder under
+ * the projects directory, writes the seed files, and git-inits.
+ */
+export interface ProjectProposal {
+  /** Folder name under the projects directory (single path segment). */
+  folderName: string;
+  title: string;
+  description: string;
+  files: { path: string; content: string }[];
+}
+
+/** One agent turn in the new-project conversation. */
+export interface SetupReply {
+  reply: string;
+  proposal?: ProjectProposal;
+}
+
+export interface SetupMessage {
+  author: Author;
+  text: string;
+}
+
 export interface RecentFile {
   path: string;
   name: string;

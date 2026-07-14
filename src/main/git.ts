@@ -24,6 +24,18 @@ export async function initRepo(filePath: string): Promise<void> {
   await git(path.dirname(filePath), ['init']);
 }
 
+/** git init + first commit of everything in a freshly created project dir. */
+export async function initProjectRepo(dir: string, message: string): Promise<void> {
+  await git(dir, ['init']);
+  try {
+    await git(dir, ['add', '-A']);
+    await git(dir, ['commit', '-m', message]);
+  } catch {
+    // e.g. no git identity configured — the repo exists, project creation
+    // still succeeds; round checkpoints surface git problems non-fatally.
+  }
+}
+
 /**
  * Commit the document, its review sidecar, and any extra paths (e.g. the
  * workspace's .margin directory — discussion + agent notes) if changed.

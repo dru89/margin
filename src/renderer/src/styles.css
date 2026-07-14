@@ -1212,6 +1212,62 @@ button.status-chip:active { transform: translateY(1px); }
   white-space: pre-wrap;
 }
 
+/* ——— new-project setup conversation (welcome screen) ——— */
+
+.welcome-card-setup {
+  width: min(680px, 90vw);
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+.setup { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.setup-thread { flex: 1; overflow-y: auto; padding: 8px 2px 12px; }
+.setup-intro { color: var(--ink-soft); font-family: var(--font-ui); font-size: 13.5px; }
+.setup-msg { margin-bottom: 14px; font-family: var(--font-ui); font-size: 13.5px; }
+.setup-who {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  margin-bottom: 3px;
+}
+.setup-msg-user .setup-who { color: var(--user); }
+.setup-msg-agent .setup-who { color: var(--agent); }
+.setup-busy { color: var(--ink-faint); font-family: var(--font-ui); font-size: 12.5px; font-style: italic; }
+
+.setup-card {
+  border: 1px solid color-mix(in srgb, var(--agent) 40%, var(--rule));
+  background: var(--agent-wash);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin: 4px 0 14px;
+  font-family: var(--font-ui);
+}
+.setup-card-title { font-weight: 650; font-size: 15px; }
+.setup-card-desc { color: var(--ink-soft); font-size: 13px; margin-top: 2px; }
+.setup-card-path { font-family: var(--font-mono); font-size: 12px; color: var(--ink-faint); margin-top: 8px; overflow-wrap: anywhere; }
+.setup-card-files { margin: 6px 0 12px; padding-left: 18px; font-family: var(--font-mono); font-size: 12.5px; }
+.setup-card-actions { display: flex; align-items: center; gap: 10px; }
+.setup-card-hint { color: var(--ink-faint); font-size: 12px; }
+
+.setup-compose { border-top: 1px solid var(--rule); padding-top: 10px; }
+.setup-input {
+  width: 100%;
+  resize: none;
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: 13.5px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.setup-input:focus { outline: none; border-color: var(--user); }
+.setup-compose-row { display: flex; justify-content: space-between; margin-top: 8px; }
+
 /* preview: list breathing room (issue #7) */
 .preview-body li { margin: 0.35em 0; }
 .preview-body li > p { margin: 0.35em 0; }

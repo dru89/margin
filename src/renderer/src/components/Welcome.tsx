@@ -1,12 +1,25 @@
 import { useEffect, useState } from 'react';
 import type { RecentFile } from '@shared/types';
+import { ProjectSetup } from '@/components/ProjectSetup';
 
 export function Welcome() {
   const [recents, setRecents] = useState<RecentFile[]>([]);
+  const [settingUp, setSettingUp] = useState(false);
 
   useEffect(() => {
     void window.margin.getRecents().then(setRecents);
   }, []);
+
+  if (settingUp) {
+    return (
+      <div className="welcome">
+        <div className="welcome-card welcome-card-setup">
+          <h1 className="welcome-title">New project</h1>
+          <ProjectSetup onBack={() => setSettingUp(false)} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="welcome">
@@ -19,6 +32,9 @@ export function Welcome() {
         </p>
         <button className="btn btn-primary btn-lg" onClick={() => void window.margin.openFileDialog()}>
           Open a markdown file…
+        </button>
+        <button className="btn btn-lg" onClick={() => setSettingUp(true)}>
+          Start a new project with Claude…
         </button>
         {recents.length > 0 && (
           <div className="welcome-recents">
