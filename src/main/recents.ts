@@ -25,12 +25,13 @@ export async function getRecentFiles(): Promise<RecentFile[]> {
   return cache;
 }
 
-export async function addRecentFile(filePath: string): Promise<void> {
+export async function addRecentFile(filePath: string, root?: string): Promise<void> {
   const recents = await getRecentFiles();
   const resolved = path.resolve(filePath);
   cache = [
-    { path: resolved, name: path.basename(resolved), openedAt: new Date().toISOString() },
-    ...recents.filter((r) => r.path !== resolved),
+    { path: resolved, name: path.basename(resolved), openedAt: new Date().toISOString(), root },
+    // One entry per project: the newest file in a workspace replaces its siblings.
+    ...recents.filter((r) => r.path !== resolved && !(root && r.root === root)),
   ].slice(0, MAX_RECENTS);
   app.addRecentDocument(resolved);
   await persist();

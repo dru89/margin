@@ -103,7 +103,7 @@ export async function attachDocument(win: BrowserWindow, filePath: string): Prom
   const session = await DocumentSession.open(filePath, win);
   setSession(win.webContents.id, session);
   win.setTitle(session.fileName);
-  await addRecentFile(filePath);
+  await addRecentFile(filePath, session.workspaceRoot);
   const send = () => win.webContents.send(IPC.docLoaded, session.toDocState());
   if (win.webContents.isLoading()) {
     win.webContents.once('did-finish-load', send);

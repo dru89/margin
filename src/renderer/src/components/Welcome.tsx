@@ -1,14 +1,34 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { RecentFile } from '@shared/types';
 import { ProjectSetup } from '@/components/ProjectSetup';
+
+/** Recents deduped to their project folders — the unit is the project, not the file. */
+interface RecentProject {
+  root: string;
+  name: string;
+  /** Most recently opened file in this project — what a click reopens. */
+  filePath: string;
+}
 
 export function Welcome() {
   const [recents, setRecents] = useState<RecentFile[]>([]);
   const [settingUp, setSettingUp] = useState(false);
+  const isMac = navigator.userAgent.includes('Mac');
 
   useEffect(() => {
     void window.margin.getRecents().then(setRecents);
   }, []);
+
+  const projects = useMemo<RecentProject[]>(() => {
+    const seen = new Map<string, RecentProject>();
+    for (const r of recents) {
+      const root = r.root ?? (r.path.slice(0, r.path.lastIndexOf('/')) || r.path);
+      if (!seen.has(root)) {
+        seen.set(root, { root, name: root.split('/').pop() || root, filePath: r.path });
+      }
+    }
+    return [...seen.values()];
+  }, [recents]);
 
   if (settingUp) {
     return (
@@ -30,29 +50,31 @@ export function Welcome() {
           <br />
           Claude reviews in rounds — you decide what lands.
         </p>
-        <button className="btn btn-primary btn-lg" onClick={() => void window.margin.openFileDialog()}>
-          Open a markdown file…
-        </button>
-        <button className="btn btn-lg" onClick={() => setSettingUp(true)}>
-          Start a new project with Claude…
-        </button>
-        {recents.length > 0 && (
+        <div className="welcome-actions">
+          <button className="btn btn-primary btn-lg" onClick={() => void window.margin.openFileDialog()}>
+            Open a markdown file…
+          </button>
+          <button className="btn btn-ghost" onClick={() => setSettingUp(true)}>
+            Start a new project with Claude…
+          </button>
+        </div>
+        {projects.length > 0 && (
           <div className="welcome-recents">
-            {recents.slice(0, 6).map((r) => (
+            {projects.slice(0, 6).map((p) => (
               <button
-                key={r.path}
+                key={p.root}
                 className="welcome-recent"
-                title={r.path}
-                onClick={() => void window.margin.openPath(r.path)}
+                title={p.root}
+                onClick={() => void window.margin.openPath(p.filePath)}
               >
-                <span className="welcome-recent-name">{r.name}</span>
-                <span className="welcome-recent-path">{r.path}</span>
+                <span className="welcome-recent-name">{p.name}</span>
+                <span className="welcome-recent-path">{p.root}</span>
               </button>
             ))}
           </div>
         )}
         <p className="welcome-hint">
-          <kbd>⌘O</kbd> / <kbd>Ctrl+O</kbd> to open · or drop a file anywhere
+          <kbd>{isMac ? '⌘O' : 'Ctrl+O'}</kbd> to open · or drop a file anywhere
         </p>
       </div>
     </div>

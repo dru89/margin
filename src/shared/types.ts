@@ -190,6 +190,8 @@ export interface RecentFile {
   path: string;
   name: string;
   openedAt: string;
+  /** Workspace root the file belongs to (absent on legacy entries). */
+  root?: string;
 }
 
 export function emptyReview(documentName: string): ReviewData {

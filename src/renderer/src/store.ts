@@ -157,6 +157,7 @@ export const useStore = create<MarginState>((set, get) => {
       const load = (doc: DocState) =>
         set({
           dockOpen: localStorage.getItem(`margin-dock-open:${doc.workspaceRoot}`) === 'true',
+          reviewModel: localStorage.getItem(`margin-model:${doc.workspaceRoot}`) ?? undefined,
           doc,
           content: doc.content,
           review: doc.review,
@@ -379,7 +380,15 @@ export const useStore = create<MarginState>((set, get) => {
     },
 
     reviewModel: undefined,
-    setReviewModel: (reviewModel) => set({ reviewModel }),
+    setReviewModel: (reviewModel) => {
+      // Sticky per project: the picker sets a default, not a per-round choice.
+      const root = get().doc?.workspaceRoot;
+      if (root) {
+        if (reviewModel) localStorage.setItem(`margin-model:${root}`, reviewModel);
+        else localStorage.removeItem(`margin-model:${root}`);
+      }
+      set({ reviewModel });
+    },
     hoveredAnchorId: null,
     setHoveredAnchor: (hoveredAnchorId) => set({ hoveredAnchorId }),
     diskConflict: false,
