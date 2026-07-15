@@ -486,6 +486,26 @@ creation — parity with non-fatal round checkpoints. MARGIN_FAKE_AGENT
 scripts a one-message propose so the whole surface tests without
 credentials.
 
+## 40. Google Docs sync: spec'd, not built (docs/specs/gdocs-sync.md)
+
+Full spec in `docs/specs/gdocs-sync.md`; this entry records the
+invariants so future sessions don't relitigate them. Sync is explicit,
+never live. Imported collaborator threads are read-down with a local
+"shadow discussion" (author + Claude) that is structurally unable to
+sync; the only upstream write is an explicit Reply-on-Doc composer
+sending exactly the author's typed text as a reply to an existing
+thread — which is also the API-safe boundary, since creating new
+anchored comments programmatically isn't supported. **The agent has no
+code path to the Doc** (the GitHub-byline lesson as architecture, not
+etiquette). Comment preservation on push uses the anchor-preserving
+splice (insert strictly inside the anchored range, then delete flanks —
+the range never hits zero width); tables morph in place when commented,
+replace atomically when not. OAuth is drive.file only, embedded public
+client with an org-overridable custom client (rclone/gcloud pattern, no
+fork). Conversion core: TypeScript port of Drew's internal Python tool
+(mdast replaces pandoc), its integration-test corpus ported first as
+the spec.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:
