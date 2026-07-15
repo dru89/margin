@@ -106,6 +106,9 @@ npx electron . --remote-debugging-port=9224 "path/to/doc.md" &   # background
   is prompted to answer them and propose replacements (DECISIONS.md §8).
 - No Sift/vault/work-log integration for this project — Drew tracks it
   himself.
+- **GitHub comments post from Drew's own account.** Write issue/PR comments
+  as neutral log entries — never name Drew, address him as "you", or use an
+  assistant voice. Under his byline that reads as Drew talking to himself.
 - Feature priority (2026-07-10): multi-document workspace → comments in
   preview mode → history browser → model picker → about/auto-update/
   packaging → user-authored suggestions.
