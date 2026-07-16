@@ -1,0 +1,23 @@
+{
+  "name": "gdocs-sync",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Standalone markdown <-> Google Docs sync engine: push, fetch, comments, tabs, images. Fresh implementation against the dru89/doc-tools scenario catalog. Consumers: Margin (embedded) and a future gpush/gfetch-compatible CLI. Extracts to its own repo when stable.",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/mdast": "^4.0.4",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "dependencies": {
+    "mdast-util-from-markdown": "^2.0.1",
+    "mdast-util-gfm": "^3.0.0",
+    "micromark-extension-gfm": "^3.0.0"
+  }
+}
