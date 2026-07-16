@@ -1,6 +1,6 @@
 # Spec: Google Docs sync
 
-Status: **proposed, rev 2** · Owner: Margin · Reference:
+Status: **accepted, rev 3** · Owner: Margin · Reference:
 [`dru89/doc-tools`](https://github.com/dru89/doc-tools) — the knowledge
 base distilled from an internal md↔gdocs tool with months of production
 use (`docs/google-docs-api-lessons.md`, `docs/test-scenarios.md`).
@@ -281,38 +281,48 @@ literal:
   import), Picker import of pre-existing docs, multi-tab mapping
   (UTAB planner).
 
-## Open questions (for the reference implementation's owners)
+## Interop conventions (resolved — doc-tools `docs/conventions.md`)
 
-1. **Frontmatter contract.** The reference renders frontmatter
-   title/subtitle/author/date as TITLE/SUBTITLE styles and smart chips
-   (META-1..6) and can read its target URL from frontmatter (UMISC-5).
-   What are the exact keys/formats, and should Margin honor the same
-   frontmatter convention for interop with docs the internal tool
-   manages — or is `.margin/gdocs.json` the sole link store and
-   frontmatter-URL support just an import convenience?
-2. **Heading policy.** UREAD-2 implies a level-shift policy (H1 vs
-   TITLE). Which mapping did the reference land on, so Margin
-   round-trips internally-created docs without spurious diffs?
-3. **Comments-section markers.** UMISC-1 says fetched docs may carry an
-   appended human-readable comments section that must be stripped before
-   re-upload. Exact marker format, and do existing docs in the wild
-   contain these sections?
-4. **Multi-tab input convention.** The UTAB planner reconciles "input
-   tabs" against a doc — how does the markdown side declare tabs (file
-   per tab? manifest? headings)? Margin v0 is single-tab, but the
-   mapping should not paint over the reference's convention.
-5. **Chip creation on push.** META-4 has the author rendering as a
-   person smart chip, but the lessons doc covers only *reading* chips.
-   Which requests create person/date chips on the write path?
-6. **Diagram support (DIA-1..3).** In or out of the colleague's actual
-   needs? It carries its own appendix/anchor machinery and read-back
-   link-repair pass; would prefer to scope it explicitly.
-7. Resolve-sync default (ask vs. on vs. off) — product taste, low risk.
+1. **Frontmatter.** Reference push reads `title`, `subtitle`, `author`,
+   `author-email`, `date`, `url`; fetch writes `title`, `author`, `url`,
+   published date, `google-doc` tag; after a push `url:` is always
+   overwritten, other keys added only if missing. **Margin's contract:**
+   honor `url:` on import as a link-*offer* signal (files that touched
+   the reference tool carry it); `.margin/gdocs.json` is the sole link
+   store; Margin never writes `url:` into the user's markdown.
+2. **Headings.** Push shifts −1 (`#` → TITLE, `##` → Heading 1, …);
+   read maps TITLE → `#`, Heading N → N+1 hashes. Round-trip stable.
+   Do **not** copy the reference's SUBTITLE asymmetry (written from
+   frontmatter, read back as `##`) — Margin round-trips SUBTITLE to the
+   `subtitle` frontmatter key.
+3. **Comment-section markers.** Fetched docs in the wild carry
+   `<!-- gpush:comments-start -->` … `<!-- gpush:comments-end -->`
+   wrapping a `---` + `## Comments` section at EOF. The push path strips
+   from the start marker to end of file before parsing (UMISC-1). No
+   unmarked legacy format exists.
+4. **Multi-tab.** Reference declares tabs as ordered CLI args
+   (`"Title=path.md"` or bare path; title falls back `#` heading →
+   frontmatter → filename stem; 50-char truncation at word boundaries).
+   Margin's file+`tabId` link record is compatible — writes are scoped
+   to Margin's own tab, so single-tab Margin coexists with multi-tab
+   docs.
+5. **Chips on push.** `insertPerson` (`personProperties.email`) and
+   `insertDate` (ISO 8601 UTC timestamp). Each chip is exactly **one
+   index unit**. On update, the title/subtitle/chip block is found and
+   **replaced, never appended** (chips invisible to a text diff
+   duplicate on every push otherwise — UCHIP-1..4).
+6. **Diagram support (DIA-*) is out of scope** for v0–v2. The scenarios
+   stay in the catalog if it's ever wanted.
+
+Remaining open question: resolve-sync default (ask vs. on vs. off) —
+product taste, low risk, decide at v1.
 
 ## Dependencies
 
-Resolved: `dru89/doc-tools` (lessons + scenario catalog) is the
-specification for the conversion core. No code crosses the boundary;
-the internal tool remains the reference implementation and keeps
-running. Implementation of the library and the Margin integration
-proceeds on a feature branch once the open questions above are settled.
+Resolved: `dru89/doc-tools` (lessons + scenario catalog + interop
+conventions) is the specification for the conversion core. No code
+crosses the boundary; the internal tool remains the reference
+implementation and keeps running. Implementation proceeds on the
+`gdocs-sync` feature branch: the conversion library starts life at
+`packages/gdocs-sync/` (self-contained, own test suite, no coupling to
+the app build) and extracts to its own repo when it stabilizes.
