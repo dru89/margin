@@ -525,6 +525,21 @@ new engineering gated behind live boundary tests, upgrade ladder list
 items → code blocks → tables. §40's invariants (shadow discussions
 never sync, Reply-on-Doc only, no agent path to the Doc) are unchanged.
 
+## 42. gdocs-sync is a standalone library; Margin is a consumer
+
+Drew's bar for the sync engine: good enough to *replace* his internal
+gpush/gfetch CLI tools, not just power Margin. So `packages/gdocs-sync`
+is a standalone package — own package.json/tsconfig/vitest suite,
+unscoped name, **zero imports from Margin, ever** — whose public API is
+shaped so a CLI can wrap it one-to-one (push/fetch/comments/tabs/
+images; token in, fidelity out). It lives in this repo for iteration
+speed and extracts to its own repo when stable. Tests are named by
+doc-tools scenario ID; the README's coverage checklist is the
+resumption point for any session continuing the work. Rule for future
+sessions: if a change would make the library know about Margin types,
+review sidecars, or Electron, it belongs in Margin's integration layer
+instead.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:
