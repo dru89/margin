@@ -1,8 +1,16 @@
 # Spec: Google Docs sync
 
-Status: **proposed** · Owner: Margin · Depends on: extraction of the
-md↔gdocs conversion core from an existing internal tool (Python), to be
-ported to TypeScript as a standalone library.
+Status: **proposed, rev 2** · Owner: Margin · Reference:
+[`dru89/doc-tools`](https://github.com/dru89/doc-tools) — the knowledge
+base distilled from an internal md↔gdocs tool with months of production
+use (`docs/google-docs-api-lessons.md`, `docs/test-scenarios.md`).
+Scenario IDs below (RT-1, CP-8, UTAB-*, …) refer to that catalog.
+
+Rev 2 incorporates review against the reference behavior: the conversion
+core arrives as a **specification, not code to port**; push diffs
+against live doc read-back; comment preservation ships at block-level
+parity first with the anchor-preserving splice re-phased behind a live
+test rig; images move into v0; `writeControl` is mandatory.
 
 ## Summary
 
@@ -22,8 +30,8 @@ explicitly sent.**
   attributed, anchored to the right text.
 - Discuss collaborator feedback with Claude locally — plan responses,
   propose document edits — without any of that discussion reaching the Doc.
-- Preserve collaborator comments across pushes, including edits to
-  commented text and (eventually) tables.
+- Preserve collaborator comments across pushes to the extent the API
+  allows, stated honestly at each phase.
 - Work as a normal external app under Google's least-privilege scope
   (`drive.file`), while allowing orgs to substitute their own OAuth client.
 
@@ -35,8 +43,8 @@ explicitly sent.**
 - The agent writing anything to the Doc. There is deliberately **no code
   path** for agent-authored content to reach Google — not a setting, an
   invariant.
-- Office / Confluence. Out of scope here; the conversion library should
-  not preclude them, but this spec is Docs-only.
+- Office / Confluence. Out of scope; the conversion library should not
+  preclude them, but this spec is Docs-only.
 
 ## Product model
 
@@ -47,22 +55,33 @@ explicitly sent.**
   within `drive.file` scope.
 - **Import-existing (v2):** linking a Doc someone else created requires
   the Google Picker flow (that's how `drive.file` grants per-file access).
-- Link state is a project-scoped record (see *Data* below). One markdown
-  file ↔ one Doc (or one tab of a Doc; the conversion core already
-  supports tabs).
+- Link state is a project-scoped record (see *Data*). One markdown file
+  ↔ one Doc or one tab (the reference supports nested tabs; Margin v0 is
+  single-tab, with the tab-reconciliation planner (UTAB-*) reserved for
+  a later multi-file↔multi-tab mapping).
 
 ### Sync actions
 
-- **Pull:** fetch Doc → convert to markdown → write the local file
+- **Pull:** fetch Doc (`documents.get` with `includeTabsContent=true` —
+  never the export path) → convert to markdown → write the local file
   through Margin's existing external-change path (clean editor reloads
   silently; dirty editor gets the conflict banner). Fetch comments and
   merge (append-only by ID). Git checkpoint before and after.
-- **Push:** diff last-synced base → current local markdown → minimal
-  Docs API `batchUpdate`. Git checkpoint before and after.
+- **Push:** read the live Doc back, canonicalize both sides, and diff
+  **doc-readback vs. current markdown** (reference behavior: you need
+  the read for current indices regardless, and doc-vs-markdown diffing
+  self-heals renderer drift — this is also why canonicalization parity
+  is a hard requirement, lesson 5). Emit the minimal `batchUpdate`s.
+  Git checkpoint before and after.
+- **Every push batchUpdate sets `writeControl.requiredRevisionId`**,
+  chained through the returned revision across sequential batches. A
+  racing collaborator makes the push fail cleanly instead of editing
+  against moved indices; the user re-pulls and retries.
 - **Conflict rule:** the link record stores the Doc `revisionId` and a
-  base snapshot from the last sync. If both sides changed since base,
-  neither direction proceeds silently — the user chooses pull-first or
-  push-anyway. No three-way text merge in v1.
+  base snapshot (git blob) from the last sync — used for *detection
+  only*, not as the diff base. If both sides changed since base, neither
+  direction proceeds silently: the user chooses pull-first or
+  push-anyway.
 
 ### Comments
 
@@ -71,35 +90,61 @@ Margin) or `imported` (from the Doc, with collaborator attribution).
 
 - **Imported threads are read-down.** They render in the sidebar with the
   collaborator's name, anchored via the same quote+context re-anchoring
-  Margin uses everywhere (`quotedFileContent` from the Drive API maps
-  directly onto Margin's anchor model).
+  Margin uses everywhere (`quotedFileContent` from the Drive comments API
+  maps directly onto Margin's anchor model). Comment fetch failures
+  (403/404 independent of file access) degrade gracefully.
 - **Shadow discussion:** each imported thread supports local replies
-  (author and Claude) that are stored in the review sidecar and are
-  structurally unable to sync. This is the primary workflow: hash out a
-  collaborator's comment with Claude, decide what to do, respond with
-  document edits.
+  (author and Claude) stored in the review sidecar, structurally unable
+  to sync. This is the primary workflow: hash out a collaborator's
+  comment with Claude, decide what to do, respond with document edits.
 - **Reply on Doc** is a separate, explicit composer on an imported
   thread. It sends exactly the text typed into it, as a reply to the
-  existing Drive comment thread, under the user's account. Nothing else
-  syncs up: local threads never do, shadow replies never do, agent text
-  never does. (Replying to *existing* threads is fully supported by the
-  Drive API; creating *new* anchored comments programmatically is not —
-  the Docs anchor format is undocumented — so restricting upstream writes
-  to replies is also the technically safe boundary.)
-- **Resolution:** resolving an imported thread in Margin optionally syncs
-  (Drive supports resolve-via-reply); default is to ask.
+  existing Drive thread, under the user's account. Nothing else syncs
+  up. (This is also the only technically safe upstream write: creating
+  *positioned* comments programmatically is unsupported — the Docs
+  anchor format is undocumented and unstable, lesson 6.)
+- **Resolution:** resolving an imported thread in Margin optionally
+  syncs (resolve-via-reply); default is to ask.
 - Native Margin comments never appear in the Doc.
+
+**Preservation phasing (revised):** the reference behavior is
+block-level diff-and-rebuild, which preserves comments on *unchanged*
+blocks and **orphans comments on any block that is edited** — pinned as
+CP-8, a known limitation, not a solved problem. Margin ships that parity
+first (v1), stated in the UI ("editing commented text will disconnect
+the comment in Google Docs"). The **anchor-preserving splice** (insert
+strictly inside the anchored range, then delete flanks; the range never
+hits zero width) is the intended upgrade, but it is **new engineering,
+not extraction** — a prior inline-diff prototype was abandoned with
+exactly the bugs the splice must avoid (delete-then-insert ordering,
+code-point index math). It lands only behind live boundary tests
+(insertion at range start/end, single-character anchors, suggesting
+mode, concurrent edits — the CP-8 extension group), following the
+reference's difficulty ladder: **list items → code blocks → tables.**
 
 ### Collaborator suggestions (v2)
 
-Google suggested edits can be *read* through the Docs API and rendered as
-Margin suggestion cards (author-attributed, accept/reject). Constraints:
+Google suggested edits can be *read* (suggestion spans in document
+content) and rendered as Margin suggestion cards. The API **cannot
+accept or reject** a suggestion; accepting in Margin applies the change
+locally and the Doc-side suggestion goes stale, superseded by the next
+push. The UI must say so honestly. Push onto a Doc with pending
+suggestions is unpinned behavior — live tests before shipping.
 
-- The API cannot accept or reject a suggestion in the Doc. Accepting in
-  Margin applies the change locally; the Doc-side suggestion becomes
-  stale and is superseded by the next push. The UI must say so honestly.
-- A push onto a Doc with pending suggestions is the messiest known case;
-  behavior must be pinned by integration tests before this ships.
+### Images (v0 — real documents have images)
+
+- `insertInlineImage` needs a URI Google's fetchers can reach. Workspace
+  accounts that block public link-sharing require the temp-doc staging
+  trick (upload a .docx containing all images with convert-to-Doc, read
+  back the ~30-minute `contentUri`s, delete the temp doc) — it works
+  under `drive.file`. Batch all images into one temp doc.
+- Always set `objectSize` (Docs renders raw pixel size otherwise);
+  compute from pixel dimensions at render DPI, clamp to page width and
+  max height preserving aspect ratio.
+- An inline image is **one index unit**.
+- Dialect: image alone in a paragraph with alt text = figure (centered,
+  italic caption); mixed with text = inline; empty alt = plain paragraph.
+- Scenarios: UIMG-1..6 offline, IMG-1..3 live.
 
 ### Agent integration
 
@@ -125,7 +170,7 @@ and only when the author pushes.
       "docId": "…",
       "tabId": "…",                      // optional
       "revisionId": "…",                 // Doc revision at last sync
-      "baseRef": "…",                    // git blob of last-synced markdown
+      "baseRef": "…",                    // git blob of last-synced markdown (conflict detection only)
       "threads": { "<localThreadId>": "<driveCommentId>", … },
       "lastSyncAt": "…"
     }
@@ -133,117 +178,141 @@ and only when the author pushes.
 }
 ```
 
-The base snapshot is a git blob reference (the checkpoint commits already
-exist), not a copied file.
+### Push pipeline (per the reference architecture)
 
-### Push granularity (hybrid)
+1. **Read back** the live Doc; convert to canonical block list.
+2. **Canonicalize** the markdown AST side to the same form. Parity rules
+   from lesson 5: coalesce Docs' per-line code paragraphs into one
+   block; one canonical string per table (per-cell text, stripped,
+   newline-joined, row-major); render smart chips as text or they're
+   invisible to the diff and duplicate forever. Block identity = type +
+   heading level + plain text — **content, not styling** (UDIFF-6/7).
+3. **Diff** block lists (UDIFF-*), group changes into contiguous rebuild
+   regions (UREGION-*).
+4. **Build requests** with the phase ordering that doesn't lose styles
+   (lesson 2): all inserts → all bullet applications → all base
+   paragraph/text styles → all inline styles. Correct post-bullet
+   indices for the tabs `createParagraphBullets` removes (lesson 3 —
+   the empty-document bug). **Explicitly set every inheritable property
+   on everything inserted** (named style, font, alignment, bullet
+   state) — insertion inherits neighbor formatting and the bug class
+   only manifests on incremental update, never on fresh create
+   (lesson 4; SI-1..3 were all production bugs).
+5. **Send** with `writeControl.requiredRevisionId`; retry 429s with
+   exponential backoff at the single choke point (60 write
+   requests/min/user — lesson 10).
 
-- **Prose:** word/run-level diffs within changed paragraphs. Smallest
-  edits maximize server-side comment-anchor survival.
-- **Structure:** paragraph/block operations for insert/delete/reorder.
-- **Tables:** *atomic* (delete + reinsert) when the table carries no
-  comments; **in-place morph** when it does — row/column ops for shape,
-  then per-cell splices for content.
-- All operations are emitted in **reverse document order** so earlier
-  indices are never invalidated by already-emitted edits. Indices are
-  UTF-16 code units (Docs API convention).
+Granularity: word-level prose diffs and in-place table morphing are
+*not* v0/v1. The reference validates block-level rebuild with atomic
+tables; finer granularity follows the splice work (see Comments).
 
-### The anchor-preserving splice
+Index math is **UTF-16 code units** everywhere. TS `String.length`
+already is — do not "fix" it to code points (lesson 1). Visible width
+(table column sizing) is a third, separate measurement (UMISC-2).
 
-The standard write primitive whenever a diff hunk overlaps a comment
-anchor. Invariant: **a comment survives as long as its anchored range
-never reaches zero width at any point in the operation sequence.**
+### Read pipeline
 
-1. Insert the replacement text *strictly inside* the anchored range
-   (the range absorbs the insertion and grows).
-2. Delete the old text on each flank as separate operations (the range
-   shrinks but never vanishes).
-
-Delete-then-insert orphans the comment; insert-then-delete preserves it.
-
-Known edges, all of which must be pinned by live integration tests
-because Google documents none of this behavior:
-
-- **Boundary semantics:** insertion strictly inside extends the range;
-  insertion at the range's start/end boundary generally does not.
-- **Single-character anchors** have no strictly-inside insertion point —
-  the degenerate case. Fallback: accept the orphan, or recreate the
-  thread as best-effort (loses Doc-side anchor).
-- **Style inheritance:** inserted text takes the style at the insertion
-  point; the engine applies text-style corrections after the splice
-  rather than assuming the insert landed clean.
-- **Suggesting mode:** interactions between the splice and pending
-  suggestion spans are unknown; test, don't reason.
-- **Concurrent edits:** a collaborator typing in the same region during
-  a push is decided by the API's revision handling, not the splice.
-  Sync being explicit makes this rare, not impossible; needs a live test
-  and a defined retry/abort behavior.
+Structured `documents.get` walk (never export-to-docx: silent table
+loss, size limits). Merge adjacent same-format runs (`**bo****ld**`),
+push whitespace out of emphasis markers, render smart chips explicitly,
+reconstruct nested/checkbox lists, blank line between adjacent lists of
+different types. UREAD-1..10.
 
 ## Conversion library
 
-A new standalone TypeScript library (own public repo), ported from the
-internal Python tool. The internal tool is the reference implementation
-and keeps running unmodified.
+A standalone TypeScript library (own repo), **written fresh against the
+scenario catalog** — the internal implementation stays internal; what
+crossed the boundary is what it learned. "Tests are the spec" is now
+literal:
 
-- **AST:** remark/mdast with GFM replaces pandoc. Margin already ships
-  remark; dropping the pandoc binary removes a large bundled dependency
-  and version-skew risk. The markdown dialect is GFM, which mdast covers.
-- **Styling:** the reference.docx concept survives as a style-mapping
-  config (fonts/spacing per block type). A reference.docx *importer* can
-  come later; the mapping format is the contract.
+- **Build order:** port the scenario catalog into a test suite first.
+  The first implementation target is **RT-1** (push a doc with every
+  block type; re-push identical markdown; assert zero write requests) —
+  it catches canonicalization drift for every block type at once and
+  stays green forever.
+- **Test architecture** (from the catalog's design principle): pure
+  decision logic (differ, region planner, tab planner, request builder)
+  tested offline in milliseconds; a **fake Docs service** middle tier
+  proving the orchestrator emits surgical requests (USCOPE-*); an
+  opt-in live tier with session-scoped auth (skip, don't fail, when
+  unauthenticated), retry-on-429, per-test scratch docs with cleanup,
+  and generated image fixtures.
+- **AST:** remark/mdast with GFM (Margin already ships remark; no
+  pandoc binary). **Dialect is pinned, not inherited** (UMD-1..4):
+  smart punctuation off — straight quotes stay straight, `--` stays two
+  hyphens, `...` stays three dots — lists parse without a preceding
+  blank line, the image trichotomy above, HR as a `borderBottom`
+  paragraph (no HR element exists in Docs).
+- **Styling:** style-mapping config (fonts/spacing per block type); a
+  reference.docx importer can come later.
 - **API surface:** token in, fidelity out. No auth opinions, no Margin
-  types — the library speaks markdown, Docs API requests, and comment
-  records. Margin owns sync, provenance, and UI. The internal tool can
-  eventually wrap the same library with internal auth and the
-  Office/Confluence extras.
-- **Tests are the spec.** Port the existing integration round-trip corpus
-  *first*, then implement until green. Add: table-torture cases (the
-  known weak spot), splice boundary-semantics pinning tests, and a
-  live-API mode that runs against a scratch Doc under a test account.
+  types. The internal tool can eventually wrap the same library.
 
 ## OAuth
 
-- **Scope:** `drive.file` only. Avoids the restricted-scope security
-  assessment that makes full-`drive` external apps effectively
-  unshippable, and matches the product: push-created docs are in scope
-  automatically; import-existing goes through the Picker.
-- **Client config, three tiers** (same binary for everyone — no fork):
-  1. Default: embedded public Margin client. Zero setup.
-  2. Custom: paste a client-config file or URL in settings — orgs
-     distribute one internal link, setup is a runbook sentence. (Same
-     pattern as rclone/gcloud custom clients.)
-  3. Org admins can pre-approve their internal client, so colleagues
-     never see an unverified-app consent screen — useful while the
-     public client works through Google's verification queue.
-- **Flow:** installed-app loopback + PKCE. Client IDs for native apps are
-  not secrets (the repo is public). Tokens stored via Electron
-  `safeStorage` (OS keychain).
+- **Scope:** `drive.file` only. Avoids restricted-scope review;
+  push-created docs are in scope automatically; import-existing goes
+  through the Picker. Sufficient for the image staging trick.
+- **Client config, three tiers** (same binary — no fork): embedded
+  public Margin client by default; custom client via a config file/URL
+  pasted in settings (orgs distribute one internal link — the
+  rclone/gcloud pattern); org admins can pre-approve their internal
+  client so colleagues skip the unverified-app screen.
+- **Flow:** installed-app loopback + PKCE; tokens in Electron
+  `safeStorage`. Client IDs for native apps are not secrets.
+- **Token handling carries the reference's failure-mode fixes**
+  (UAUTH-1..4): persist *granted* scopes and compare against required
+  (an unexpired read-only token must not pass as valid for writes);
+  refresh failure falls through to interactive auth; `invalid_client`
+  gets its own user-facing message (re-auth won't fix a dead client).
 
 ## Phasing
 
-- **v0 — content round-trip:** link (push-created), push, pull, conflict
-  banner, checkpoints. Tables atomic. No comments yet. Independently
-  useful: write locally, share as a Doc.
-- **v1 — comments:** import + attribution + re-anchoring, shadow
-  discussions, Reply-on-Doc, optional resolve sync, agent sees imported
-  threads in review state. Splice primitive for prose; commented tables
-  still atomic (documented as lossy).
-- **v2 — the hard fidelity:** collaborator suggestions (read-only
-  import), commented-table morphing, Picker import of pre-existing docs.
+- **v0 — content round-trip:** link (push-created), push, pull, images,
+  conflict banner, checkpoints, `writeControl`, RT-1 green. Tables
+  atomic. No comments yet.
+- **v1 — comments at reference parity:** import + attribution +
+  re-anchoring, shadow discussions, Reply-on-Doc, optional resolve
+  sync, agent sees imported threads. Block-level preservation with the
+  CP-8 limitation stated in the UI.
+- **v2 — fidelity upgrades, each behind live tests:** the
+  anchor-preserving splice (list items → code blocks → tables),
+  commented-table morphing, collaborator suggestions (read-only
+  import), Picker import of pre-existing docs, multi-tab mapping
+  (UTAB planner).
 
-## Open questions
+## Open questions (for the reference implementation's owners)
 
-1. Incremental-push quality on tables in the reference implementation is
-   still being worked; the morph strategy above needs validation against
-   its test corpus.
-2. Splice behavior under suggesting mode and concurrent edits —
-   empirical, needs the live test rig.
-3. Whether resolve-sync should default on or off.
-4. Style-mapping format: minimal JSON now vs. reference.docx parity.
+1. **Frontmatter contract.** The reference renders frontmatter
+   title/subtitle/author/date as TITLE/SUBTITLE styles and smart chips
+   (META-1..6) and can read its target URL from frontmatter (UMISC-5).
+   What are the exact keys/formats, and should Margin honor the same
+   frontmatter convention for interop with docs the internal tool
+   manages — or is `.margin/gdocs.json` the sole link store and
+   frontmatter-URL support just an import convenience?
+2. **Heading policy.** UREAD-2 implies a level-shift policy (H1 vs
+   TITLE). Which mapping did the reference land on, so Margin
+   round-trips internally-created docs without spurious diffs?
+3. **Comments-section markers.** UMISC-1 says fetched docs may carry an
+   appended human-readable comments section that must be stripped before
+   re-upload. Exact marker format, and do existing docs in the wild
+   contain these sections?
+4. **Multi-tab input convention.** The UTAB planner reconciles "input
+   tabs" against a doc — how does the markdown side declare tabs (file
+   per tab? manifest? headings)? Margin v0 is single-tab, but the
+   mapping should not paint over the reference's convention.
+5. **Chip creation on push.** META-4 has the author rendering as a
+   person smart chip, but the lessons doc covers only *reading* chips.
+   Which requests create person/date chips on the write path?
+6. **Diagram support (DIA-1..3).** In or out of the colleague's actual
+   needs? It carries its own appendix/anchor machinery and read-back
+   link-repair pass; would prefer to scope it explicitly.
+7. Resolve-sync default (ask vs. on vs. off) — product taste, low risk.
 
-## Dependencies / what unblocks implementation
+## Dependencies
 
-From the internal tool (sanitized for sharing): the md↔gdocs conversion
-core, the integration-test fixture corpus (round-trip cases), and any
-notes/commits documenting Docs API bugs already solved. Internal OAuth
-handling and the Office/Confluence paths stay behind.
+Resolved: `dru89/doc-tools` (lessons + scenario catalog) is the
+specification for the conversion core. No code crosses the boundary;
+the internal tool remains the reference implementation and keeps
+running. Implementation of the library and the Margin integration
+proceeds on a feature branch once the open questions above are settled.

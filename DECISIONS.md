@@ -506,6 +506,25 @@ fork). Conversion core: TypeScript port of Drew's internal Python tool
 (mdast replaces pandoc), its integration-test corpus ported first as
 the spec.
 
+## 41. Google Docs sync spec, rev 2 (reference-behavior review)
+
+The internal tool's code stays internal; `dru89/doc-tools` publishes
+what it learned (API lessons + a scenario catalog with stable IDs), and
+the TS conversion library is a fresh implementation whose test suite is
+that catalog — RT-1 (noop re-push emits zero writes) is the first thing
+built and stays green forever. Spec changes from the review: push diffs
+**live doc read-back vs. markdown** (self-healing; base snapshot is for
+conflict detection only); every push batchUpdate sets
+`writeControl.requiredRevisionId`; images move into v0 (temp-doc
+staging under drive.file, explicit objectSize); markdown dialect is
+pinned (smart punctuation off) rather than inherited from remark
+defaults. Comment preservation ships at **block-level reference parity
+first** (edits to a commented block orphan its comment — CP-8, stated
+in the UI); the anchor-preserving splice from §40 is re-classified as
+new engineering gated behind live boundary tests, upgrade ladder list
+items → code blocks → tables. §40's invariants (shadow discussions
+never sync, Reply-on-Doc only, no agent path to the Doc) are unchanged.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:
