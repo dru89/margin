@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { CanonicalBlock } from '../src/blocks.js';
-import { diffBlocks } from '../src/differ.js';
-import { planRegions } from '../src/regions.js';
+import type { CanonicalBlock } from '../src/blocks.ts';
+import { diffBlocks } from '../src/differ.ts';
+import { planRegions } from '../src/regions.ts';
 
 const p = (text: string): CanonicalBlock => ({ kind: 'paragraph', spans: [{ text }] });
 const h = (level: number, text: string): CanonicalBlock => ({ kind: 'heading', level, spans: [{ text }] });

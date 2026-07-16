@@ -59,7 +59,9 @@ export function identity(block: CanonicalBlock): string {
     case 'paragraph':
       return `p:${spanText(block.spans)}`;
     case 'code':
-      return `c:${block.lang ?? ''}:${block.text}`;
+      // lang excluded: the Doc has nowhere to store it, so including it
+      // would break canonicalization parity on every read-back diff.
+      return `c:${block.text}`;
     case 'list':
       return `l:${listCanonical(block.items)}`;
     case 'table':

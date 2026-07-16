@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { displayWidth, docIdFromUrl, scopesSatisfy, truncateTabTitle, withQuotaRetry } from '../src/util.js';
-import { splitFrontmatter, stripCommentsSection } from '../src/markdown.js';
+import { displayWidth, docIdFromUrl, scopesSatisfy, truncateTabTitle, withQuotaRetry } from '../src/util.ts';
+import { splitFrontmatter, stripCommentsSection } from '../src/markdown.ts';
 
 describe('UMISC — small but load-bearing', () => {
   it('UMISC-1: strips the gpush comments section from start marker to EOF', () => {

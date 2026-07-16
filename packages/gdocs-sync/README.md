@@ -25,17 +25,29 @@ credentials).
 - [x] UQUOTA-1..3 — retry wrapper (`src/util.ts`)
 - [x] UAUTH-1..3 — scope checks (pure part; UAUTH-4 needs the auth flow)
 - [x] UIMG-2 — figure/inline/empty-alt trichotomy (parse side)
-- [ ] UBUILD-1..5 — request builder (blocks → batchUpdate; phase
-      ordering, bullet-tab index correction, explicit-styles invariant)
-- [ ] UREAD-1..10 — Docs JSON → blocks/markdown (run merging, chips,
-      checkboxes, heading −1 shift with SUBTITLE→frontmatter)
-- [ ] UIMG-1,3..6 — image index math, figure emission, sizing
+- [x] UBUILD-1..5 — request builder (phase ordering, bullet-tab index
+      correction, explicit-styles invariant) (`src/builder.ts`)
+- [x] USCOPE-1..3 — orchestrator vs. fake Docs service (`src/sync.ts`)
+- [x] UREAD (partial) — run merging (UREAD-5), heading −1 shift, ranges;
+      remaining: chips, checkboxes, adjacent-list separation, subtitle
+- [x] **RT-1 (live) — PASSING.** Corpus: 3 heading levels, styled
+      paragraphs, nested + ordered lists, table, fenced code,
+      blockquote. Create ≈47 writes; identical re-push plans zero.
+      `npm run rt1` (needs `npm run auth` once).
+- [ ] UREAD-7..10 — checkboxes, adjacent lists, chips, subtitle policy
+- [ ] UIMG-1,3..6 — image index math, figure emission, sizing (v0 gap:
+      images currently placeholder in builder)
 - [ ] UCHIP-1..4 — metadata chip block replacement (fake service)
 - [ ] UTAB-1..9 — tab reconciliation planner
-- [ ] USCOPE-1..3 — orchestrator vs. fake Docs service
 - [ ] UAUTH-4 — auth flow end-to-end (fake flow)
-- [ ] Live tier: RT-1 first (noop re-push, zero writes), then CP-*,
-      SI-*, TAB-*, IMG-*, META-* per the harness design in the catalog.
+- [ ] Live tier beyond RT-1: CP-* (comment preservation — next), SI-*,
+      TAB-*, IMG-*, META-* per the harness design in the catalog.
+
+Known warts (deliberate, revisit): update regions at doc end can leave
+a trailing empty paragraph (the final segment newline is undeletable —
+lesson 13; the reader skips empties so parity holds); code blocks with
+blank lines split on read-back; checkbox list items round-trip as plain
+items.
 
 ## Architecture
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { coalesceCodeBlocks, identity, tableCanonical, type CanonicalBlock } from '../src/blocks.js';
-import { markdownToBlocks } from '../src/markdown.js';
+import { coalesceCodeBlocks, identity, tableCanonical, type CanonicalBlock } from '../src/blocks.ts';
+import { markdownToBlocks } from '../src/markdown.ts';
 
 describe('UCANON — canonicalization parity', () => {
   it('UCANON-1: doc-side and md-side tables flatten to the identical canonical string', () => {

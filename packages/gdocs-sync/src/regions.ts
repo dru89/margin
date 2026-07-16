@@ -3,8 +3,8 @@
  * update orchestrator deletes each region's old range and rebuilds its
  * new blocks, touching nothing else. KEEP blocks are in no region.
  */
-import type { CanonicalBlock } from './blocks.js';
-import type { DiffOp } from './differ.js';
+import type { CanonicalBlock } from './blocks.ts';
+import type { DiffOp } from './differ.ts';
 
 export interface RebuildRegion {
   /** Old-side block index range to delete, [start, end). Empty when insert-only. */
