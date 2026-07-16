@@ -7,3 +7,5 @@ export * from './gdoc.ts';
 export * from './reader.ts';
 export * from './builder.ts';
 export * from './sync.ts';
+export * from './serialize.ts';
+export * from './tabs.ts';
