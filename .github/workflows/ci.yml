@@ -17,3 +17,21 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npx electron-vite build
+
+  # Offline tier only: the live suite (smoke, RT-1, CP-*) needs real
+  # credentials and stays local/manual per the doc-tools harness design.
+  gdocs-sync:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/gdocs-sync
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: packages/gdocs-sync/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
