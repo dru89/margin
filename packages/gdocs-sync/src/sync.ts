@@ -14,6 +14,7 @@ import type { DocsClient, GDocDocument, GDocRequest, GDocStructuralElement } fro
 import { markdownToBlocks, splitFrontmatter, stripCommentsSection } from './markdown.ts';
 import { MONO_FONT, docToBlocks } from './reader.ts';
 import { planRegions } from './regions.ts';
+import { columnWidthRequests, planColumnWidths } from './widths.ts';
 
 export function mdToCanonical(markdown: string): CanonicalBlock[] {
   const { body } = splitFrontmatter(stripCommentsSection(markdown));
@@ -142,6 +143,11 @@ async function applyBlocksAt(
         }
         offset += span.text.length;
       }
+    }
+    // Provisional column sizing (UWIDTH-*; algorithm pending reference
+    // answers in margin#10). Column properties don't shift text indices.
+    if (table.startIndex !== undefined) {
+      styleFixes.push(...columnWidthRequests(table.startIndex, planColumnWidths(block.rows)));
     }
     if (fills.length > 0 || styleFixes.length > 0) {
       // Fills are emitted in reverse order, so style ranges computed from

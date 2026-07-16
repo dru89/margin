@@ -34,14 +34,25 @@ credentials).
       paragraphs, nested + ordered lists, table, fenced code,
       blockquote. Create ≈47 writes; identical re-push plans zero.
       `npm run rt1` (needs `npm run auth` once).
-- [ ] UREAD-7..10 — checkboxes, adjacent lists, chips, subtitle policy
-- [ ] UIMG-1,3..6 — image index math, figure emission, sizing (v0 gap:
-      images currently placeholder in builder)
-- [ ] UCHIP-1..4 — metadata chip block replacement (fake service)
-- [ ] UTAB-1..9 — tab reconciliation planner
+- [x] Serializer (fetch path): blocks → markdown, contract = re-parse
+      is identity-equal; UREAD-5 hygiene, checkbox round-trip
+      (`src/serialize.ts`)
+- [x] UTAB-1..9 — tab reconciliation planner (`src/tabs.ts`)
+- [x] UWIDTH-1..3 — **provisional** column sizing (`src/widths.ts`);
+      algorithm pending reference answers (margin#10)
+- [x] Live tier v1 (`npm run test:live`): comments persist across
+      region rebuilds, CP-5 edit-lands, edit→noop stability. Skips
+      without credentials; scratch docs self-clean.
+- [ ] CP anchored-survival (CP-1..4/8 proper) — **blocked**:
+      programmatic comments are unanchored (probed); needs the
+      reference harness technique (asked in margin#10)
+- [ ] UREAD-7..10 remainder — doc-side checkbox read, chips, subtitle
+      policy
+- [ ] UIMG-1,3..6 — image index math, staging, sizing (v0 gap: images
+      still placeholder in builder)
+- [ ] UCHIP-1..4 — metadata block (title/subtitle/chips) replacement
 - [ ] UAUTH-4 — auth flow end-to-end (fake flow)
-- [ ] Live tier beyond RT-1: CP-* (comment preservation — next), SI-*,
-      TAB-*, IMG-*, META-* per the harness design in the catalog.
+- [ ] Live tier: SI-*, TAB-*, IMG-*, META-* per the catalog.
 
 Known warts (deliberate, revisit): update regions at doc end can leave
 a trailing empty paragraph (the final segment newline is undeletable —
