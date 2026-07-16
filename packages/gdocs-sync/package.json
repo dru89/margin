@@ -10,7 +10,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "auth": "node src/auth.ts",
-    "smoke": "node scripts/smoke.ts"
+    "smoke": "node scripts/smoke.ts",
+    "rt1": "node scripts/rt1.ts"
   },
   "devDependencies": {
     "@types/mdast": "^4.0.4",

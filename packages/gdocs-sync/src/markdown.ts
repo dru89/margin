@@ -16,7 +16,7 @@ import type {
   RootContent,
   TableCell,
 } from 'mdast';
-import type { CanonicalBlock, InlineSpan, ListItem } from './blocks.js';
+import type { CanonicalBlock, InlineSpan, ListItem } from './blocks.ts';
 
 const COMMENTS_START = '<!-- gpush:comments-start -->';
 

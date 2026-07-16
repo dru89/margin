@@ -3,7 +3,7 @@
  * styling), with adjacent DELETE+INSERT pairs of the same kind fused
  * into MODIFY so a changed paragraph reads as one edit.
  */
-import { identity, type CanonicalBlock } from './blocks.js';
+import { identity, type CanonicalBlock } from './blocks.ts';
 
 export type DiffOp =
   | { op: 'keep'; oldIndex: number; newIndex: number; block: CanonicalBlock }
