@@ -580,6 +580,35 @@ harness technique — the pinnable subset (comments persist across
 region rebuilds, CP-5 edit-lands, edit→noop stability) is live and
 green.
 
+## 44. Reference answers integrated: widths, styles, checkboxes
+
+The doc-tools answers (conventions.md @ ad145b3) landed and replaced
+the provisional work. **Column widths** now implement the reference
+algorithm exactly: 80th-percentile typical (never below header),
+one-line fit at typical×6.2+14 up to 150pt then the 26·√typical−20
+wrap tier, a word floor (longest token capped at 20 glyphs; hyphens
+don't split; header unbroken), clamp [26,350], pooling keyed on
+(position, full leading-header prefix), water-fill page fit that pins
+26pt floors and never stretches fitting tables, centering when ≤48pt
+and all body cells ≤1 glyph. Pooling context is the whole document
+(widths planned once from all md tables, regions get theirs by block
+reference). **Styles** come from reference.docx (parsed locally from
+doc-tools): Roboto 11 body, Lato title/subtitle/headings with the
+extracted sizes/spacing/colors, Roboto Mono 11 #188038 code, 1.8pt
+compact list spacing — layered explicitly per lesson 4; the builder's
+base reset now sets the reference body look rather than clearing to
+Google defaults. **Checkboxes** use conventions option (c):
+BULLET_CHECKBOX preset + explicit strikethrough on checked items —
+real checkboxes, and [x] state round-trips through the read heuristic
+(strike is stripped on read; it encodes state, not formatting). Chosen
+over (a) because silently degrading the author's [x] to [ ] on every
+pull is worse for a review tool than the struck-text look; matches how
+UI-checked items read back anyway. Checkbox read detection was probed
+live: glyphType GLYPH_TYPE_UNSPECIFIED with no glyphSymbol. The CP
+catalog amendment (thread-survival vs anchor-state split) matches what
+the live tier already pins; anchor-state tests still need a UI-created
+durable fixture doc.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:

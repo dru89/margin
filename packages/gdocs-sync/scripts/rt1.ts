@@ -26,6 +26,9 @@ Second paragraph so KEEP runs exist between block types.
 1. first
 2. second
 
+- [ ] an open task
+- [x] a finished task
+
 | Name | Qty |
 | --- | --- |
 | apple | 3 |

@@ -47,7 +47,10 @@ export interface GDocDocument {
   documentId?: string;
   revisionId?: string;
   body?: { content?: GDocStructuralElement[] };
-  lists?: Record<string, { listProperties?: { nestingLevels?: { glyphType?: string }[] } }>;
+  lists?: Record<
+    string,
+    { listProperties?: { nestingLevels?: { glyphType?: string; glyphSymbol?: string }[] } }
+  >;
 }
 
 /* ——— request shapes (subset we emit) ——— */
