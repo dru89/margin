@@ -4,21 +4,40 @@
  * fills cells via read-back).
  *
  * Lesson 2 phase order, one batch: all inserts → bullet phase (clear
- * then create) → paragraph styles → text styles (reset first, then
- * bold/italic/link — base-before-inline or the bold silently dies).
+ * then create) → paragraph styles → text styles (base reset first,
+ * then block looks, then inline — base-before-inline or bold dies).
  *
  * Lesson 3: createParagraphBullets removes the leading nesting tabs,
  * shrinking the document mid-batch. Every post-bullet index is
  * corrected by the count of removed tabs before it.
  *
  * Lesson 4: explicitly set every inheritable property on everything
- * inserted — named style + alignment on every paragraph, a full text
- * style reset over the whole range — because inserted content inherits
- * neighbor formatting, and only on incremental updates.
+ * inserted. The base reset sets the reference body look (Roboto 11)
+ * rather than clearing to named-style defaults — pushed docs carry the
+ * reference.docx styling (src/styles.ts), not Google's defaults.
+ *
+ * Checkboxes (conventions option c): BULLET_CHECKBOX preset + explicit
+ * strikethrough on checked items — real checkboxes, and checked state
+ * round-trips through the read heuristic. The API cannot set the box
+ * itself; the strikethrough mirrors how the Docs UI renders checked
+ * items, so UI-authored and pushed data read back identically.
  */
 import type { CanonicalBlock, InlineSpan } from './blocks.ts';
 import type { GDocRequest } from './gdoc.ts';
-import { MONO_FONT } from './reader.ts';
+import {
+  BODY,
+  BODY_SPACING,
+  CODE,
+  CODE_SPACING,
+  LIST_SPACING,
+  QUOTE_SPACING,
+  TITLE,
+  TITLE_SPACING,
+  headingStyle,
+  rgb,
+  spacingStyle,
+  textStyleOf,
+} from './styles.ts';
 
 const QUOTE_INDENT = { magnitude: 36, unit: 'PT' };
 
@@ -28,12 +47,19 @@ interface SpanRange {
   end: number;
 }
 
+interface ItemRange {
+  start: number;
+  end: number;
+  checked?: boolean;
+}
+
 interface BlockLayout {
   block: CanonicalBlock;
   /** Pre-bullet-correction absolute range of the block's paragraphs. */
   start: number;
   end: number;
   spans: SpanRange[];
+  items?: ItemRange[];
 }
 
 export interface BuiltSegment {
@@ -42,7 +68,7 @@ export interface BuiltSegment {
   insertedLength: number;
 }
 
-function blockText(block: CanonicalBlock): { text: string; spans: SpanRange[] } {
+function blockText(block: CanonicalBlock): { text: string; spans: SpanRange[]; items?: ItemRange[] } {
   switch (block.kind) {
     case 'heading':
     case 'paragraph':
@@ -60,18 +86,21 @@ function blockText(block: CanonicalBlock): { text: string; spans: SpanRange[] } 
     case 'list': {
       let cursor = 0;
       const spans: SpanRange[] = [];
+      const items: ItemRange[] = [];
       const lines: string[] = [];
       for (const item of block.items) {
         const prefix = '\t'.repeat(item.depth);
+        const itemStart = cursor + prefix.length;
         cursor += prefix.length;
         for (const span of item.spans) {
           spans.push({ span, start: cursor, end: cursor + span.text.length });
           cursor += span.text.length;
         }
+        items.push({ start: itemStart, end: cursor, checked: item.checked });
         cursor += 1; // newline
         lines.push(prefix + item.spans.map((s) => s.text).join(''));
       }
-      return { text: lines.join('\n') + '\n', spans };
+      return { text: lines.join('\n') + '\n', spans, items };
     }
     case 'hr':
       return { text: '\n', spans: [] };
@@ -92,6 +121,21 @@ function namedStyleFor(block: CanonicalBlock): string {
   return 'NORMAL_TEXT';
 }
 
+function spacingFor(block: CanonicalBlock): ReturnType<typeof spacingStyle> {
+  switch (block.kind) {
+    case 'heading':
+      return spacingStyle(block.level === 1 ? TITLE_SPACING : headingStyle(block.level).spacing);
+    case 'code':
+      return spacingStyle(CODE_SPACING);
+    case 'blockquote':
+      return spacingStyle(QUOTE_SPACING);
+    case 'list':
+      return spacingStyle(LIST_SPACING);
+    default:
+      return spacingStyle(BODY_SPACING);
+  }
+}
+
 export function buildSegment(blocks: CanonicalBlock[], insertAt: number): BuiltSegment {
   const layouts: BlockLayout[] = [];
   const inserts: GDocRequest[] = [];
@@ -99,8 +143,7 @@ export function buildSegment(blocks: CanonicalBlock[], insertAt: number): BuiltS
   let cursor = insertAt;
 
   for (const block of blocks) {
-    const { text, spans } = blockText(block);
-    // Record nesting-tab positions for the lesson-3 correction.
+    const { text, spans, items } = blockText(block);
     if (block.kind === 'list') {
       let lineStart = cursor;
       for (const item of block.items) {
@@ -114,6 +157,7 @@ export function buildSegment(blocks: CanonicalBlock[], insertAt: number): BuiltS
       start: cursor,
       end: cursor + text.length,
       spans: spans.map((s) => ({ ...s, start: cursor + s.start, end: cursor + s.end })),
+      items: items?.map((i) => ({ ...i, start: cursor + i.start, end: cursor + i.end })),
     });
     cursor += text.length;
   }
@@ -135,8 +179,6 @@ export function buildSegment(blocks: CanonicalBlock[], insertAt: number): BuiltS
   /* ——— bullet phase ——— */
   const bullets: GDocRequest[] = [];
   if (totalEnd > insertAt) {
-    // Clear inherited bullets across the entire inserted range (lesson 4),
-    // then apply real ones. Range still contains tabs at this point.
     bullets.push({
       deleteParagraphBullets: { range: { startIndex: insertAt, endIndex: totalEnd } },
     });
@@ -144,6 +186,7 @@ export function buildSegment(blocks: CanonicalBlock[], insertAt: number): BuiltS
   let tabsRemovedSoFar = 0;
   for (const layout of layouts) {
     if (layout.block.kind !== 'list') continue;
+    const isCheckbox = layout.block.items.some((i) => i.checked !== undefined);
     const ordered = layout.block.items[0]?.ordered ?? false;
     bullets.push({
       createParagraphBullets: {
@@ -151,7 +194,11 @@ export function buildSegment(blocks: CanonicalBlock[], insertAt: number): BuiltS
           startIndex: layout.start - tabsRemovedSoFar,
           endIndex: layout.end - tabsRemovedSoFar,
         },
-        bulletPreset: ordered ? 'NUMBERED_DECIMAL_ALPHA_ROMAN' : 'BULLET_DISC_CIRCLE_SQUARE',
+        bulletPreset: isCheckbox
+          ? 'BULLET_CHECKBOX'
+          : ordered
+            ? 'NUMBERED_DECIMAL_ALPHA_ROMAN'
+            : 'BULLET_DISC_CIRCLE_SQUARE',
       },
     });
     tabsRemovedSoFar += layout.block.items.reduce((n, i) => n + i.depth, 0);
@@ -164,8 +211,9 @@ export function buildSegment(blocks: CanonicalBlock[], insertAt: number): BuiltS
     const style: Record<string, unknown> = {
       namedStyleType: namedStyleFor(layout.block),
       alignment: 'START',
+      ...spacingFor(layout.block),
     };
-    let fields = 'namedStyleType,alignment';
+    let fields = 'namedStyleType,alignment,spaceAbove,spaceBelow';
     if (layout.block.kind === 'blockquote') {
       style.indentStart = QUOTE_INDENT;
       style.indentFirstLine = QUOTE_INDENT;
@@ -183,36 +231,59 @@ export function buildSegment(blocks: CanonicalBlock[], insertAt: number): BuiltS
     paraStyles.push({ updateParagraphStyle: { range, paragraphStyle: style, fields } });
   }
 
-  /* ——— text styles: reset first, then base fonts, then inline ——— */
+  /* ——— text styles: base reset, block looks, then inline ——— */
   const textStyles: GDocRequest[] = [];
   const correctedTotalEnd = corrected(totalEnd);
   if (correctedTotalEnd > insertAt) {
-    // Full reset over the inserted range: inherited bold/fonts die here.
+    // Base reset = the reference body look, explicitly (lesson 4).
     textStyles.push({
       updateTextStyle: {
         range: { startIndex: insertAt, endIndex: correctedTotalEnd },
-        textStyle: {},
-        fields: 'bold,italic,strikethrough,link,weightedFontFamily',
+        textStyle: { ...textStyleOf(BODY), foregroundColor: rgb('000000') },
+        fields: 'bold,italic,strikethrough,link,weightedFontFamily,fontSize,foregroundColor',
       },
     });
   }
   for (const layout of layouts) {
+    const range = { startIndex: corrected(layout.start), endIndex: corrected(layout.end) };
+    if (layout.block.kind === 'heading') {
+      const look = layout.block.level === 1 ? TITLE : headingStyle(layout.block.level).look;
+      textStyles.push({
+        updateTextStyle: {
+          range,
+          textStyle: textStyleOf(look),
+          fields: 'weightedFontFamily,fontSize' + (look.colorHex ? ',foregroundColor' : ''),
+        },
+      });
+    }
     if (layout.block.kind === 'code') {
       textStyles.push({
         updateTextStyle: {
-          range: { startIndex: corrected(layout.start), endIndex: corrected(layout.end) },
-          textStyle: { weightedFontFamily: { fontFamily: MONO_FONT } },
-          fields: 'weightedFontFamily',
+          range,
+          textStyle: textStyleOf(CODE),
+          fields: 'weightedFontFamily,fontSize,foregroundColor',
         },
       });
+    }
+    // Checked checkbox items: explicit strikethrough (conventions option c).
+    for (const item of layout.items ?? []) {
+      if (item.checked && item.end > item.start) {
+        textStyles.push({
+          updateTextStyle: {
+            range: { startIndex: corrected(item.start), endIndex: corrected(item.end) },
+            textStyle: { strikethrough: true },
+            fields: 'strikethrough',
+          },
+        });
+      }
     }
     for (const { span, start, end } of layout.spans) {
       if (start === end) continue;
       const style: Record<string, unknown> = {};
       const fields: string[] = [];
       if (span.code) {
-        style.weightedFontFamily = { fontFamily: MONO_FONT };
-        fields.push('weightedFontFamily');
+        Object.assign(style, textStyleOf(CODE));
+        fields.push('weightedFontFamily', 'fontSize', 'foregroundColor');
       }
       if (span.bold) {
         style.bold = true;

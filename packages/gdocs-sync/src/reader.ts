@@ -14,7 +14,7 @@ import type { CanonicalBlock, InlineSpan, ListItem } from './blocks.ts';
 import { coalesceCodeBlocks } from './blocks.ts';
 import type { GDocDocument, GDocParagraph, GDocStructuralElement } from './gdoc.ts';
 
-export const MONO_FONT = 'Courier New';
+export const MONO_FONT = 'Roboto Mono';
 const QUOTE_INDENT_PT = 30;
 
 export interface ReadBlock {
@@ -72,6 +72,17 @@ function isOrderedList(doc: GDocDocument, listId: string, level: number): boolea
   return glyph.startsWith('DECIMAL') || glyph.startsWith('ALPHA') || glyph.startsWith('ROMAN') || glyph.startsWith('UPPER');
 }
 
+/**
+ * Checkbox lists (probed live): glyphType GLYPH_TYPE_UNSPECIFIED with
+ * no glyphSymbol. Disc/circle lists carry a glyphSymbol; ordered lists
+ * carry a real glyphType.
+ */
+function isCheckboxList(doc: GDocDocument, listId: string): boolean {
+  const level = doc.lists?.[listId]?.listProperties?.nestingLevels?.[0];
+  if (!level) return false;
+  return (level.glyphType ?? 'GLYPH_TYPE_UNSPECIFIED') === 'GLYPH_TYPE_UNSPECIFIED' && !level.glyphSymbol;
+}
+
 /** Walk body content (single tab) into canonical blocks with doc ranges. */
 export function docToBlocks(doc: GDocDocument): ReadBlock[] {
   const out: ReadBlock[] = [];
@@ -114,6 +125,13 @@ export function docToBlocks(doc: GDocDocument): ReadBlock[] {
         ordered: isOrderedList(doc, para.bullet.listId, depth),
         spans,
       };
+      if (isCheckboxList(doc, para.bullet.listId)) {
+        // UREAD-7 heuristic: checked = every run struck through. Strip
+        // the strike from spans — it encodes checked state, not
+        // author formatting (mirrors the builder's write path).
+        item.checked = spans.length > 0 && spans.every((s) => s.strike);
+        if (item.checked) for (const s of spans) delete s.strike;
+      }
       // Group consecutive items of the same listId into one list block.
       const prev = out[out.length - 1];
       const prevListId = (prev as { listId?: string } | undefined)?.listId;

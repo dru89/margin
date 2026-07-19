@@ -14,7 +14,12 @@ import type { DocsClient, GDocDocument, GDocRequest, GDocStructuralElement } fro
 import { markdownToBlocks, splitFrontmatter, stripCommentsSection } from './markdown.ts';
 import { MONO_FONT, docToBlocks } from './reader.ts';
 import { planRegions } from './regions.ts';
-import { columnWidthRequests, planColumnWidths } from './widths.ts';
+import {
+  columnWidthRequests,
+  planColumnWidths,
+  planDocumentWidths,
+  shouldCenterColumn,
+} from './widths.ts';
 
 export function mdToCanonical(markdown: string): CanonicalBlock[] {
   const { body } = splitFrontmatter(stripCommentsSection(markdown));
@@ -54,10 +59,13 @@ async function applyBlocksAt(
   blocks: CanonicalBlock[],
   insertAt: number,
   tablesBefore: number,
+  /** Pre-planned (possibly pooled) widths for the tables in `blocks`, in order. */
+  tableWidths?: number[][],
 ): Promise<number> {
   let written = 0;
   let cursor = insertAt;
   let tableOrdinal = tablesBefore;
+  let widthIdx = 0;
   let pending: CanonicalBlock[] = [];
 
   const flush = async (): Promise<void> => {
@@ -93,16 +101,18 @@ async function applyBlocksAt(
     if (!table?.table?.tableRows) throw new Error('inserted table not found on read-back');
     const fills: GDocRequest[] = [];
     const styleFixes: GDocRequest[] = [];
-    const cells: { index: number; spans: InlineSpan[] }[] = [];
+    const cells: { index: number; spans: InlineSpan[]; col: number }[] = [];
     table.table.tableRows.forEach((row, r) => {
       row.tableCells?.forEach((cell, c) => {
         const start = cell.content?.[0]?.startIndex;
         const spans = block.rows[r]?.[c];
         if (start !== undefined && spans && spanText(spans).length > 0) {
-          cells.push({ index: start, spans });
+          cells.push({ index: start, spans, col: c });
         }
       });
     });
+    const planned = tableWidths?.[widthIdx++];
+    const widths = planned && planned.length > 0 ? planned : planColumnWidths(block.rows);
     // Reverse document order: earlier indices stay valid (lesson 1).
     cells.sort((a, b) => b.index - a.index);
     for (const cell of cells) {
@@ -120,7 +130,13 @@ async function applyBlocksAt(
       styleFixes.push({
         updateParagraphStyle: {
           range: { startIndex: cell.index, endIndex: cell.index + text.length },
-          paragraphStyle: { namedStyleType: 'NORMAL_TEXT', alignment: 'START' },
+          paragraphStyle: {
+            namedStyleType: 'NORMAL_TEXT',
+            // SI-4: narrow single-glyph columns center their cells.
+            alignment: shouldCenterColumn(widths[cell.col] ?? 999, block.rows, cell.col)
+              ? 'CENTER'
+              : 'START',
+          },
           fields: 'namedStyleType,alignment',
         },
       });
@@ -144,10 +160,10 @@ async function applyBlocksAt(
         offset += span.text.length;
       }
     }
-    // Provisional column sizing (UWIDTH-*; algorithm pending reference
-    // answers in margin#10). Column properties don't shift text indices.
+    // Reference column sizing (doc-tools conventions.md @ ad145b3).
+    // Column properties don't shift text indices.
     if (table.startIndex !== undefined) {
-      styleFixes.push(...columnWidthRequests(table.startIndex, planColumnWidths(block.rows)));
+      styleFixes.push(...columnWidthRequests(table.startIndex, widths));
     }
     if (fills.length > 0 || styleFixes.length > 0) {
       // Fills are emitted in reverse order, so style ranges computed from
@@ -172,7 +188,10 @@ export async function createFromMarkdown(
 ): Promise<{ documentId: string; requestsSent: number }> {
   const { documentId } = await client.createDocument(title);
   const blocks = mdToCanonical(markdown);
-  const requestsSent = await applyBlocksAt(client, documentId, blocks, 1, 0);
+  const tableWidths = planDocumentWidths(
+    blocks.filter((b) => b.kind === 'table').map((b) => (b as { rows: InlineSpan[][][] }).rows),
+  );
+  const requestsSent = await applyBlocksAt(client, documentId, blocks, 1, 0, tableWidths);
   return { documentId, requestsSent };
 }
 
@@ -199,6 +218,12 @@ export async function updateFromMarkdown(
 
   const endIndex = docEndIndex(doc);
   let requestsSent = 0;
+  // Pooling context is the whole markdown document: plan widths for all
+  // md tables up front, then hand each region its slice (forward order).
+  const mdTables = mdBlocks.filter((b) => b.kind === 'table');
+  const allWidths = planDocumentWidths(mdTables.map((b) => (b as { rows: InlineSpan[][][] }).rows));
+  // Region blocks are references into mdBlocks, so widths map by identity.
+  const widthByTable = new Map(mdTables.map((t, i) => [t, allWidths[i]!]));
   // Reverse region order: later edits never shift earlier indices.
   for (const region of [...regions].reverse()) {
     let insertAt: number;
@@ -225,7 +250,10 @@ export async function updateFromMarkdown(
     const tablesBefore = readBlocks
       .slice(0, region.oldStart)
       .filter((r) => r.block.kind === 'table').length;
-    requestsSent += await applyBlocksAt(client, docId, region.blocks, insertAt, tablesBefore);
+    const widths = region.blocks
+      .filter((b) => b.kind === 'table')
+      .map((t) => widthByTable.get(t) ?? []);
+    requestsSent += await applyBlocksAt(client, docId, region.blocks, insertAt, tablesBefore, widths);
   }
   return { regions: regions.length, requestsSent };
 }

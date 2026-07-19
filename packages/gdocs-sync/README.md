@@ -38,16 +38,20 @@ credentials).
       is identity-equal; UREAD-5 hygiene, checkbox round-trip
       (`src/serialize.ts`)
 - [x] UTAB-1..9 — tab reconciliation planner (`src/tabs.ts`)
-- [x] UWIDTH-1..3 — **provisional** column sizing (`src/widths.ts`);
-      algorithm pending reference answers (margin#10)
+- [x] UWIDTH-1..5 — **reference** column-sizing algorithm (percentile,
+      wrap tier, word floor, prefix pooling, water-fill, SI-4
+      centering) (`src/widths.ts`)
+- [x] Reference styles from reference.docx (`src/styles.ts`): Roboto
+      body, Lato headings, Roboto Mono code, extracted spacing
+- [x] Checkboxes end-to-end: BULLET_CHECKBOX + strikethrough encodes
+      checked (conventions option c); read detection probed live
 - [x] Live tier v1 (`npm run test:live`): comments persist across
       region rebuilds, CP-5 edit-lands, edit→noop stability. Skips
       without credentials; scratch docs self-clean.
 - [ ] CP anchored-survival (CP-1..4/8 proper) — **blocked**:
       programmatic comments are unanchored (probed); needs the
       reference harness technique (asked in margin#10)
-- [ ] UREAD-7..10 remainder — doc-side checkbox read, chips, subtitle
-      policy
+- [ ] UREAD-8..10 remainder — chips read, subtitle policy
 - [ ] UIMG-1,3..6 — image index math, staging, sizing (v0 gap: images
       still placeholder in builder)
 - [ ] UCHIP-1..4 — metadata block (title/subtitle/chips) replacement
