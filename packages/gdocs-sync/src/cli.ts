@@ -18,6 +18,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { authorize, getAccessToken } from './auth.ts';
+import { makeDocxStager } from './images.ts';
 import { HttpDocsClient } from './gdoc.ts';
 import { docIdFromUrl } from './util.ts';
 import { splitFrontmatter, stripCommentsSection } from './markdown.ts';
@@ -71,12 +72,13 @@ async function cmdPush(args: string[]): Promise<void> {
   if (inputs.length === 1) {
     const input = inputs[0]!;
     const baseDir = path.dirname(path.resolve(input.file));
+    const imageStager = makeDocxStager(async () => (await getAccessToken())!);
     if (target) {
-      const plan = await updateFromMarkdown(c, target, input.markdown, { baseDir });
+      const plan = await updateFromMarkdown(c, target, input.markdown, { baseDir, imageStager });
       console.log(`updated: ${plan.regions} region(s), ${plan.requestsSent} request(s)`);
       console.log(`https://docs.google.com/document/d/${target}/edit`);
     } else {
-      const { documentId } = await createFromMarkdown(c, input.title, input.markdown, { baseDir });
+      const { documentId } = await createFromMarkdown(c, input.title, input.markdown, { baseDir, imageStager });
       const url = `https://docs.google.com/document/d/${documentId}/edit`;
       console.log(`created: ${url}`);
       if (writeUrl) {
@@ -96,6 +98,7 @@ async function cmdPush(args: string[]): Promise<void> {
   if (!target) fail('multi-tab push needs --doc <url|docId>');
   const result = await pushTabs(c, target, inputs, {
     baseDir: path.dirname(path.resolve(inputs[0]!.file)),
+    imageStager: makeDocxStager(async () => (await getAccessToken())!),
   });
   for (const step of result.steps) console.log(`  ${step}`);
   for (const [title, plan] of Object.entries(result.perTab)) {

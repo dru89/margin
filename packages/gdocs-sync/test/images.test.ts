@@ -111,3 +111,26 @@ describe('UIMG — image logic (offline)', () => {
     expect(identity(blocks[0]!)).toBe(identity(mdSide[0]!)); // src excluded from identity
   });
 });
+
+describe('staging machinery, offline half (issue #18)', () => {
+  it('jpegDimensions parses an SOF0 fragment; imageDimensions dispatches', async () => {
+    const { jpegDimensions, imageDimensions, buildImagesDocx } = await import('../src/images.ts');
+    // Handcrafted: SOI, APP0 (16 bytes), SOF0 with height 200 / width 320.
+    const jpeg = new Uint8Array([
+      0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, ...new Array(14).fill(0),
+      0xff, 0xc0, 0x00, 0x11, 0x08, 0x00, 0xc8, 0x01, 0x40, 0x03, ...new Array(10).fill(0),
+    ]);
+    expect(jpegDimensions(jpeg)).toEqual({ width: 320, height: 200 });
+    expect(imageDimensions(minimalPng(10, 20))).toEqual({ width: 10, height: 20 });
+    expect(imageDimensions(new Uint8Array([1, 2, 3]))).toBeNull();
+
+    // The docx is a valid stored zip: PK signature, end-of-central marker.
+    const docx = buildImagesDocx([{ bytes: minimalPng(5, 5), ext: 'png' }]);
+    expect([...docx.slice(0, 4)]).toEqual([0x50, 0x4b, 0x03, 0x04]);
+    const tail = docx.slice(-22, -18);
+    expect([...tail]).toEqual([0x50, 0x4b, 0x05, 0x06]);
+    const text = new TextDecoder('latin1').decode(docx);
+    expect(text).toContain('word/media/img1.png');
+    expect(text).toContain('rIdImg1');
+  });
+});
