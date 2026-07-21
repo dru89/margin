@@ -9,7 +9,7 @@
 import type { CanonicalBlock, InlineSpan } from './blocks.ts';
 import { spanText } from './blocks.ts';
 import { buildSegment, restyleRequests } from './builder.ts';
-import { BLOCK_GAP_PT, BODY, rgb, textStyleOf } from './styles.ts';
+import { BLOCK_GAP_PT, BODY, TABLE_STYLE, rgb, textStyleOf } from './styles.ts';
 import { resolveImageSource, stageImage, type StagedImage } from './images.ts';
 import {
   buildMetaRequests,
@@ -138,13 +138,13 @@ async function applyBlocksAt(
     tableOrdinal++;
     if (!table?.table?.tableRows) throw new Error('inserted table not found on read-back');
     const cellRequests: GDocRequest[] = [];
-    const cells: { index: number; spans: InlineSpan[]; col: number }[] = [];
+    const cells: { index: number; spans: InlineSpan[]; col: number; row: number }[] = [];
     table.table.tableRows.forEach((row, r) => {
       row.tableCells?.forEach((cell, c) => {
         const start = cell.content?.[0]?.startIndex;
         const spans = block.rows[r]?.[c];
         if (start !== undefined && spans && spanText(spans).length > 0) {
-          cells.push({ index: start, spans, col: c });
+          cells.push({ index: start, spans, col: c, row: r });
         }
       });
     });
@@ -175,10 +175,15 @@ async function applyBlocksAt(
       });
       // Lesson 4 / SI-2: explicit body look on cell text (not a bare
       // reset — that clears to the named-style default, not Roboto).
+      // Header cells (row 0) get the reference chrome: bold, #333333.
       cellRequests.push({
         updateTextStyle: {
           range: { startIndex: cell.index, endIndex: cell.index + text.length },
-          textStyle: { ...textStyleOf(BODY), foregroundColor: rgb('000000') },
+          textStyle: {
+            ...textStyleOf(BODY),
+            foregroundColor: rgb(cell.row === 0 ? TABLE_STYLE.header.textColorHex : '000000'),
+            bold: cell.row === 0,
+          },
           fields: 'bold,italic,strikethrough,link,weightedFontFamily,fontSize,foregroundColor',
         },
       });
@@ -202,9 +207,73 @@ async function applyBlocksAt(
         offset += span.text.length;
       }
     }
-    // Reference column sizing (doc-tools conventions.md @ ad145b3).
-    // Column properties don't shift text indices.
+    // Table chrome (reference.docx "Table" style, issue #17). Cell-style
+    // requests address cells by table position, not text index — safe
+    // after fills in the same batch.
     if (table.startIndex !== undefined) {
+      const tStart = { index: table.startIndex };
+      const columns = block.rows[0]?.length ?? 1;
+      const borderSide = {
+        width: { magnitude: TABLE_STYLE.border.widthPt, unit: 'PT' },
+        dashStyle: 'SOLID',
+        color: rgb(TABLE_STYLE.border.colorHex),
+      };
+      const cellRange = (rowIndex: number, rowSpan: number) => ({
+        tableCellLocation: { tableStartLocation: tStart, rowIndex, columnIndex: 0 },
+        rowSpan,
+        columnSpan: columns,
+      });
+      // Whole table: borders + padding.
+      cellRequests.push({
+        updateTableCellStyle: {
+          tableRange: cellRange(0, block.rows.length),
+          tableCellStyle: {
+            borderTop: borderSide,
+            borderBottom: borderSide,
+            borderLeft: borderSide,
+            borderRight: borderSide,
+            paddingTop: { magnitude: TABLE_STYLE.padding.topPt, unit: 'PT' },
+            paddingBottom: { magnitude: TABLE_STYLE.padding.bottomPt, unit: 'PT' },
+            paddingLeft: { magnitude: TABLE_STYLE.padding.leftPt, unit: 'PT' },
+            paddingRight: { magnitude: TABLE_STYLE.padding.rightPt, unit: 'PT' },
+          },
+          fields:
+            'borderTop,borderBottom,borderLeft,borderRight,paddingTop,paddingBottom,paddingLeft,paddingRight',
+        },
+      });
+      // Header row: background, heavier bottom border, bottom-aligned.
+      cellRequests.push({
+        updateTableCellStyle: {
+          tableRange: cellRange(0, 1),
+          tableCellStyle: {
+            backgroundColor: rgb(TABLE_STYLE.header.backgroundHex),
+            borderBottom: {
+              width: { magnitude: TABLE_STYLE.header.bottomBorder.widthPt, unit: 'PT' },
+              dashStyle: 'SOLID',
+              color: rgb(TABLE_STYLE.header.bottomBorder.colorHex),
+            },
+            contentAlignment: 'BOTTOM',
+          },
+          fields: 'backgroundColor,borderBottom,contentAlignment',
+        },
+      });
+      // Zebra striping on body rows: first body row shaded, alternating.
+      for (let r = 1; r < block.rows.length; r++) {
+        cellRequests.push({
+          updateTableCellStyle: {
+            tableRange: cellRange(r, 1),
+            tableCellStyle: {
+              backgroundColor: (r - 1) % 2 === 0 ? rgb(TABLE_STYLE.bandHex) : rgb('FFFFFF'),
+            },
+            fields: 'backgroundColor',
+          },
+        });
+      }
+      // Headers repeat across page breaks.
+      cellRequests.push({
+        pinTableHeaderRows: { tableStartLocation: tStart, pinnedHeaderRowsCount: 1 },
+      });
+      // Reference column sizing (doc-tools conventions.md @ ad145b3).
       cellRequests.push(...columnWidthRequests(table.startIndex, widths));
     }
     if (cellRequests.length > 0) {

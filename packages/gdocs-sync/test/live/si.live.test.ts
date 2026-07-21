@@ -59,6 +59,20 @@ ${body}`;
     }
     expect(fonts.length).toBeGreaterThan(0);
     for (const f of fonts) expect(f).toBe('Roboto'); // not the heading's Lato
+
+    // Table chrome survives the rebuild (issue #17): header bold on
+    // #F2F2F2, first body row banded #F9F9F9.
+    let headerBold = false;
+    const bg = (r: number) =>
+      (table!.table!.tableRows![r]!.tableCells![0] as any).tableCellStyle?.backgroundColor
+        ?.color?.rgbColor ?? null;
+    for (const pe of table!.table!.tableRows![0]!.tableCells![0]!.content![0]!.paragraph!
+      .elements ?? []) {
+      if (pe.textRun?.content?.trim() && pe.textRun.textStyle?.bold) headerBold = true;
+    }
+    expect(headerBold).toBe(true);
+    expect(Math.round((bg(0)?.red ?? 0) * 255)).toBe(0xf2);
+    expect(Math.round((bg(1)?.red ?? 0) * 255)).toBe(0xf9);
   });
 
   it('SI-3: a code block rebuilt next to a bulleted list does not catch bullets', async () => {

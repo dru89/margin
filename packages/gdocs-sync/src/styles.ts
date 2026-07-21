@@ -57,6 +57,20 @@ export const QUOTE_BORDER = {
   color: { color: { rgbColor: { red: 0.7, green: 0.7, blue: 0.7 } } },
 };
 
+/** Table chrome from reference.docx (style id "Table" + firstRow/banding). */
+export const TABLE_STYLE = {
+  border: { widthPt: 0.5, colorHex: 'BFBFBF' },
+  /** dxa 40/115 → pt. */
+  padding: { topPt: 2, bottomPt: 2, leftPt: 5.75, rightPt: 5.75 },
+  header: {
+    backgroundHex: 'F2F2F2',
+    textColorHex: '333333',
+    bottomBorder: { widthPt: 1, colorHex: '808080' },
+  },
+  /** Zebra striping: first body row F9F9F9, then alternating white. */
+  bandHex: 'F9F9F9',
+} as const;
+
 export function rgb(hex: string): { color: { rgbColor: { red: number; green: number; blue: number } } } {
   return {
     color: {
