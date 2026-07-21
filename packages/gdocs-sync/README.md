@@ -62,7 +62,8 @@ Known warts (deliberate, revisit): update regions at doc end can leave
 a trailing empty paragraph (the final segment newline is undeletable —
 lesson 13; the reader skips empties so parity holds); code blocks with
 blank lines split on read-back; checkbox list items round-trip as plain
-items.
+items; UI-checked boxes whose text is not struck read back as
+unchecked (probed: the API exposes no checked state at all).
 
 ## Architecture
 
