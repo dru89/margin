@@ -62,8 +62,16 @@ credentials).
       emission with caption fold-back, unstaged degradation
       (`src/images.ts`); RT-1 corpus includes a live URL figure.
       Local-file staging (temp-docx contentUri trick) still deferred.
+- [x] Multi-tab orchestration (`src/tabsync.ts`): UTAB plan execution
+      (addDocumentTab/rename/delete/reorder-one-per-batch) + per-tab
+      content sync via tab-scoped client views; TAB live test green
+- [x] SI-1..3 live — caught and fixed two real cell-styling bugs
+      (phased-fill index shift; namedStyleType wiping run styles)
+- [x] CLI (`src/cli.ts`, `npm run gdocs` / bin `gdocs`): auth, push
+      (single doc via frontmatter url or --doc; multi-tab Title=path
+      specs), fetch, --write-url — the gpush/gfetch replacement
 - [ ] UAUTH-4 — auth flow end-to-end (fake flow)
-- [ ] Live tier: SI-*, TAB-*, IMG-*, META-* per the catalog.
+- [ ] Live tier remainder: IMG-* (local-file staging), META live
 
 Known warts (deliberate, revisit): update regions at doc end can leave
 a trailing empty paragraph (the final segment newline is undeletable —
