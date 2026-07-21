@@ -10,5 +10,11 @@
  * Probed ground truth: UI comments carry `anchor` (opaque kix.* id);
  * suggestions appear as suggestedInsertionIds/suggestedDeletionIds
  * on text runs.
+ *
+ * Checkbox finding (probed after UI check): the checked item exposes
+ * NOTHING via the API — no run strikethrough, no bullet/list marker.
+ * UI-checked state without struck text is unreadable; only strike-
+ * encoded checks (our write path, and UI checklists that strike their
+ * text) round-trip. Recorded as a known API-level loss.
  */
 export const CP_ANCHORS_FIXTURE_DOC_ID = '1gRN3xsJ7nE_0DNOUnwYD_8jIQqnC_afv2P_54IZq1K4';
