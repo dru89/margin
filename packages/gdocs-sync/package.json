@@ -12,7 +12,8 @@
     "auth": "node src/auth.ts",
     "smoke": "node scripts/smoke.ts",
     "rt1": "node scripts/rt1.ts",
-    "test:live": "vitest run --config vitest.live.config.ts"
+    "test:live": "vitest run --config vitest.live.config.ts",
+    "gdocs": "node src/cli.ts"
   },
   "devDependencies": {
     "@types/mdast": "^4.0.4",
@@ -24,5 +25,8 @@
     "mdast-util-from-markdown": "^2.0.1",
     "mdast-util-gfm": "^3.0.0",
     "micromark-extension-gfm": "^3.0.0"
+  },
+  "bin": {
+    "gdocs": "src/cli.ts"
   }
 }
