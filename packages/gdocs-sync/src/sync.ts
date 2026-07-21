@@ -9,7 +9,7 @@
 import type { CanonicalBlock, InlineSpan } from './blocks.ts';
 import { spanText } from './blocks.ts';
 import { buildSegment } from './builder.ts';
-import { BLOCK_GAP_PT } from './styles.ts';
+import { BLOCK_GAP_PT, BODY, rgb, textStyleOf } from './styles.ts';
 import { resolveImageSource, stageImage, type StagedImage } from './images.ts';
 import {
   buildMetaRequests,
@@ -137,8 +137,7 @@ async function applyBlocksAt(
     const table = nthTable(doc, tableOrdinal);
     tableOrdinal++;
     if (!table?.table?.tableRows) throw new Error('inserted table not found on read-back');
-    const fills: GDocRequest[] = [];
-    const styleFixes: GDocRequest[] = [];
+    const cellRequests: GDocRequest[] = [];
     const cells: { index: number; spans: InlineSpan[]; col: number }[] = [];
     table.table.tableRows.forEach((row, r) => {
       row.tableCells?.forEach((cell, c) => {
@@ -151,21 +150,19 @@ async function applyBlocksAt(
     });
     const planned = opts.tableWidths?.[widthIdx++];
     const widths = planned && planned.length > 0 ? planned : planColumnWidths(block.rows);
-    // Reverse document order: earlier indices stay valid (lesson 1).
+    // Reverse document order, with each cell's fill IMMEDIATELY
+    // followed by its style requests: a cell's ranges are only valid
+    // before earlier-position fills execute (SI-2 caught the phased
+    // version applying styles against already-shifted indices).
     cells.sort((a, b) => b.index - a.index);
     for (const cell of cells) {
       const text = spanText(cell.spans);
-      fills.push({ insertText: { location: { index: cell.index }, text } });
-      // Lesson 4 / SI-2: explicit style on cell text so a neighboring
-      // heading can't bleed in. Reset + explicit named style.
-      styleFixes.push({
-        updateTextStyle: {
-          range: { startIndex: cell.index, endIndex: cell.index + text.length },
-          textStyle: {},
-          fields: 'bold,italic,strikethrough,link,weightedFontFamily',
-        },
-      });
-      styleFixes.push({
+      cellRequests.push({ insertText: { location: { index: cell.index }, text } });
+      // Paragraph style FIRST: applying namedStyleType re-applies the
+      // named style's text properties, wiping run-level overrides —
+      // text styles must come after (SI-2 caught the inverted order;
+      // same rule as buildSegment's phase ordering).
+      cellRequests.push({
         updateParagraphStyle: {
           range: { startIndex: cell.index, endIndex: cell.index + text.length },
           paragraphStyle: {
@@ -174,6 +171,15 @@ async function applyBlocksAt(
             alignment: shouldCenterColumn(block.rows, cell.col) ? 'CENTER' : 'START',
           },
           fields: 'namedStyleType,alignment',
+        },
+      });
+      // Lesson 4 / SI-2: explicit body look on cell text (not a bare
+      // reset — that clears to the named-style default, not Roboto).
+      cellRequests.push({
+        updateTextStyle: {
+          range: { startIndex: cell.index, endIndex: cell.index + text.length },
+          textStyle: { ...textStyleOf(BODY), foregroundColor: rgb('000000') },
+          fields: 'bold,italic,strikethrough,link,weightedFontFamily,fontSize,foregroundColor',
         },
       });
       let offset = cell.index;
@@ -185,7 +191,7 @@ async function applyBlocksAt(
         if (span.code)
           (style.weightedFontFamily = { fontFamily: MONO_FONT }), fields.push('weightedFontFamily');
         if (fields.length > 0 && span.text.length > 0) {
-          styleFixes.push({
+          cellRequests.push({
             updateTextStyle: {
               range: { startIndex: offset, endIndex: offset + span.text.length },
               textStyle: style,
@@ -199,14 +205,11 @@ async function applyBlocksAt(
     // Reference column sizing (doc-tools conventions.md @ ad145b3).
     // Column properties don't shift text indices.
     if (table.startIndex !== undefined) {
-      styleFixes.push(...columnWidthRequests(table.startIndex, widths));
+      cellRequests.push(...columnWidthRequests(table.startIndex, widths));
     }
-    if (fills.length > 0 || styleFixes.length > 0) {
-      // Fills are emitted in reverse order, so style ranges computed from
-      // pre-fill indices are only valid for their own cell — which is
-      // exactly how they were computed. Same batch, fills first.
-      await client.batchUpdate(docId, [...fills, ...styleFixes], doc.revisionId);
-      written += fills.length + styleFixes.length;
+    if (cellRequests.length > 0) {
+      await client.batchUpdate(docId, cellRequests, doc.revisionId);
+      written += cellRequests.length;
     }
     // Re-read for the post-fill end of the table.
     const after = await client.getDocument(docId);
