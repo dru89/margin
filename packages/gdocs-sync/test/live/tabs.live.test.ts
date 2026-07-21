@@ -6,7 +6,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { HttpDocsClient } from '../../src/gdoc.ts';
-import { pushTabs } from '../../src/tabsync.ts';
+import { fetchTabs, pushTabs } from '../../src/tabsync.ts';
+import { fetchAsMarkdown } from '../../src/sync.ts';
 import { client, token, trackDoc } from './harness.ts';
 
 async function tabTitles(docId: string): Promise<string[]> {
@@ -53,12 +54,24 @@ describe.skipIf(!token)('TAB — multi-tab reconciliation (live)', () => {
     expect(await tabTitles(documentId)).toEqual(['Gamma', 'Alpha', 'Bravo']);
     expect(Object.values(r3.perTab).every((p) => p.requestsSent === 0)).toBe(true);
 
-    // Round 4: delete a tab.
-    const r4 = await pushTabs(client!, documentId, [
+    // Round 4: fetch → push the fetched set back = per-tab noop
+    // (issue #22 — the multi-tab round-trip contract).
+    const fetched = await fetchTabs(client!, documentId);
+    expect(fetched.map((t) => t.title)).toEqual(['Gamma', 'Alpha', 'Bravo']);
+    expect(fetched[0]!.markdown).toContain('Gamma body.');
+    const r4 = await pushTabs(client!, documentId, fetched);
+    expect(r4.steps).toEqual([]);
+    expect(Object.values(r4.perTab).every((p) => p.requestsSent === 0)).toBe(true);
+
+    // Single-doc fetch refuses multi-tab docs with a pointer to --tabs.
+    await expect(fetchAsMarkdown(client!, documentId)).rejects.toThrow(/multiple tabs/);
+
+    // Round 5: delete a tab.
+    const r5 = await pushTabs(client!, documentId, [
       { title: 'Gamma', markdown: '# Gamma\n\nGamma body.\n' },
       { title: 'Bravo', markdown: '# Bravo\n\nBravo body, renamed.\n' },
     ]);
     expect(await tabTitles(documentId)).toEqual(['Gamma', 'Bravo']);
-    expect(r4.steps).toContain('delete:Alpha');
+    expect(r5.steps).toContain('delete:Alpha');
   }, 300_000);
 });

@@ -105,11 +105,31 @@ async function cmdPush(args: string[]): Promise<void> {
 }
 
 async function cmdFetch(args: string[]): Promise<void> {
-  const [ref, out] = args;
+  const tabsFlag = args.indexOf('--tabs');
+  const rest = args.filter((_, i) => i !== tabsFlag);
+  const [ref, out] = rest;
   if (!ref) fail('fetch needs a doc URL or id');
   const docId = docIdFromUrl(ref);
   if (!docId) fail(`not a Google Doc reference: ${ref}`);
-  const markdown = await fetchAsMarkdown(await client(), docId);
+  const c = await client();
+
+  if (tabsFlag !== -1) {
+    // One file per top-level tab; prints the push-back spec list.
+    const { fetchTabs } = await import('./tabsync.ts');
+    const dir = out ?? '.';
+    await fs.mkdir(dir, { recursive: true });
+    const specs: string[] = [];
+    for (const tab of await fetchTabs(c, docId)) {
+      const file = path.join(dir, `${tab.title.replace(/[^\w.-]+/g, '-').replace(/^-|-$/g, '') || 'tab'}.md`);
+      await fs.writeFile(file, tab.markdown, 'utf8');
+      console.log(`wrote ${file}`);
+      specs.push(`"${tab.title}=${file}"`);
+    }
+    console.log(`\npush back with:\n  gdocs push ${specs.join(' ')} --doc ${docId}`);
+    return;
+  }
+
+  const markdown = await fetchAsMarkdown(c, docId);
   if (out) {
     await fs.writeFile(out, markdown, 'utf8');
     console.log(`wrote ${out}`);

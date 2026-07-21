@@ -273,6 +273,18 @@ export interface UpdatePlan {
  * proposals, not document content.
  */
 export async function fetchAsMarkdown(client: DocsClient, docId: string): Promise<string> {
+  // Refuse multi-tab docs rather than silently returning the first tab
+  // (issue #22): callers use fetchTabs for those. Clients without tab
+  // reads (the fake) skip the check.
+  const withTabs = (
+    client as DocsClient & { getDocumentWithTabs?: DocsClient['getDocument'] }
+  ).getDocumentWithTabs;
+  if (withTabs) {
+    const tabbed = (await withTabs.call(client, docId)) as { tabs?: unknown[] };
+    if ((tabbed.tabs?.length ?? 0) > 1) {
+      throw new Error('Document has multiple tabs — use fetchTabs (CLI: fetch --tabs).');
+    }
+  }
   const doc = await client.getDocument(docId, 'PREVIEW_WITHOUT_SUGGESTIONS');
   const { meta, consumedElements } = parseDocMeta(doc);
   const body = serializeBlocks(docToBlocks(doc, consumedElements).map((r) => r.block));

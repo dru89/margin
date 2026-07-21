@@ -14,6 +14,9 @@ import type { DocsClient, GDocDocument, GDocRequest } from './gdoc.ts';
 import { planTabs } from './tabs.ts';
 import { truncateTabTitle } from './util.ts';
 import { updateFromMarkdown, type SyncOptions, type UpdatePlan } from './sync.ts';
+import { emitFrontmatter, parseDocMeta } from './meta.ts';
+import { docToBlocks } from './reader.ts';
+import { serializeBlocks } from './serialize.ts';
 
 export interface TabInput {
   title: string;
@@ -94,6 +97,35 @@ async function readTabs(
 export interface TabsPushResult {
   steps: string[];
   perTab: Record<string, UpdatePlan>;
+}
+
+/**
+ * Fetch every top-level tab as markdown (issue #22 — the gfetch half
+ * of multi-tab round-tripping). Each tab goes through the same
+ * meta + reader + serializer path as a single-doc fetch. The contract:
+ * pushTabs of the fetched set is a per-tab noop.
+ */
+export async function fetchTabs(client: DocsClient, docId: string): Promise<TabInput[]> {
+  const withTabs = (
+    client as DocsClient & { getDocumentWithTabs?: typeof client.getDocument }
+  ).getDocumentWithTabs;
+  if (!withTabs) throw new Error('client does not support tab reads (getDocumentWithTabs)');
+  const doc = (await withTabs.call(client, docId, 'PREVIEW_WITHOUT_SUGGESTIONS')) as TabbedDoc;
+  const out: TabInput[] = [];
+  for (const tab of doc.tabs ?? []) {
+    const tabId = tab.tabProperties?.tabId;
+    if (!tabId) continue;
+    const view = tabView(doc, tabId);
+    const meta = parseDocMeta(view);
+    const body = serializeBlocks(docToBlocks(view, meta.consumedElements).map((r) => r.block));
+    out.push({ title: tab.tabProperties?.title ?? '', markdown: emitFrontmatter(meta.meta) + body });
+  }
+  return out;
+}
+
+/** Top-level tab count — lets single-doc fetch refuse multi-tab docs. */
+export async function countTabs(client: DocsClient, docId: string): Promise<number> {
+  return (await readTabs(client, docId)).length;
 }
 
 /**
