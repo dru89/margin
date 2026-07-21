@@ -99,6 +99,71 @@ npx electron . --remote-debugging-port=9224 "path/to/doc.md" &   # background
 - Fonts are bundled Fontsource packages (CSP has no network access):
   Newsreader = document prose, Spline Sans = UI, Spline Sans Mono = code.
 
+## The gdocs-sync package (`packages/gdocs-sync/`)
+
+A **standalone** markdown ↔ Google Docs sync engine — the future
+replacement for Drew's internal gpush/gfetch CLIs; Margin will be one
+consumer. **Zero imports from Margin, ever** (DECISIONS §42): if a
+change would make it know about Margin types, review sidecars, or
+Electron, it belongs in Margin's integration layer instead.
+
+**Specs, in authority order:** `docs/specs/gdocs-sync.md` (product,
+rev 3+), the `dru89/doc-tools` repo (API lessons, scenario catalog with
+stable IDs like RT-1/CP-8/UBUILD-4, interop conventions), the package
+README (scenario-coverage checklist = the resumption point), and
+`packages/gdocs-sync/docs/splice-findings.md` (one-shot human-verified
+anchor experiments — cannot be re-run; treat as ground truth). Open
+work is tracked as GitHub issues under the three `gdocs-sync:`
+milestones. Tests are named by catalog scenario ID.
+
+```bash
+cd packages/gdocs-sync
+npm test              # offline tier (CI runs this; no credentials)
+npm run test:live     # live tier — real API, scratch docs; skips w/o auth
+npm run rt1           # THE canary: noop re-push must plan zero writes
+npm run smoke         # client/scopes/APIs end-to-end
+npm run auth          # one-time interactive OAuth (loopback+PKCE)
+npm run gdocs -- …    # the CLI: auth | push | fetch
+```
+
+Auth lives in `~/.config/margin/google-oauth.json` (Google's downloaded
+Desktop-client shape) + a cached token; scope is `drive.file` only.
+The live tier's durable fixture doc id is in `test/live/fixtures.ts` —
+**read-only, never recreate**; its anchored comments/suggestions were
+made by hand in the Docs UI and the API cannot recreate them.
+
+### Gotchas specific to this package
+
+- **Node runs the .ts directly** (type stripping): internal imports use
+  `.ts` extensions, and only erasable syntax — no parameter properties,
+  no enums. tsc/vitest are configured to match.
+- **Run everything from the package dir.** The Bash tool's cwd resets
+  between calls; a `python3`/`npm` invoked from the repo root has
+  twice edited the WRONG package.json. `cd` in the same command.
+- **RT-1 is the canary** for any conversion change: push every block
+  type, re-push identical markdown, assert zero writes. If it fails,
+  the script prints side-by-side identities. Keep it green forever.
+- **Index math is UTF-16 code units** — in TS, `String.length` is
+  already correct; do not "fix" it to code points.
+- **Phase ordering is load-bearing** (lesson 2): inserts → bullets →
+  paragraph styles → text styles; and `updateParagraphStyle` with
+  `namedStyleType` RE-APPLIES the named style's text properties —
+  paragraph styles must precede text styles or fonts silently vanish
+  (this shipped broken once; SI-2 caught it).
+- **Table cell requests interleave per cell** (fill → styles, reverse
+  document order) — phased styles run against shifted indices.
+- **Comment anchor state is API-invisible** — orphaned and healthy
+  comments are indistinguishable via `comments.list`; automated tests
+  max out at thread survival + quotes; anchor claims need one-shot
+  UI-decorated experiments (protocol in splice-findings.md).
+- **Sync reads use the default (inline) view for indices; the fetch
+  path uses PREVIEW_WITHOUT_SUGGESTIONS; push refuses when suggestions
+  are pending** — both other combinations corrupt or destroy content.
+- A doc body's first element is a **sectionBreak** — scanners must skip
+  it, not stop (broke the meta scanner once).
+- Styling is excluded from block identity (UDIFF-7); styling-only
+  changes travel via the `restyle` op, never rebuilds.
+
 ## Author preferences that shape this app
 
 - In-app comments are the primary feedback channel; inline `(TK: ...)`
