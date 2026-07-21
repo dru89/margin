@@ -129,7 +129,9 @@ async function cmdFetch(args: string[]): Promise<void> {
     return;
   }
 
-  const markdown = await fetchAsMarkdown(c, docId);
+  // Fetch over an existing file preserves its unknown frontmatter keys.
+  const existing = out ? await fs.readFile(out, 'utf8').catch(() => undefined) : undefined;
+  const markdown = await fetchAsMarkdown(c, docId, { preserveFrontmatterFrom: existing });
   if (out) {
     await fs.writeFile(out, markdown, 'utf8');
     console.log(`wrote ${out}`);

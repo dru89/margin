@@ -34,34 +34,83 @@ export interface Frontmatter {
   title?: string;
   subtitle?: string;
   author?: string;
+  /** All authors when the file carries a YAML list. */
+  authors?: string[];
   authorEmail?: string;
   date?: string;
   /** Link-offer signal on import; Margin never writes it. */
   url?: string;
 }
 
-/** Split leading YAML frontmatter; parse only the keys in the interop contract. */
-export function splitFrontmatter(markdown: string): { meta: Frontmatter; body: string } {
+/** One frontmatter entry, raw lines kept verbatim for preservation. */
+export interface FrontmatterEntry {
+  key: string;
+  lines: string[];
+}
+
+const CONTRACT_KEYS: Record<string, keyof Frontmatter> = {
+  title: 'title',
+  subtitle: 'subtitle',
+  author: 'author',
+  'author-email': 'authorEmail',
+  date: 'date',
+  url: 'url',
+};
+
+function unquote(value: string): string {
+  return value.trim().replace(/^["']|["']$/g, '');
+}
+
+/**
+ * Split leading YAML frontmatter. Contract keys parse (including
+ * folded/literal block scalars and YAML-list authors, issue #20);
+ * EVERY entry — known or unknown — is preserved verbatim in `entries`
+ * so fetch-over-a-richer-file never drops keys.
+ */
+export function splitFrontmatter(markdown: string): {
+  meta: Frontmatter;
+  body: string;
+  entries: FrontmatterEntry[];
+} {
   const m = /^---\n([\s\S]*?)\n---\n?/.exec(markdown);
-  if (!m) return { meta: {}, body: markdown };
+  if (!m) return { meta: {}, body: markdown, entries: [] };
   const meta: Frontmatter = {};
-  const keys: Record<string, keyof Frontmatter> = {
-    title: 'title',
-    subtitle: 'subtitle',
-    author: 'author',
-    'author-email': 'authorEmail',
-    date: 'date',
-    url: 'url',
-  };
-  for (const line of m[1]!.split('\n')) {
-    const kv = /^([A-Za-z-]+):\s*(.*)$/.exec(line);
+  const entries: FrontmatterEntry[] = [];
+  const lines = m[1]!.split('\n');
+
+  for (let i = 0; i < lines.length; i++) {
+    const kv = /^([A-Za-z0-9_-]+):(.*)$/.exec(lines[i]!);
     if (!kv) continue;
-    const key = keys[kv[1]!];
-    if (!key) continue;
-    // UMISC-5: quoted, single-quoted, and bare values all parse.
-    meta[key] = kv[2]!.trim().replace(/^["']|["']$/g, '');
+    const key = kv[1]!;
+    const inline = kv[2]!.trim();
+    const entry: FrontmatterEntry = { key, lines: [lines[i]!] };
+    // Consume continuation lines: block scalars (`>` / `|`) and list
+    // items — anything indented or a `- ` item belongs to this entry.
+    const continuation: string[] = [];
+    while (i + 1 < lines.length && /^(\s+\S|\s*-\s)/.test(lines[i + 1]!)) {
+      i++;
+      entry.lines.push(lines[i]!);
+      continuation.push(lines[i]!.trim());
+    }
+    entries.push(entry);
+
+    const contract = CONTRACT_KEYS[key];
+    if (!contract) continue;
+    let value: string;
+    if (inline === '>' || inline === '|') {
+      // Folded scalars join with spaces; literal scalars keep newlines.
+      value = continuation.filter((l) => !l.startsWith('- ')).join(inline === '>' ? ' ' : '\n');
+    } else if (inline === '' && continuation.some((l) => l.startsWith('- '))) {
+      // YAML list (authors): first item is the value; keep the rest.
+      const items = continuation.filter((l) => l.startsWith('- ')).map((l) => unquote(l.slice(2)));
+      if (contract === 'author') meta.authors = items;
+      value = items[0] ?? '';
+    } else {
+      value = unquote(inline);
+    }
+    if (value !== '') meta[contract] = value as never;
   }
-  return { meta, body: markdown.slice(m[0].length) };
+  return { meta, body: markdown.slice(m[0].length), entries };
 }
 
 function spansOf(nodes: PhrasingContent[], inherit: Partial<InlineSpan> = {}): InlineSpan[] {
