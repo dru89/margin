@@ -62,13 +62,14 @@ describe('UWIDTH — reference column-sizing algorithm (conventions @ ad145b3)',
     expect(w3![1]).not.toBe(w1![1]);
   });
 
-  it('UWIDTH-5 (SI-4): centering = width ≤ 48pt and every body cell ≤ 1 glyph', () => {
-    const emoji = [row('S', 'Desc'), row('⚠️', 'longer text'), row('👍🏽', 'more text')];
-    const widths = planColumnWidths(emoji);
-    expect(shouldCenterColumn(widths[0]!, emoji, 0)).toBe(true);
-    expect(shouldCenterColumn(widths[1]!, emoji, 1)).toBe(false);
-    // Two-glyph cells don't center even when narrow.
-    const twoGlyph = [row('S'), row('ab')];
-    expect(shouldCenterColumn(30, twoGlyph, 0)).toBe(false);
+  it('UWIDTH-5 (SI-4): centering = every body cell ≤ 1 glyph, header width irrelevant', () => {
+    // A wordy header ("Status") must not defeat centering — style-review
+    // feedback; deviates deliberately from the reference's ≤48pt guard.
+    const emoji = [row('Status', 'Desc'), row('⚠️', 'longer text'), row('👍🏽', 'more text')];
+    expect(shouldCenterColumn(emoji, 0)).toBe(true);
+    expect(shouldCenterColumn(emoji, 1)).toBe(false);
+    // Two-glyph cells don't center; empty tables don't center.
+    expect(shouldCenterColumn([row('S'), row('ab')], 0)).toBe(false);
+    expect(shouldCenterColumn([row('S')], 0)).toBe(false);
   });
 });

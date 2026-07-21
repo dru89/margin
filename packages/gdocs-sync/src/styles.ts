@@ -43,9 +43,19 @@ export function headingStyle(level: number): { look: TextLook; spacing: ParaSpac
 export const CODE: TextLook = { font: 'Roboto Mono', sizePt: 11, colorHex: '188038' };
 export const CODE_SPACING: ParaSpacing = { beforePt: 0, afterPt: 2 };
 
-export const QUOTE_SPACING: ParaSpacing = { beforePt: 5, afterPt: 5 };
-/** The reference's Compact style — list items breathe 1.8pt, not 10pt. */
-export const LIST_SPACING: ParaSpacing = { beforePt: 1.8, afterPt: 1.8 };
+export const QUOTE_SPACING: ParaSpacing = { beforePt: 10, afterPt: 10 };
+/** Tight lists breathe 1.8pt between items; loose (blank-line) lists get body spacing. */
+export const LIST_ITEM_GAP_PT = 1.8;
+export const LOOSE_ITEM_GAP_PT = 10;
+/** Block-level breathing room above/below lists, code blocks, and tables. */
+export const BLOCK_GAP_PT = 10;
+/** Blockquote left border — reads as a quoted block. */
+export const QUOTE_BORDER = {
+  width: { magnitude: 3, unit: 'PT' },
+  padding: { magnitude: 8, unit: 'PT' },
+  dashStyle: 'SOLID',
+  color: { color: { rgbColor: { red: 0.7, green: 0.7, blue: 0.7 } } },
+};
 
 export function rgb(hex: string): { color: { rgbColor: { red: number; green: number; blue: number } } } {
   return {

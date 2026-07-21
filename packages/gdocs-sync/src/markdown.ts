@@ -157,7 +157,7 @@ export function markdownToBlocks(body: string): CanonicalBlock[] {
         blocks.push({ kind: 'code', lang: node.lang ?? null, text: node.value });
         break;
       case 'list':
-        blocks.push({ kind: 'list', items: listItems(node, 0) });
+        blocks.push({ kind: 'list', items: listItems(node, 0), loose: node.spread === true });
         break;
       case 'table':
         blocks.push({

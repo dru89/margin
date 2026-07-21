@@ -26,7 +26,7 @@ export type CanonicalBlock =
   | { kind: 'heading'; level: number; spans: InlineSpan[] }
   | { kind: 'paragraph'; spans: InlineSpan[] }
   | { kind: 'code'; lang: string | null; text: string }
-  | { kind: 'list'; items: ListItem[] }
+  | { kind: 'list'; items: ListItem[]; /** blank-line-separated items → roomier spacing */ loose?: boolean }
   | { kind: 'table'; rows: InlineSpan[][][] } // rows → cells → spans
   | { kind: 'blockquote'; spans: InlineSpan[] }
   | { kind: 'hr' }

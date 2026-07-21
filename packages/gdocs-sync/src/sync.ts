@@ -9,6 +9,7 @@
 import type { CanonicalBlock, InlineSpan } from './blocks.ts';
 import { spanText } from './blocks.ts';
 import { buildSegment } from './builder.ts';
+import { BLOCK_GAP_PT } from './styles.ts';
 import { diffBlocks } from './differ.ts';
 import type { DocsClient, GDocDocument, GDocRequest, GDocStructuralElement } from './gdoc.ts';
 import { markdownToBlocks, splitFrontmatter, stripCommentsSection } from './markdown.ts';
@@ -66,11 +67,17 @@ async function applyBlocksAt(
   let cursor = insertAt;
   let tableOrdinal = tablesBefore;
   let widthIdx = 0;
+  let afterTable = false;
   let pending: CanonicalBlock[] = [];
 
   const flush = async (): Promise<void> => {
     if (pending.length === 0) return;
-    const segment = buildSegment(pending, cursor);
+    // The paragraph after a table carries the table's bottom gap —
+    // tables themselves can't hold spacing (style-review feedback).
+    const segment = buildSegment(pending, cursor, {
+      leadingSpaceAbovePt: afterTable ? BLOCK_GAP_PT : undefined,
+    });
+    afterTable = false;
     const revision = await revisionOf(client, docId);
     await client.batchUpdate(docId, segment.requests, revision);
     written += segment.requests.length;
@@ -132,10 +139,8 @@ async function applyBlocksAt(
           range: { startIndex: cell.index, endIndex: cell.index + text.length },
           paragraphStyle: {
             namedStyleType: 'NORMAL_TEXT',
-            // SI-4: narrow single-glyph columns center their cells.
-            alignment: shouldCenterColumn(widths[cell.col] ?? 999, block.rows, cell.col)
-              ? 'CENTER'
-              : 'START',
+            // SI-4: single-glyph columns center their cells.
+            alignment: shouldCenterColumn(block.rows, cell.col) ? 'CENTER' : 'START',
           },
           fields: 'namedStyleType,alignment',
         },
@@ -176,6 +181,7 @@ async function applyBlocksAt(
     const after = await client.getDocument(docId);
     const filled = nthTable(after, tableOrdinal - 1);
     cursor = filled?.endIndex ?? cursor;
+    afterTable = true;
   }
   await flush();
   return written;
