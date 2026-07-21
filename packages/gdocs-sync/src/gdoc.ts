@@ -11,6 +11,8 @@ import { withQuotaRetry } from './util.ts';
 export interface GDocTextRun {
   textRun?: {
     content?: string;
+    suggestedInsertionIds?: string[];
+    suggestedDeletionIds?: string[];
     textStyle?: {
       bold?: boolean;
       italic?: boolean;
@@ -57,10 +59,39 @@ export interface GDocDocument {
 
 export type GDocRequest = Record<string, unknown>;
 
+export type SuggestionsViewMode = 'SUGGESTIONS_INLINE' | 'PREVIEW_WITHOUT_SUGGESTIONS';
+
 export interface DocsClient {
   createDocument(title: string): Promise<{ documentId: string }>;
-  getDocument(docId: string): Promise<GDocDocument>;
+  /**
+   * Default view is SUGGESTIONS_INLINE — the document's real stored
+   * content, which is what batchUpdate indices are measured against.
+   * PREVIEW_WITHOUT_SUGGESTIONS (original text) is for the fetch path
+   * only; its indices must never be used for writes.
+   */
+  getDocument(docId: string, viewMode?: SuggestionsViewMode): Promise<GDocDocument>;
   batchUpdate(docId: string, requests: GDocRequest[], requiredRevisionId?: string): Promise<void>;
+}
+
+/** True when any run carries pending suggested insertions/deletions. */
+export function hasPendingSuggestions(doc: GDocDocument): boolean {
+  for (const el of doc.body?.content ?? []) {
+    for (const pe of el.paragraph?.elements ?? []) {
+      const run = pe.textRun;
+      if (run?.suggestedInsertionIds?.length || run?.suggestedDeletionIds?.length) return true;
+    }
+    for (const row of el.table?.tableRows ?? []) {
+      for (const cell of row.tableCells ?? []) {
+        for (const inner of cell.content ?? []) {
+          for (const pe of inner.paragraph?.elements ?? []) {
+            const run = pe.textRun;
+            if (run?.suggestedInsertionIds?.length || run?.suggestedDeletionIds?.length) return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
 }
 
 /* ——— live HTTP client ——— */
@@ -97,8 +128,9 @@ export class HttpDocsClient implements DocsClient {
     return this.call(DOCS, { method: 'POST', body: JSON.stringify({ title }) });
   }
 
-  getDocument(docId: string): Promise<GDocDocument> {
-    return this.call(`${DOCS}/${docId}`);
+  getDocument(docId: string, viewMode?: SuggestionsViewMode): Promise<GDocDocument> {
+    const query = viewMode ? `?suggestionsViewMode=${viewMode}` : '';
+    return this.call(`${DOCS}/${docId}${query}`);
   }
 
   async batchUpdate(docId: string, requests: GDocRequest[], requiredRevisionId?: string): Promise<void> {

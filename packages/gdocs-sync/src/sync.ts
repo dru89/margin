@@ -12,6 +12,8 @@ import { buildSegment } from './builder.ts';
 import { BLOCK_GAP_PT } from './styles.ts';
 import { diffBlocks } from './differ.ts';
 import type { DocsClient, GDocDocument, GDocRequest, GDocStructuralElement } from './gdoc.ts';
+import { hasPendingSuggestions } from './gdoc.ts';
+import { serializeBlocks } from './serialize.ts';
 import { markdownToBlocks, splitFrontmatter, stripCommentsSection } from './markdown.ts';
 import { MONO_FONT, docToBlocks } from './reader.ts';
 import { planRegions } from './regions.ts';
@@ -211,12 +213,32 @@ export interface UpdatePlan {
  * only the changed regions (reverse order so earlier indices survive).
  * Identical content sends zero write requests — RT-1's contract.
  */
+/**
+ * Fetch path (the gfetch core): Doc → markdown. Reads the
+ * original-text view — collaborators' pending suggestions are their
+ * proposals, not document content.
+ */
+export async function fetchAsMarkdown(client: DocsClient, docId: string): Promise<string> {
+  const doc = await client.getDocument(docId, 'PREVIEW_WITHOUT_SUGGESTIONS');
+  return serializeBlocks(docToBlocks(doc).map((r) => r.block));
+}
+
 export async function updateFromMarkdown(
   client: DocsClient,
   docId: string,
   markdown: string,
 ): Promise<UpdatePlan> {
   const doc = await client.getDocument(docId);
+  // Pending suggestions poison both diff and indices: the original-text
+  // view diffs correctly but its indices don't match the stored content
+  // batchUpdate writes against; the inline view has usable indices but
+  // would diff collaborators' suggestions as document text and destroy
+  // them. v1 policy (spec: unpinned behavior): refuse, cleanly.
+  if (hasPendingSuggestions(doc)) {
+    throw new Error(
+      'Document has pending suggested edits — resolve them in Google Docs (or pull first) before pushing.',
+    );
+  }
   const readBlocks = docToBlocks(doc);
   const mdBlocks = mdToCanonical(markdown);
   const regions = planRegions(diffBlocks(readBlocks.map((r) => r.block), mdBlocks));
