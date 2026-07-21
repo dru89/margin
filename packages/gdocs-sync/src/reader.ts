@@ -127,12 +127,24 @@ export function docToBlocks(doc: GDocDocument, skipElements = 0): ReadBlock[] {
     const end = el.endIndex ?? start;
 
     if (el.table) {
-      const rows = (el.table.tableRows ?? []).map((row) =>
+      const rows = (el.table.tableRows ?? []).map((row, r) =>
         (row.tableCells ?? []).map((cell) => {
+          // Guards (issue #17): merged cells and nested tables would
+          // silently mangle — refuse loudly instead.
+          const style = (cell as { tableCellStyle?: { rowSpan?: number; columnSpan?: number } })
+            .tableCellStyle;
+          if ((style?.rowSpan ?? 1) > 1 || (style?.columnSpan ?? 1) > 1) {
+            throw new Error('Table has merged cells — not supported by gdocs-sync yet.');
+          }
           const cellSpans: InlineSpan[] = [];
           for (const inner of cell.content ?? []) {
+            if (inner.table) throw new Error('Nested tables are not supported by gdocs-sync yet.');
             if (inner.paragraph) cellSpans.push(...spansOf(inner.paragraph));
           }
+          // Header-row bold is OUR chrome (reference table style), not
+          // authored formatting — strip it so fetch stays round-trip
+          // stable ('| Name |' never becomes '| **Name** |').
+          if (r === 0) for (const s of cellSpans) delete s.bold;
           return cellSpans;
         }),
       );
