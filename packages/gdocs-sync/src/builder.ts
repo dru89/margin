@@ -26,6 +26,7 @@ import type { CanonicalBlock, InlineSpan } from './blocks.ts';
 import type { GDocRequest } from './gdoc.ts';
 import {
   BLOCK_GAP_PT,
+  TABLE_STYLE,
   BODY,
   BODY_SPACING,
   CODE,
@@ -184,6 +185,99 @@ export function restyleRequests(block: CanonicalBlock, startIndex: number): GDoc
         fields: fields.join(','),
       },
     });
+  }
+  return requests;
+}
+
+/** Per-span inline style requests over an absolute range (restyle plumbing). */
+function spanStyleRequests(
+  spans: InlineSpan[],
+  startIndex: number,
+  baseStyle: Record<string, unknown>,
+  baseFields: string,
+): GDocRequest[] {
+  const textLen = spans.reduce((n, s) => n + s.text.length, 0);
+  if (textLen === 0) return [];
+  const requests: GDocRequest[] = [
+    {
+      updateTextStyle: {
+        range: { startIndex, endIndex: startIndex + textLen },
+        textStyle: baseStyle,
+        fields: baseFields,
+      },
+    },
+  ];
+  let at = startIndex;
+  for (const span of spans) {
+    const end = at + span.text.length;
+    const style: Record<string, unknown> = {};
+    const fields: string[] = [];
+    if (span.code) {
+      Object.assign(style, textStyleOf(CODE));
+      fields.push('weightedFontFamily', 'fontSize', 'foregroundColor');
+    }
+    if (span.bold) (style.bold = true), fields.push('bold');
+    if (span.italic) (style.italic = true), fields.push('italic');
+    if (span.strike) (style.strikethrough = true), fields.push('strikethrough');
+    if (span.link) (style.link = { url: span.link }), fields.push('link');
+    if (fields.length > 0 && end > at) {
+      requests.push({
+        updateTextStyle: {
+          range: { startIndex: at, endIndex: end },
+          textStyle: style,
+          fields: fields.join(','),
+        },
+      });
+    }
+    at = end;
+  }
+  return requests;
+}
+
+const BODY_RESET = {
+  style: { ...textStyleOf(BODY), foregroundColor: rgb('000000') } as Record<string, unknown>,
+  fields: 'bold,italic,strikethrough,link,weightedFontFamily,fontSize,foregroundColor',
+};
+
+/** Restyle a list in place: per-item span styles over item doc ranges (issue #21). */
+export function restyleListRequests(
+  block: CanonicalBlock & { kind: 'list' },
+  itemRanges: { start: number; end: number }[],
+): GDocRequest[] {
+  const requests: GDocRequest[] = [];
+  block.items.forEach((item, i) => {
+    const range = itemRanges[i];
+    if (!range) return;
+    // Checked items keep their strike encoding: re-apply after reset.
+    const spans = item.checked
+      ? item.spans.map((s) => ({ ...s, strike: true }))
+      : item.spans;
+    requests.push(...spanStyleRequests(spans, range.start, BODY_RESET.style, BODY_RESET.fields));
+  });
+  return requests;
+}
+
+/** Restyle table cells in place; header row keeps its chrome (issue #21). */
+export function restyleTableRequests(
+  block: CanonicalBlock & { kind: 'table' },
+  cellRanges: { row: number; col: number; start: number; end: number }[],
+): GDocRequest[] {
+  const requests: GDocRequest[] = [];
+  for (const cell of cellRanges) {
+    const spans = block.rows[cell.row]?.[cell.col];
+    if (!spans || spans.length === 0) continue;
+    const base =
+      cell.row === 0
+        ? {
+            style: {
+              ...textStyleOf(BODY),
+              foregroundColor: rgb(TABLE_STYLE.header.textColorHex),
+              bold: true,
+            } as Record<string, unknown>,
+            fields: BODY_RESET.fields,
+          }
+        : BODY_RESET;
+    requests.push(...spanStyleRequests(spans, cell.start, base.style, base.fields));
   }
   return requests;
 }

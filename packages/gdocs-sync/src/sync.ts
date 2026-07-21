@@ -8,7 +8,7 @@
  */
 import type { CanonicalBlock, InlineSpan } from './blocks.ts';
 import { spanText } from './blocks.ts';
-import { buildSegment, restyleRequests } from './builder.ts';
+import { buildSegment, restyleListRequests, restyleRequests, restyleTableRequests } from './builder.ts';
 import { BLOCK_GAP_PT, BODY, TABLE_STYLE, rgb, textStyleOf } from './styles.ts';
 import { resolveImageSource, stageImage, type StagedImage } from './images.ts';
 import {
@@ -410,7 +410,14 @@ export async function updateFromMarkdown(
     const requests: GDocRequest[] = [];
     for (const op of restyles) {
       if (op.op !== 'restyle') continue;
-      requests.push(...restyleRequests(op.block, readBlocks[op.oldIndex]!.startIndex));
+      const rb = readBlocks[op.oldIndex]!;
+      if (op.block.kind === 'list' && rb.items) {
+        requests.push(...restyleListRequests(op.block, rb.items));
+      } else if (op.block.kind === 'table' && rb.cells) {
+        requests.push(...restyleTableRequests(op.block, rb.cells));
+      } else {
+        requests.push(...restyleRequests(op.block, rb.startIndex));
+      }
     }
     if (requests.length > 0) {
       await client.batchUpdate(docId, requests, doc.revisionId);
