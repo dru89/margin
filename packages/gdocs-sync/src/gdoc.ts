@@ -10,6 +10,9 @@ import { withQuotaRetry } from './util.ts';
 
 export interface GDocTextRun {
   inlineObjectElement?: { inlineObjectId?: string };
+  person?: { personId?: string; personProperties?: { name?: string; email?: string } };
+  dateElement?: { dateId?: string; dateElementProperties?: { timestamp?: string; displayText?: string } };
+  richLink?: { richLinkId?: string; richLinkProperties?: { title?: string; uri?: string } };
   textRun?: {
     content?: string;
     suggestedInsertionIds?: string[];

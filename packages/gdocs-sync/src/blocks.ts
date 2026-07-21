@@ -12,6 +12,13 @@ export interface InlineSpan {
   strike?: boolean;
   code?: boolean;
   link?: string;
+  /**
+   * Rendered from a smart chip (person/date/rich-link) on read-back.
+   * The text is the chip's display text so the diff sees what a human
+   * sees (lesson 5 — invisible content gets destroyed). Not a style:
+   * excluded from restyle signatures; serializes as plain text.
+   */
+  chip?: boolean;
 }
 
 export interface ListItem {
