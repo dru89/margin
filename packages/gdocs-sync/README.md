@@ -51,12 +51,17 @@ credentials).
 - [ ] CP anchored-survival (CP-1..4/8 proper) — **blocked**:
       programmatic comments are unanchored (probed); needs the
       reference harness technique (asked in margin#10)
-- [ ] UREAD-8..10 remainder — chips read, subtitle policy
+- [x] UCHIP-1..4 / META — metadata block (`src/meta.ts`): frontmatter
+      title/subtitle/author/date → TITLE/SUBTITLE paragraphs + person/
+      date chips; leading `#` lifts to title (both entry paths agree);
+      update replaces the region, never appends; fetch emits
+      frontmatter (subtitle round-trips there, not `##`); fetch→push
+      is a verified noop
+- [ ] UREAD-8..9 remainder — rich-link chips, adjacent-list separation
 - [x] UIMG-1,3..6 — images: resolution, PNG dims, sizing, figure
       emission with caption fold-back, unstaged degradation
       (`src/images.ts`); RT-1 corpus includes a live URL figure.
       Local-file staging (temp-docx contentUri trick) still deferred.
-- [ ] UCHIP-1..4 — metadata block (title/subtitle/chips) replacement
 - [ ] UAUTH-4 — auth flow end-to-end (fake flow)
 - [ ] Live tier: SI-*, TAB-*, IMG-*, META-* per the catalog.
 

@@ -98,9 +98,9 @@ function imageOf(doc: GDocDocument, para: GDocParagraph): { src: string; alt: st
 }
 
 /** Walk body content (single tab) into canonical blocks with doc ranges. */
-export function docToBlocks(doc: GDocDocument): ReadBlock[] {
+export function docToBlocks(doc: GDocDocument, skipElements = 0): ReadBlock[] {
   const out: ReadBlock[] = [];
-  const content = doc.body?.content ?? [];
+  const content = (doc.body?.content ?? []).slice(skipElements);
 
   for (let ci = 0; ci < content.length; ci++) {
     const el = content[ci]!;

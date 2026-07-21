@@ -11,6 +11,14 @@ import { spanText } from './blocks.ts';
 import { buildSegment } from './builder.ts';
 import { BLOCK_GAP_PT } from './styles.ts';
 import { resolveImageSource, stageImage, type StagedImage } from './images.ts';
+import {
+  buildMetaRequests,
+  emitFrontmatter,
+  hasMeta,
+  mdToCanonicalWithMeta,
+  metaEquals,
+  parseDocMeta,
+} from './meta.ts';
 import { diffBlocks } from './differ.ts';
 import type { DocsClient, GDocDocument, GDocRequest, GDocStructuralElement } from './gdoc.ts';
 import { hasPendingSuggestions } from './gdoc.ts';
@@ -222,12 +230,21 @@ export async function createFromMarkdown(
   options?: SyncOptions,
 ): Promise<{ documentId: string; requestsSent: number }> {
   const { documentId } = await client.createDocument(title);
-  const blocks = mdToCanonical(markdown);
+  const { meta, blocks } = mdToCanonicalWithMeta(markdown);
+  let requestsSent = 0;
+  let contentStart = 1;
+  if (hasMeta(meta)) {
+    const built = buildMetaRequests(meta, 1);
+    const revision = await revisionOf(client, documentId);
+    await client.batchUpdate(documentId, built.requests, revision);
+    requestsSent += built.requests.length;
+    contentStart += built.length;
+  }
   const tableWidths = planDocumentWidths(
     blocks.filter((b) => b.kind === 'table').map((b) => (b as { rows: InlineSpan[][][] }).rows),
   );
   const images = await stageImages(blocks, options?.baseDir ?? '');
-  const requestsSent = await applyBlocksAt(client, documentId, blocks, 1, {
+  requestsSent += await applyBlocksAt(client, documentId, blocks, contentStart, {
     tablesBefore: 0,
     tableWidths,
     images,
@@ -252,7 +269,9 @@ export interface UpdatePlan {
  */
 export async function fetchAsMarkdown(client: DocsClient, docId: string): Promise<string> {
   const doc = await client.getDocument(docId, 'PREVIEW_WITHOUT_SUGGESTIONS');
-  return serializeBlocks(docToBlocks(doc).map((r) => r.block));
+  const { meta, consumedElements } = parseDocMeta(doc);
+  const body = serializeBlocks(docToBlocks(doc, consumedElements).map((r) => r.block));
+  return emitFrontmatter(meta) + body;
 }
 
 export async function updateFromMarkdown(
@@ -272,10 +291,12 @@ export async function updateFromMarkdown(
       'Document has pending suggested edits — resolve them in Google Docs (or pull first) before pushing.',
     );
   }
-  const readBlocks = docToBlocks(doc);
-  const mdBlocks = mdToCanonical(markdown);
+  const docMeta = parseDocMeta(doc);
+  const readBlocks = docToBlocks(doc, docMeta.consumedElements);
+  const { meta: mdMeta, blocks: mdBlocks } = mdToCanonicalWithMeta(markdown);
+  const metaChanged = !metaEquals(mdMeta, docMeta.meta);
   const regions = planRegions(diffBlocks(readBlocks.map((r) => r.block), mdBlocks));
-  if (regions.length === 0) return { regions: 0, requestsSent: 0 };
+  if (regions.length === 0 && !metaChanged) return { regions: 0, requestsSent: 0 };
 
   const endIndex = docEndIndex(doc);
   let requestsSent = 0;
@@ -321,5 +342,23 @@ export async function updateFromMarkdown(
       images,
     });
   }
-  return { regions: regions.length, requestsSent };
+
+  // Meta last (it's the earliest region — content indices above stay
+  // valid): UCHIP-2 replace-never-append — delete the existing block
+  // and rebuild.
+  if (metaChanged) {
+    const requests: GDocRequest[] = [];
+    if (docMeta.consumedElements > 0 && docMeta.endIndex > 1) {
+      requests.push({
+        deleteContentRange: { range: { startIndex: 1, endIndex: docMeta.endIndex } },
+      });
+    }
+    if (hasMeta(mdMeta)) requests.push(...buildMetaRequests(mdMeta, 1).requests);
+    if (requests.length > 0) {
+      const revision = await revisionOf(client, docId);
+      await client.batchUpdate(docId, requests, revision);
+      requestsSent += requests.length;
+    }
+  }
+  return { regions: regions.length + (metaChanged ? 1 : 0), requestsSent };
 }
