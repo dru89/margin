@@ -27,6 +27,23 @@ export interface ReadBlock {
 function spansOf(para: GDocParagraph): InlineSpan[] {
   const spans: InlineSpan[] = [];
   for (const el of para.elements ?? []) {
+    // Smart chips render as text (lesson 5 / UREAD-9): content the
+    // diff can't see gets deleted on the next region rebuild.
+    if (el.person) {
+      const p = el.person.personProperties;
+      spans.push({ text: p?.name ?? p?.email ?? '', chip: true });
+      continue;
+    }
+    if (el.dateElement) {
+      const d = el.dateElement.dateElementProperties;
+      spans.push({ text: d?.displayText ?? d?.timestamp?.slice(0, 10) ?? '', chip: true });
+      continue;
+    }
+    if (el.richLink) {
+      const r = el.richLink.richLinkProperties;
+      spans.push({ text: r?.title ?? r?.uri ?? '', chip: true, link: r?.uri });
+      continue;
+    }
     const run = el.textRun;
     if (!run?.content) continue;
     const style = run.textStyle ?? {};
@@ -51,6 +68,8 @@ function spansOf(para: GDocParagraph): InlineSpan[] {
       !!prev.italic === !!s.italic &&
       !!prev.strike === !!s.strike &&
       !!prev.code === !!s.code &&
+      !prev.chip &&
+      !s.chip &&
       prev.link === s.link
     ) {
       prev.text += s.text;

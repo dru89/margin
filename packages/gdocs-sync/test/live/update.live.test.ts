@@ -11,7 +11,7 @@
  *  - RT-1 stability after an incremental edit (edit → noop re-push)
  */
 import { describe, expect, it } from 'vitest';
-import { createFromMarkdown, updateFromMarkdown } from '../../src/sync.ts';
+import { createFromMarkdown, fetchAsMarkdown, updateFromMarkdown } from '../../src/sync.ts';
 import { docToBlocks } from '../../src/reader.ts';
 import { serializeBlocks } from '../../src/serialize.ts';
 import { client, drive, token, trackDoc } from './harness.ts';
@@ -65,6 +65,47 @@ describe.skipIf(!token)('live update path (CP-pinnable subset)', () => {
     expect(mine!.content).toBe('thread about the second paragraph');
     expect(mine!.replies.map((r) => r.content)).toEqual(['a reply that must survive']);
     expect(listed.comments).toHaveLength(1); // no duplication
+  });
+
+  it('body chips survive unrelated edits and re-push is stable (issue #19)', async () => {
+    const base = '# Chip Corpus\n\nFirst paragraph.\n\nDeadline paragraph target.\n\nLast paragraph.\n';
+    const { documentId } = await createFromMarkdown(client!, `gdocs-sync chips ${Date.now()}`, base);
+    trackDoc(documentId);
+
+    // Plant a date chip inside the middle paragraph via the API.
+    const doc0 = await client!.getDocument(documentId);
+    let at = -1;
+    for (const el of doc0.body?.content ?? []) {
+      for (const pe of el.paragraph?.elements ?? []) {
+        const i = pe.textRun?.content?.indexOf('target.') ?? -1;
+        if (i !== -1) at = (pe as { startIndex?: number }).startIndex ?? -1;
+      }
+    }
+    // Fallback: find via structural walk offsets (elements carry startIndex).
+    expect(at).not.toBe(-1);
+    await client!.batchUpdate(documentId, [
+      { insertText: { location: { index: at }, text: ' ' } },
+      { insertDate: { location: { index: at }, dateElementProperties: { timestamp: '2026-07-21T12:00:00Z' } } },
+    ]);
+
+    // Pull to get the chip-rendered markdown, then push an edit to a
+    // DIFFERENT paragraph: the chip paragraph must not be rebuilt.
+    const pulled = await fetchAsMarkdown(client!, documentId);
+    expect(pulled).toMatch(/Jul 21, 2026|2026-07-21/); // chip visible as text
+    const edited = pulled.replace('Last paragraph.', 'Last paragraph, EDITED.');
+    const plan = await updateFromMarkdown(client!, documentId, edited);
+    expect(plan.regions).toBe(1);
+
+    // The chip still exists (would have been destroyed pre-#19).
+    const doc1 = await client!.getDocument(documentId);
+    const hasChip = (doc1.body?.content ?? []).some((el) =>
+      (el.paragraph?.elements ?? []).some((pe) => (pe as { dateElement?: unknown }).dateElement),
+    );
+    expect(hasChip).toBe(true);
+
+    // And the edited state re-pushes as a noop.
+    const again = await updateFromMarkdown(client!, documentId, edited);
+    expect(again.requestsSent).toBe(0);
   });
 
   it('restyle: a styling-only edit patches in place and comments survive by construction', async () => {
