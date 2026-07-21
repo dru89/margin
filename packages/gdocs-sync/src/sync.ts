@@ -8,7 +8,7 @@
  */
 import type { CanonicalBlock, InlineSpan } from './blocks.ts';
 import { spanText } from './blocks.ts';
-import { buildSegment } from './builder.ts';
+import { buildSegment, restyleRequests } from './builder.ts';
 import { BLOCK_GAP_PT, BODY, rgb, textStyleOf } from './styles.ts';
 import { resolveImageSource, stageImage, type StagedImage } from './images.ts';
 import {
@@ -257,6 +257,8 @@ export async function createFromMarkdown(
 
 export interface UpdatePlan {
   regions: number;
+  /** Styling-only blocks patched in place (comments untouched). */
+  restyles?: number;
   requestsSent: number;
 }
 
@@ -298,11 +300,30 @@ export async function updateFromMarkdown(
   const readBlocks = docToBlocks(doc, docMeta.consumedElements);
   const { meta: mdMeta, blocks: mdBlocks } = mdToCanonicalWithMeta(markdown);
   const metaChanged = !metaEquals(mdMeta, docMeta.meta);
-  const regions = planRegions(diffBlocks(readBlocks.map((r) => r.block), mdBlocks));
-  if (regions.length === 0 && !metaChanged) return { regions: 0, requestsSent: 0 };
+  const ops = diffBlocks(readBlocks.map((r) => r.block), mdBlocks);
+  const regions = planRegions(ops);
+  const restyles = ops.filter((op) => op.op === 'restyle');
+  if (regions.length === 0 && restyles.length === 0 && !metaChanged) {
+    return { regions: 0, restyles: 0, requestsSent: 0 };
+  }
 
   const endIndex = docEndIndex(doc);
   let requestsSent = 0;
+
+  // Restyles FIRST: pure style patches against read-snapshot indices,
+  // valid before any region edit moves content. No deletes → comments
+  // anchored in these blocks cannot be orphaned.
+  if (restyles.length > 0) {
+    const requests: GDocRequest[] = [];
+    for (const op of restyles) {
+      if (op.op !== 'restyle') continue;
+      requests.push(...restyleRequests(op.block, readBlocks[op.oldIndex]!.startIndex));
+    }
+    if (requests.length > 0) {
+      await client.batchUpdate(docId, requests, doc.revisionId);
+      requestsSent += requests.length;
+    }
+  }
   // Pooling context is the whole markdown document: plan widths for all
   // md tables up front, then hand each region its slice (forward order).
   const mdTables = mdBlocks.filter((b) => b.kind === 'table');
@@ -363,5 +384,5 @@ export async function updateFromMarkdown(
       requestsSent += requests.length;
     }
   }
-  return { regions: regions.length + (metaChanged ? 1 : 0), requestsSent };
+  return { regions: regions.length + (metaChanged ? 1 : 0), restyles: restyles.length, requestsSent };
 }

@@ -132,6 +132,62 @@ export interface SegmentOptions {
   images?: Map<string, import('./images.ts').StagedImage | null>;
 }
 
+/**
+ * In-place restyle for a block whose text is unchanged (differ
+ * 'restyle' op): base reset + block look + per-span styles over the
+ * block's existing doc range. No inserts, no deletes — comments
+ * anchored inside are untouched. Only span-bearing single-paragraph
+ * kinds (paragraph/heading/blockquote); offsets map 1:1 because their
+ * doc text equals the concatenated span text.
+ */
+export function restyleRequests(block: CanonicalBlock, startIndex: number): GDocRequest[] {
+  if (block.kind !== 'paragraph' && block.kind !== 'heading' && block.kind !== 'blockquote') return [];
+  const { spans } = blockText(block);
+  const textLen = block.spans.reduce((n, s) => n + s.text.length, 0);
+  if (textLen === 0) return [];
+  const requests: GDocRequest[] = [
+    {
+      updateTextStyle: {
+        range: { startIndex, endIndex: startIndex + textLen },
+        textStyle: { ...textStyleOf(BODY), foregroundColor: rgb('000000') },
+        fields: 'bold,italic,strikethrough,link,weightedFontFamily,fontSize,foregroundColor',
+      },
+    },
+  ];
+  if (block.kind === 'heading') {
+    const look = block.level === 1 ? TITLE : headingStyle(block.level).look;
+    requests.push({
+      updateTextStyle: {
+        range: { startIndex, endIndex: startIndex + textLen },
+        textStyle: textStyleOf(look),
+        fields: 'weightedFontFamily,fontSize' + (look.colorHex ? ',foregroundColor' : ''),
+      },
+    });
+  }
+  for (const { span, start, end } of spans) {
+    if (start === end) continue;
+    const style: Record<string, unknown> = {};
+    const fields: string[] = [];
+    if (span.code) {
+      Object.assign(style, textStyleOf(CODE));
+      fields.push('weightedFontFamily', 'fontSize', 'foregroundColor');
+    }
+    if (span.bold) (style.bold = true), fields.push('bold');
+    if (span.italic) (style.italic = true), fields.push('italic');
+    if (span.strike) (style.strikethrough = true), fields.push('strikethrough');
+    if (span.link) (style.link = { url: span.link }), fields.push('link');
+    if (fields.length === 0) continue;
+    requests.push({
+      updateTextStyle: {
+        range: { startIndex: startIndex + start, endIndex: startIndex + end },
+        textStyle: style,
+        fields: fields.join(','),
+      },
+    });
+  }
+  return requests;
+}
+
 export function buildSegment(
   blocks: CanonicalBlock[],
   insertAt: number,

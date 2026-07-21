@@ -67,6 +67,44 @@ describe.skipIf(!token)('live update path (CP-pinnable subset)', () => {
     expect(listed.comments).toHaveLength(1); // no duplication
   });
 
+  it('restyle: a styling-only edit patches in place and comments survive by construction', async () => {
+    const PLAIN = '# Restyle Corpus\n\nThis is bold and italics and inline code together.\n';
+    const MIXED = '# Restyle Corpus\n\nThis is **bold** and *italics* and `inline code` together.\n';
+    const { documentId } = await createFromMarkdown(client!, `gdocs-sync restyle ${Date.now()}`, PLAIN);
+    trackDoc(documentId);
+    const comment = await drive<{ id: string }>(`${documentId}/comments?fields=id`, {
+      method: 'POST',
+      body: JSON.stringify({
+        content: 'comment on the block being restyled',
+        quotedFileContent: { mimeType: 'text/plain', value: 'bold and italics' },
+      }),
+    });
+
+    const plan = await updateFromMarkdown(client!, documentId, MIXED);
+    expect(plan.regions).toBe(0); // no rebuild anywhere
+    expect(plan.restyles).toBe(1);
+    expect(plan.requestsSent).toBeGreaterThan(2);
+
+    // Styling landed: the word 'bold' is bold in the doc.
+    const doc = await client!.getDocument(documentId);
+    let boldSeen = false;
+    for (const el of doc.body?.content ?? []) {
+      for (const pe of el.paragraph?.elements ?? []) {
+        if (pe.textRun?.content?.startsWith('bold') && pe.textRun.textStyle?.bold) boldSeen = true;
+      }
+    }
+    expect(boldSeen).toBe(true);
+
+    // The comment thread survives (and with zero deletes sent, its
+    // anchor is safe by construction — nothing could orphan it).
+    const listed = await drive<{ comments: { id: string }[] }>(`${documentId}/comments?fields=comments(id)`);
+    expect(listed.comments.map((c) => c.id)).toContain(comment.id);
+
+    // And the restyled doc is stable: identical re-push is a noop.
+    const again = await updateFromMarkdown(client!, documentId, MIXED);
+    expect(again.requestsSent).toBe(0);
+  });
+
   it('edit → identical re-push is a noop (RT-1 stability under incremental updates)', async () => {
     const { documentId } = await createFromMarkdown(client!, `gdocs-sync CP-noop ${Date.now()}`, BASE_MD);
     trackDoc(documentId);

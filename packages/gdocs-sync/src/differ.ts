@@ -9,7 +9,29 @@ export type DiffOp =
   | { op: 'keep'; oldIndex: number; newIndex: number; block: CanonicalBlock }
   | { op: 'delete'; oldIndex: number; block: CanonicalBlock }
   | { op: 'insert'; newIndex: number; block: CanonicalBlock }
-  | { op: 'modify'; oldIndex: number; newIndex: number; oldBlock: CanonicalBlock; newBlock: CanonicalBlock };
+  | { op: 'modify'; oldIndex: number; newIndex: number; oldBlock: CanonicalBlock; newBlock: CanonicalBlock }
+  /**
+   * Same text, different inline styling: patch styles in place — no
+   * delete, no rebuild, so comments anchored in the block are safe.
+   * Without this op, styling-only edits never push at all (identity
+   * excludes styling by design).
+   */
+  | { op: 'restyle'; oldIndex: number; newIndex: number; block: CanonicalBlock };
+
+/** Normalized styling signature: adjacent same-format spans merge first. */
+function styleSignature(block: CanonicalBlock): string | null {
+  if (block.kind !== 'paragraph' && block.kind !== 'heading' && block.kind !== 'blockquote') {
+    return null; // restyle v1 covers span-bearing single-block kinds
+  }
+  const merged: { text: string; key: string }[] = [];
+  for (const s of block.spans) {
+    const key = `${+!!s.bold}${+!!s.italic}${+!!s.strike}${+!!s.code}|${s.link ?? ''}`;
+    const prev = merged[merged.length - 1];
+    if (prev && prev.key === key) prev.text += s.text;
+    else merged.push({ text: s.text, key });
+  }
+  return merged.map((m) => `${m.key}:${m.text}`).join('§');
+}
 
 export function diffBlocks(oldBlocks: CanonicalBlock[], newBlocks: CanonicalBlock[]): DiffOp[] {
   const oldIds = oldBlocks.map(identity);
@@ -64,5 +86,14 @@ export function diffBlocks(oldBlocks: CanonicalBlock[], newBlocks: CanonicalBloc
       ops.push(a);
     }
   }
-  return ops;
+  // Keeps whose inline styling differs become in-place restyles.
+  return ops.map((op) => {
+    if (op.op !== 'keep') return op;
+    const oldSig = styleSignature(oldBlocks[op.oldIndex]!);
+    const newSig = styleSignature(op.block);
+    if (oldSig !== null && newSig !== null && oldSig !== newSig) {
+      return { op: 'restyle', oldIndex: op.oldIndex, newIndex: op.newIndex, block: op.block } as DiffOp;
+    }
+    return op;
+  });
 }

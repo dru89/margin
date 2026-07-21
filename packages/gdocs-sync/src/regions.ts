@@ -31,7 +31,9 @@ export function planRegions(ops: DiffOp[]): RebuildRegion[] {
   };
 
   for (const op of ops) {
-    if (op.op === 'keep') {
+    if (op.op === 'keep' || op.op === 'restyle') {
+      // Restyles patch in place (no rebuild) — handled separately by
+      // the orchestrator; for region purposes they're keeps.
       flush();
       oldCursor = op.oldIndex + 1;
       continue;

@@ -70,6 +70,9 @@ credentials).
 - [x] CLI (`src/cli.ts`, `npm run gdocs` / bin `gdocs`): auth, push
       (single doc via frontmatter url or --doc; multi-tab Title=path
       specs), fetch, --write-url — the gpush/gfetch replacement
+- [x] Restyle op: styling-only changes patch in place (no delete —
+      comments in the block are safe by construction); mixed-inline
+      probe sentence pinned offline + live
 - [ ] UAUTH-4 — auth flow end-to-end (fake flow)
 - [ ] Live tier remainder: IMG-* (local-file staging), META live
 
