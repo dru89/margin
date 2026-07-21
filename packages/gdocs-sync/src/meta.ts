@@ -26,6 +26,8 @@ export interface DocMeta {
   title?: string;
   subtitle?: string;
   author?: string;
+  /** All authors when known (YAML list in, multiple person chips out). */
+  authors?: string[];
   authorEmail?: string;
   /** ISO 8601 date (YYYY-MM-DD accepted). */
   date?: string;
@@ -38,6 +40,7 @@ export function mdToCanonicalWithMeta(markdown: string): { meta: DocMeta; blocks
     title: fm.title,
     subtitle: fm.subtitle,
     author: fm.author,
+    authors: fm.authors,
     authorEmail: fm.authorEmail,
     date: fm.date,
   };
@@ -207,8 +210,12 @@ export function parseDocMeta(doc: GDocDocument): {
         const person = (chip as { person?: { personProperties?: { email?: string; name?: string } } }).person;
         if (person) {
           meta.hasAuthorChip = true;
-          meta.author = person.personProperties?.name ?? person.personProperties?.email;
-          meta.authorEmail = person.personProperties?.email;
+          const name = person.personProperties?.name ?? person.personProperties?.email;
+          if (name) (meta.authors ??= []).push(name);
+          if (!meta.author) {
+            meta.author = name;
+            meta.authorEmail = person.personProperties?.email;
+          }
         }
         const dateEl = (chip as { dateElement?: { dateElementProperties?: { timestamp?: string } } })
           .dateElement;
@@ -227,15 +234,58 @@ export function parseDocMeta(doc: GDocDocument): {
   return { meta, consumedElements: consumed, endIndex };
 }
 
-/** Frontmatter emitter for the fetch path (only keys that exist). */
-export function emitFrontmatter(meta: ReadDocMeta): string {
+/**
+ * Frontmatter emitter for the fetch path. With `preserve` (the target
+ * file's existing entries from splitFrontmatter), contract keys are
+ * updated in their original positions, unknown keys pass through
+ * verbatim in order, and new contract keys append — fetch over a
+ * richer file never drops anything (issue #20).
+ */
+export function emitFrontmatter(
+  meta: ReadDocMeta,
+  preserve?: import('./markdown.ts').FrontmatterEntry[],
+): string {
+  const contractLines = (key: string): string[] | null => {
+    switch (key) {
+      case 'title':
+        return meta.title ? [`title: ${meta.title}`] : null;
+      case 'subtitle':
+        return meta.subtitle ? [`subtitle: ${meta.subtitle}`] : null;
+      case 'author':
+        if (meta.authors && meta.authors.length > 1)
+          return ['author:', ...meta.authors.map((a) => `  - ${a}`)];
+        return meta.author ? [`author: ${meta.author}`] : null;
+      case 'author-email':
+        return meta.authorEmail && meta.authorEmail !== meta.author
+          ? [`author-email: ${meta.authorEmail}`]
+          : null;
+      case 'date':
+        return meta.date ? [`date: ${meta.date}`] : null;
+      default:
+        return null;
+    }
+  };
+  const CONTRACT = ['title', 'subtitle', 'author', 'author-email', 'date'];
   const lines: string[] = [];
-  if (meta.title) lines.push(`title: ${meta.title}`);
-  if (meta.subtitle) lines.push(`subtitle: ${meta.subtitle}`);
-  if (meta.author) lines.push(`author: ${meta.author}`);
-  if (meta.authorEmail && meta.authorEmail !== meta.author)
-    lines.push(`author-email: ${meta.authorEmail}`);
-  if (meta.date) lines.push(`date: ${meta.date}`);
+  const emitted = new Set<string>();
+
+  for (const entry of preserve ?? []) {
+    if (CONTRACT.includes(entry.key)) {
+      if (emitted.has(entry.key)) continue;
+      emitted.add(entry.key);
+      const updated = contractLines(entry.key);
+      if (updated) lines.push(...updated);
+      // Contract key absent from the doc → dropped (doc is the source
+      // of truth for its own meta on fetch).
+    } else {
+      lines.push(...entry.lines); // unknown keys verbatim, in order
+    }
+  }
+  for (const key of CONTRACT) {
+    if (emitted.has(key)) continue;
+    const fresh = contractLines(key);
+    if (fresh) lines.push(...fresh);
+  }
   if (lines.length === 0) return '';
   return `---\n${lines.join('\n')}\n---\n\n`;
 }

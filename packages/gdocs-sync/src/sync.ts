@@ -341,7 +341,16 @@ export interface UpdatePlan {
  * original-text view — collaborators' pending suggestions are their
  * proposals, not document content.
  */
-export async function fetchAsMarkdown(client: DocsClient, docId: string): Promise<string> {
+export interface FetchOptions {
+  /** Existing file content whose unknown frontmatter keys must survive (issue #20). */
+  preserveFrontmatterFrom?: string;
+}
+
+export async function fetchAsMarkdown(
+  client: DocsClient,
+  docId: string,
+  fetchOpts?: FetchOptions,
+): Promise<string> {
   // Refuse multi-tab docs rather than silently returning the first tab
   // (issue #22): callers use fetchTabs for those. Clients without tab
   // reads (the fake) skip the check.
@@ -357,7 +366,10 @@ export async function fetchAsMarkdown(client: DocsClient, docId: string): Promis
   const doc = await client.getDocument(docId, 'PREVIEW_WITHOUT_SUGGESTIONS');
   const { meta, consumedElements } = parseDocMeta(doc);
   const body = serializeBlocks(docToBlocks(doc, consumedElements).map((r) => r.block));
-  return emitFrontmatter(meta) + body;
+  const preserve = fetchOpts?.preserveFrontmatterFrom
+    ? splitFrontmatter(fetchOpts.preserveFrontmatterFrom).entries
+    : undefined;
+  return emitFrontmatter(meta, preserve) + body;
 }
 
 export async function updateFromMarkdown(
