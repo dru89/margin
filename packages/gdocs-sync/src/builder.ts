@@ -62,6 +62,8 @@ interface BlockLayout {
   end: number;
   spans: SpanRange[];
   items?: ItemRange[];
+  /** Staged image layout: caption range (absolute) when a figure. */
+  image?: { figure: boolean; caption?: { start: number; end: number } };
 }
 
 export interface BuiltSegment {
@@ -126,6 +128,8 @@ function namedStyleFor(block: CanonicalBlock): string {
 export interface SegmentOptions {
   /** Extra spaceAbove on the segment's first paragraph (e.g. after a table). */
   leadingSpaceAbovePt?: number;
+  /** Staged images by markdown src; unstaged images fall back to a placeholder paragraph. */
+  images?: Map<string, import('./images.ts').StagedImage | null>;
 }
 
 export function buildSegment(
@@ -139,6 +143,43 @@ export function buildSegment(
   let cursor = insertAt;
 
   for (const block of blocks) {
+    // Staged images: an inline object (1 index unit) in its own
+    // paragraph, plus a caption paragraph for figures.
+    const staged = block.kind === 'image' ? opts.images?.get(block.src) : undefined;
+    if (block.kind === 'image' && staged) {
+      const start = cursor;
+      inserts.push({ insertText: { location: { index: cursor }, text: '\n' } });
+      inserts.push({
+        insertInlineImage: {
+          location: { index: cursor },
+          uri: staged.uri,
+          ...(staged.widthPt && staged.heightPt
+            ? {
+                objectSize: {
+                  width: { magnitude: staged.widthPt, unit: 'PT' },
+                  height: { magnitude: staged.heightPt, unit: 'PT' },
+                },
+              }
+            : {}),
+        },
+      });
+      cursor += 2; // image (1 unit) + newline
+      let caption: { start: number; end: number } | undefined;
+      if (block.figure && block.alt) {
+        caption = { start: cursor, end: cursor + block.alt.length + 1 };
+        inserts.push({ insertText: { location: { index: cursor }, text: `${block.alt}\n` } });
+        cursor = caption.end;
+      }
+      layouts.push({
+        block,
+        start,
+        end: cursor,
+        spans: [],
+        image: { figure: block.figure, caption },
+      });
+      continue;
+    }
+
     const { text, spans, items } = blockText(block);
     if (block.kind === 'list') {
       let lineStart = cursor;
@@ -215,6 +256,38 @@ export function buildSegment(
     });
   };
   for (const layout of layouts) {
+    if (layout.image) {
+      // Image paragraph: centered for figures; caption centered too.
+      const imgEnd = layout.image.caption ? layout.image.caption.start : layout.end;
+      paraStyles.push({
+        updateParagraphStyle: {
+          range: { startIndex: corrected(layout.start), endIndex: corrected(imgEnd) },
+          paragraphStyle: {
+            namedStyleType: 'NORMAL_TEXT',
+            alignment: layout.image.figure ? 'CENTER' : 'START',
+            ...spacingStyle(BODY_SPACING),
+          },
+          fields: 'namedStyleType,alignment,spaceAbove,spaceBelow',
+        },
+      });
+      if (layout.image.caption) {
+        paraStyles.push({
+          updateParagraphStyle: {
+            range: {
+              startIndex: corrected(layout.image.caption.start),
+              endIndex: corrected(layout.image.caption.end),
+            },
+            paragraphStyle: {
+              namedStyleType: 'NORMAL_TEXT',
+              alignment: 'CENTER',
+              ...spacingStyle(BODY_SPACING),
+            },
+            fields: 'namedStyleType,alignment,spaceAbove,spaceBelow',
+          },
+        });
+      }
+      continue;
+    }
     const range = { startIndex: corrected(layout.start), endIndex: corrected(layout.end) };
     const style: Record<string, unknown> = {
       namedStyleType: namedStyleFor(layout.block),
@@ -330,6 +403,20 @@ export function buildSegment(
           fields: 'weightedFontFamily,fontSize,foregroundColor',
         },
       });
+    }
+    // Figure captions: italic, small, subdued (reader detects the
+    // italic+centered pair to fold the caption back into the figure).
+    if (layout.image?.caption) {
+      const cap = layout.image.caption;
+      if (cap.end - 1 > cap.start) {
+        textStyles.push({
+          updateTextStyle: {
+            range: { startIndex: corrected(cap.start), endIndex: corrected(cap.end - 1) },
+            textStyle: { italic: true, fontSize: { magnitude: 10, unit: 'PT' }, foregroundColor: rgb('666666') },
+            fields: 'italic,fontSize,foregroundColor',
+          },
+        });
+      }
     }
     // Checked checkbox items: explicit strikethrough (conventions option c).
     for (const item of layout.items ?? []) {

@@ -40,6 +40,8 @@ console.log(x);
 \`\`\`
 
 > A quoted line of wisdom.
+
+![The Margin icon as a figure](https://raw.githubusercontent.com/dru89/margin/main/build/icon.png)
 `;
 
 const token = await getAccessToken();

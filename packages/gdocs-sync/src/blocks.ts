@@ -71,7 +71,11 @@ export function identity(block: CanonicalBlock): string {
     case 'hr':
       return 'hr';
     case 'image':
-      return `i:${block.src}:${block.alt}:${block.figure ? 'fig' : 'inline'}`;
+      // src excluded: read-back yields Google's contentUri, not the md
+      // source, so including it would churn every image on every diff.
+      // Cost (documented): a src-only change doesn't diff — change the
+      // alt/caption too, or force a rebuild.
+      return `i:${block.alt}:${block.figure ? 'fig' : 'inline'}`;
   }
 }
 

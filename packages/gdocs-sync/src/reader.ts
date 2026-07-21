@@ -83,12 +83,27 @@ function isCheckboxList(doc: GDocDocument, listId: string): boolean {
   return (level.glyphType ?? 'GLYPH_TYPE_UNSPECIFIED') === 'GLYPH_TYPE_UNSPECIFIED' && !level.glyphSymbol;
 }
 
+function imageOf(doc: GDocDocument, para: GDocParagraph): { src: string; alt: string } | null {
+  const objEl = (para.elements ?? []).find((e) => e.inlineObjectElement?.inlineObjectId);
+  if (!objEl) return null;
+  const hasText = (para.elements ?? []).some((e) => (e.textRun?.content ?? '').trim() !== '');
+  if (hasText) return null; // mixed image+text paragraphs stay paragraphs (v0)
+  const embedded =
+    doc.inlineObjects?.[objEl.inlineObjectElement!.inlineObjectId!]?.inlineObjectProperties
+      ?.embeddedObject;
+  return {
+    src: embedded?.imageProperties?.sourceUri ?? embedded?.imageProperties?.contentUri ?? '',
+    alt: embedded?.description ?? '',
+  };
+}
+
 /** Walk body content (single tab) into canonical blocks with doc ranges. */
 export function docToBlocks(doc: GDocDocument): ReadBlock[] {
   const out: ReadBlock[] = [];
   const content = doc.body?.content ?? [];
 
-  for (const el of content) {
+  for (let ci = 0; ci < content.length; ci++) {
+    const el = content[ci]!;
     const start = el.startIndex ?? 0;
     const end = el.endIndex ?? start;
 
@@ -108,6 +123,37 @@ export function docToBlocks(doc: GDocDocument): ReadBlock[] {
 
     const para = el.paragraph;
     if (!para) continue; // sectionBreak etc.
+
+    // Image paragraph → image block; a following centered-italic
+    // paragraph is its caption (figure trichotomy, builder convention).
+    const image = imageOf(doc, para);
+    if (image) {
+      const centered = para.paragraphStyle?.alignment === 'CENTER';
+      let blockEnd = end;
+      let alt = image.alt;
+      let figure = false;
+      const next = content[ci + 1];
+      if (centered && next?.paragraph) {
+        const nextSpans = spansOf(next.paragraph);
+        const isCaption =
+          nextSpans.length > 0 &&
+          nextSpans.every((s) => s.italic) &&
+          next.paragraph.paragraphStyle?.alignment === 'CENTER';
+        if (isCaption) {
+          alt = nextSpans.map((s) => s.text).join('');
+          figure = true;
+          blockEnd = next.endIndex ?? blockEnd;
+          ci++; // consume the caption
+        }
+      }
+      out.push({
+        block: { kind: 'image', src: image.src, alt, figure },
+        startIndex: start,
+        endIndex: blockEnd,
+      });
+      continue;
+    }
+
     const spans = spansOf(para);
     const text = spans.map((s) => s.text).join('');
     const style = para.paragraphStyle ?? {};

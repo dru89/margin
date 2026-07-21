@@ -10,6 +10,7 @@ import type { CanonicalBlock, InlineSpan } from './blocks.ts';
 import { spanText } from './blocks.ts';
 import { buildSegment } from './builder.ts';
 import { BLOCK_GAP_PT } from './styles.ts';
+import { resolveImageSource, stageImage, type StagedImage } from './images.ts';
 import { diffBlocks } from './differ.ts';
 import type { DocsClient, GDocDocument, GDocRequest, GDocStructuralElement } from './gdoc.ts';
 import { hasPendingSuggestions } from './gdoc.ts';
@@ -56,18 +57,37 @@ function nthTable(doc: GDocDocument, n: number): GDocStructuralElement | null {
  * read-back, filled in reverse cell order with explicit styles (SI-2).
  * Returns the number of write requests sent.
  */
+interface ApplyOptions {
+  tablesBefore: number;
+  /** Pre-planned (possibly pooled) widths for the tables in `blocks`, in order. */
+  tableWidths?: number[][];
+  /** Staged images by markdown src. */
+  images?: Map<string, StagedImage | null>;
+}
+
+/** Stage every image block's source (URLs measured; local files deferred). */
+async function stageImages(
+  blocks: CanonicalBlock[],
+  baseDir: string,
+): Promise<Map<string, StagedImage | null>> {
+  const images = new Map<string, StagedImage | null>();
+  for (const block of blocks) {
+    if (block.kind !== 'image' || images.has(block.src)) continue;
+    images.set(block.src, await stageImage(resolveImageSource(block.src, baseDir)));
+  }
+  return images;
+}
+
 async function applyBlocksAt(
   client: DocsClient,
   docId: string,
   blocks: CanonicalBlock[],
   insertAt: number,
-  tablesBefore: number,
-  /** Pre-planned (possibly pooled) widths for the tables in `blocks`, in order. */
-  tableWidths?: number[][],
+  opts: ApplyOptions,
 ): Promise<number> {
   let written = 0;
   let cursor = insertAt;
-  let tableOrdinal = tablesBefore;
+  let tableOrdinal = opts.tablesBefore;
   let widthIdx = 0;
   let afterTable = false;
   let pending: CanonicalBlock[] = [];
@@ -78,6 +98,7 @@ async function applyBlocksAt(
     // tables themselves can't hold spacing (style-review feedback).
     const segment = buildSegment(pending, cursor, {
       leadingSpaceAbovePt: afterTable ? BLOCK_GAP_PT : undefined,
+      images: opts.images,
     });
     afterTable = false;
     const revision = await revisionOf(client, docId);
@@ -120,7 +141,7 @@ async function applyBlocksAt(
         }
       });
     });
-    const planned = tableWidths?.[widthIdx++];
+    const planned = opts.tableWidths?.[widthIdx++];
     const widths = planned && planned.length > 0 ? planned : planColumnWidths(block.rows);
     // Reverse document order: earlier indices stay valid (lesson 1).
     cells.sort((a, b) => b.index - a.index);
@@ -189,17 +210,28 @@ async function applyBlocksAt(
   return written;
 }
 
+export interface SyncOptions {
+  /** Directory for resolving relative image paths in the markdown. */
+  baseDir?: string;
+}
+
 export async function createFromMarkdown(
   client: DocsClient,
   title: string,
   markdown: string,
+  options?: SyncOptions,
 ): Promise<{ documentId: string; requestsSent: number }> {
   const { documentId } = await client.createDocument(title);
   const blocks = mdToCanonical(markdown);
   const tableWidths = planDocumentWidths(
     blocks.filter((b) => b.kind === 'table').map((b) => (b as { rows: InlineSpan[][][] }).rows),
   );
-  const requestsSent = await applyBlocksAt(client, documentId, blocks, 1, 0, tableWidths);
+  const images = await stageImages(blocks, options?.baseDir ?? '');
+  const requestsSent = await applyBlocksAt(client, documentId, blocks, 1, {
+    tablesBefore: 0,
+    tableWidths,
+    images,
+  });
   return { documentId, requestsSent };
 }
 
@@ -227,6 +259,7 @@ export async function updateFromMarkdown(
   client: DocsClient,
   docId: string,
   markdown: string,
+  options?: SyncOptions,
 ): Promise<UpdatePlan> {
   const doc = await client.getDocument(docId);
   // Pending suggestions poison both diff and indices: the original-text
@@ -281,7 +314,12 @@ export async function updateFromMarkdown(
     const widths = region.blocks
       .filter((b) => b.kind === 'table')
       .map((t) => widthByTable.get(t) ?? []);
-    requestsSent += await applyBlocksAt(client, docId, region.blocks, insertAt, tablesBefore, widths);
+    const images = await stageImages(region.blocks, options?.baseDir ?? '');
+    requestsSent += await applyBlocksAt(client, docId, region.blocks, insertAt, {
+      tablesBefore,
+      tableWidths: widths,
+      images,
+    });
   }
   return { regions: regions.length, requestsSent };
 }
