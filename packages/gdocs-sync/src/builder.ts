@@ -25,11 +25,13 @@
 import type { CanonicalBlock, InlineSpan } from './blocks.ts';
 import type { GDocRequest } from './gdoc.ts';
 import {
+  BLOCK_GAP_PT,
   BODY,
   BODY_SPACING,
   CODE,
-  CODE_SPACING,
-  LIST_SPACING,
+  LIST_ITEM_GAP_PT,
+  LOOSE_ITEM_GAP_PT,
+  QUOTE_BORDER,
   QUOTE_SPACING,
   TITLE,
   TITLE_SPACING,
@@ -121,22 +123,16 @@ function namedStyleFor(block: CanonicalBlock): string {
   return 'NORMAL_TEXT';
 }
 
-function spacingFor(block: CanonicalBlock): ReturnType<typeof spacingStyle> {
-  switch (block.kind) {
-    case 'heading':
-      return spacingStyle(block.level === 1 ? TITLE_SPACING : headingStyle(block.level).spacing);
-    case 'code':
-      return spacingStyle(CODE_SPACING);
-    case 'blockquote':
-      return spacingStyle(QUOTE_SPACING);
-    case 'list':
-      return spacingStyle(LIST_SPACING);
-    default:
-      return spacingStyle(BODY_SPACING);
-  }
+export interface SegmentOptions {
+  /** Extra spaceAbove on the segment's first paragraph (e.g. after a table). */
+  leadingSpaceAbovePt?: number;
 }
 
-export function buildSegment(blocks: CanonicalBlock[], insertAt: number): BuiltSegment {
+export function buildSegment(
+  blocks: CanonicalBlock[],
+  insertAt: number,
+  opts: SegmentOptions = {},
+): BuiltSegment {
   const layouts: BlockLayout[] = [];
   const inserts: GDocRequest[] = [];
   const tabPositions: number[] = []; // absolute, pre-bullet
@@ -204,31 +200,101 @@ export function buildSegment(blocks: CanonicalBlock[], insertAt: number): BuiltS
     tabsRemovedSoFar += layout.block.items.reduce((n, i) => n + i.depth, 0);
   }
 
-  /* ——— paragraph styles (post-correction indices) ——— */
+  /* ——— paragraph styles (post-correction indices) ———
+   * Block-gap model (style review feedback): every block ends with
+   * 10pt spaceBelow; lists and code blocks get 10pt at their edges but
+   * tight spacing between inner lines/items (1.8pt tight, 10pt loose). */
   const paraStyles: GDocRequest[] = [];
+  const pushSpacing = (startIdx: number, endIdx: number, abovePt: number, belowPt: number): void => {
+    paraStyles.push({
+      updateParagraphStyle: {
+        range: { startIndex: corrected(startIdx), endIndex: corrected(endIdx) },
+        paragraphStyle: spacingStyle({ beforePt: abovePt, afterPt: belowPt }),
+        fields: 'spaceAbove,spaceBelow',
+      },
+    });
+  };
   for (const layout of layouts) {
     const range = { startIndex: corrected(layout.start), endIndex: corrected(layout.end) };
     const style: Record<string, unknown> = {
       namedStyleType: namedStyleFor(layout.block),
       alignment: 'START',
-      ...spacingFor(layout.block),
     };
     let fields = 'namedStyleType,alignment,spaceAbove,spaceBelow';
-    if (layout.block.kind === 'blockquote') {
-      style.indentStart = QUOTE_INDENT;
-      style.indentFirstLine = QUOTE_INDENT;
-      fields += ',indentStart,indentFirstLine';
-    }
-    if (layout.block.kind === 'hr') {
-      style.borderBottom = {
-        width: { magnitude: 1, unit: 'PT' },
-        padding: { magnitude: 1, unit: 'PT' },
-        dashStyle: 'SOLID',
-        color: { color: { rgbColor: { red: 0.6, green: 0.6, blue: 0.6 } } },
-      };
-      fields += ',borderBottom';
+    switch (layout.block.kind) {
+      case 'heading':
+        Object.assign(
+          style,
+          spacingStyle(layout.block.level === 1 ? TITLE_SPACING : headingStyle(layout.block.level).spacing),
+        );
+        break;
+      case 'blockquote':
+        Object.assign(style, spacingStyle(QUOTE_SPACING));
+        style.indentStart = QUOTE_INDENT;
+        style.indentFirstLine = QUOTE_INDENT;
+        style.borderLeft = QUOTE_BORDER;
+        fields += ',indentStart,indentFirstLine,borderLeft';
+        break;
+      case 'code':
+      case 'list': {
+        // Inner spacing over the whole range; edge gaps patched after.
+        const gap =
+          layout.block.kind === 'list'
+            ? layout.block.loose
+              ? LOOSE_ITEM_GAP_PT
+              : LIST_ITEM_GAP_PT
+            : 0;
+        Object.assign(style, spacingStyle({ beforePt: gap, afterPt: gap }));
+        break;
+      }
+      case 'hr':
+        Object.assign(style, spacingStyle(BODY_SPACING));
+        style.borderBottom = {
+          width: { magnitude: 1, unit: 'PT' },
+          padding: { magnitude: 1, unit: 'PT' },
+          dashStyle: 'SOLID',
+          color: { color: { rgbColor: { red: 0.6, green: 0.6, blue: 0.6 } } },
+        };
+        fields += ',borderBottom';
+        break;
+      default:
+        Object.assign(style, spacingStyle(BODY_SPACING));
     }
     paraStyles.push({ updateParagraphStyle: { range, paragraphStyle: style, fields } });
+
+    // Edge gaps for multi-paragraph blocks: 10pt entering and leaving.
+    if (layout.block.kind === 'code') {
+      const lines = layout.block.text.split('\n');
+      const firstEnd = layout.start + lines[0]!.length + 1;
+      const lastStart = layout.end - (lines[lines.length - 1]!.length + 1);
+      pushSpacing(layout.start, firstEnd, BLOCK_GAP_PT, lines.length === 1 ? BLOCK_GAP_PT : 0);
+      if (lines.length > 1) pushSpacing(lastStart, layout.end, 0, BLOCK_GAP_PT);
+    }
+    if (layout.block.kind === 'list' && layout.items && layout.items.length > 0) {
+      const gap = layout.block.loose ? LOOSE_ITEM_GAP_PT : LIST_ITEM_GAP_PT;
+      const first = layout.items[0]!;
+      const last = layout.items[layout.items.length - 1]!;
+      pushSpacing(first.start, first.end + 1, BLOCK_GAP_PT, layout.items.length === 1 ? BLOCK_GAP_PT : gap);
+      if (layout.items.length > 1) pushSpacing(last.start, last.end + 1, gap, BLOCK_GAP_PT);
+    }
+  }
+  // Segment following a table: its first paragraph provides the gap
+  // below the table (tables themselves can't carry spacing).
+  if (opts.leadingSpaceAbovePt !== undefined && layouts.length > 0) {
+    const firstLayout = layouts[0]!;
+    let firstParaEnd = firstLayout.end;
+    if (firstLayout.block.kind === 'code') {
+      firstParaEnd = firstLayout.start + firstLayout.block.text.split('\n')[0]!.length + 1;
+    } else if (firstLayout.block.kind === 'list' && firstLayout.items?.[0]) {
+      firstParaEnd = firstLayout.items[0]!.end + 1;
+    }
+    paraStyles.push({
+      updateParagraphStyle: {
+        range: { startIndex: corrected(firstLayout.start), endIndex: corrected(firstParaEnd) },
+        paragraphStyle: { spaceAbove: { magnitude: opts.leadingSpaceAbovePt, unit: 'PT' } },
+        fields: 'spaceAbove',
+      },
+    });
   }
 
   /* ——— text styles: base reset, block looks, then inline ——— */

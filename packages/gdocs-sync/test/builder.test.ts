@@ -74,10 +74,13 @@ describe('UBUILD — request builder', () => {
       { kind: 'hr' },
     ];
     const { requests } = buildSegment(blocks, 1) as { requests: Req[] };
-    const paraStyles = requests.filter((r) => r.updateParagraphStyle);
+    // Spacing-patch requests (block-edge gaps) ride alongside; the
+    // per-block style request is the one carrying namedStyleType.
+    const paraStyles = requests.filter((r) =>
+      r.updateParagraphStyle?.fields.includes('namedStyleType'),
+    );
     expect(paraStyles).toHaveLength(blocks.length);
     for (const r of paraStyles) {
-      expect(r.updateParagraphStyle.fields).toContain('namedStyleType');
       expect(r.updateParagraphStyle.fields).toContain('alignment');
       expect(r.updateParagraphStyle.paragraphStyle.alignment).toBe('START');
     }
