@@ -9,3 +9,7 @@ export * from './builder.ts';
 export * from './sync.ts';
 export * from './serialize.ts';
 export * from './tabs.ts';
+export * from './tabsync.ts';
+export * from './meta.ts';
+export * from './images.ts';
+export * from './styles.ts';

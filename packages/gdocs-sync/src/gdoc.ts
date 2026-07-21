@@ -147,6 +147,13 @@ export class HttpDocsClient implements DocsClient {
     return this.call(`${DOCS}/${docId}${query}`);
   }
 
+  /** Tab-aware read: legacy body fields are not populated in this view. */
+  getDocumentWithTabs(docId: string, viewMode?: SuggestionsViewMode): Promise<GDocDocument> {
+    const params = new URLSearchParams({ includeTabsContent: 'true' });
+    if (viewMode) params.set('suggestionsViewMode', viewMode);
+    return this.call(`${DOCS}/${docId}?${params}`);
+  }
+
   async batchUpdate(docId: string, requests: GDocRequest[], requiredRevisionId?: string): Promise<void> {
     if (requests.length === 0) return;
     await this.call(`${DOCS}/${docId}:batchUpdate`, {
