@@ -22,6 +22,10 @@ export interface ReadBlock {
   /** Doc index range covering the block (for region deletes). */
   startIndex: number;
   endIndex: number;
+  /** Per-item paragraph ranges for list blocks (restyle targets). */
+  items?: { start: number; end: number }[];
+  /** Per-cell content ranges for table blocks (restyle targets). */
+  cells?: { row: number; col: number; start: number; end: number }[];
 }
 
 function spansOf(para: GDocParagraph): InlineSpan[] {
@@ -127,8 +131,9 @@ export function docToBlocks(doc: GDocDocument, skipElements = 0): ReadBlock[] {
     const end = el.endIndex ?? start;
 
     if (el.table) {
+      const cellRanges: { row: number; col: number; start: number; end: number }[] = [];
       const rows = (el.table.tableRows ?? []).map((row, r) =>
-        (row.tableCells ?? []).map((cell) => {
+        (row.tableCells ?? []).map((cell, c) => {
           // Guards (issue #17): merged cells and nested tables would
           // silently mangle — refuse loudly instead.
           const style = (cell as { tableCellStyle?: { rowSpan?: number; columnSpan?: number } })
@@ -141,6 +146,15 @@ export function docToBlocks(doc: GDocDocument, skipElements = 0): ReadBlock[] {
             if (inner.table) throw new Error('Nested tables are not supported by gdocs-sync yet.');
             if (inner.paragraph) cellSpans.push(...spansOf(inner.paragraph));
           }
+          const first = cell.content?.[0]?.startIndex;
+          if (first !== undefined) {
+            cellRanges.push({
+              row: r,
+              col: c,
+              start: first,
+              end: cell.content?.[cell.content.length - 1]?.endIndex ?? first,
+            });
+          }
           // Header-row bold is OUR chrome (reference table style), not
           // authored formatting — strip it so fetch stays round-trip
           // stable ('| Name |' never becomes '| **Name** |').
@@ -148,7 +162,7 @@ export function docToBlocks(doc: GDocDocument, skipElements = 0): ReadBlock[] {
           return cellSpans;
         }),
       );
-      out.push({ block: { kind: 'table', rows }, startIndex: start, endIndex: end });
+      out.push({ block: { kind: 'table', rows }, startIndex: start, endIndex: end, cells: cellRanges });
       continue;
     }
 
@@ -214,12 +228,14 @@ export function docToBlocks(doc: GDocDocument, skipElements = 0): ReadBlock[] {
       const prevListId = (prev as { listId?: string } | undefined)?.listId;
       if (prev?.block.kind === 'list' && prevListId === para.bullet.listId) {
         prev.block.items.push(item);
+        prev.items!.push({ start, end });
         prev.endIndex = end;
       } else {
         const rb: ReadBlock & { listId?: string } = {
           block: { kind: 'list', items: [item] },
           startIndex: start,
           endIndex: end,
+          items: [{ start, end }],
           listId: para.bullet.listId,
         };
         out.push(rb);

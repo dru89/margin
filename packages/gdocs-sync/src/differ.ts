@@ -18,19 +18,32 @@ export type DiffOp =
    */
   | { op: 'restyle'; oldIndex: number; newIndex: number; block: CanonicalBlock };
 
-/** Normalized styling signature: adjacent same-format spans merge first. */
-function styleSignature(block: CanonicalBlock): string | null {
-  if (block.kind !== 'paragraph' && block.kind !== 'heading' && block.kind !== 'blockquote') {
-    return null; // restyle v1 covers span-bearing single-block kinds
-  }
+/** Normalized span signature: adjacent same-format spans merge first. */
+function spanSignature(spans: { text: string; bold?: boolean; italic?: boolean; strike?: boolean; code?: boolean; link?: string }[]): string {
   const merged: { text: string; key: string }[] = [];
-  for (const s of block.spans) {
+  for (const s of spans) {
     const key = `${+!!s.bold}${+!!s.italic}${+!!s.strike}${+!!s.code}|${s.link ?? ''}`;
     const prev = merged[merged.length - 1];
     if (prev && prev.key === key) prev.text += s.text;
     else merged.push({ text: s.text, key });
   }
   return merged.map((m) => `${m.key}:${m.text}`).join('§');
+}
+
+/** Styling signature for restyle-eligible kinds; null = not eligible (code has no user styling). */
+function styleSignature(block: CanonicalBlock): string | null {
+  switch (block.kind) {
+    case 'paragraph':
+    case 'heading':
+    case 'blockquote':
+      return spanSignature(block.spans);
+    case 'list':
+      return block.items.map((i) => spanSignature(i.spans)).join('‖');
+    case 'table':
+      return block.rows.map((r) => r.map((c) => spanSignature(c)).join('¦')).join('‖');
+    default:
+      return null;
+  }
 }
 
 export function diffBlocks(oldBlocks: CanonicalBlock[], newBlocks: CanonicalBlock[]): DiffOp[] {

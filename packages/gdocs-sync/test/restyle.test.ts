@@ -76,3 +76,43 @@ describe('restyle op — styling-only changes patch in place', () => {
     expect(flat.filter((r) => r.updateTextStyle).length).toBeGreaterThan(2);
   });
 });
+
+describe('restyle op — lists and tables (issue #21)', () => {
+  it('differ: styling-only list change → restyle; styling-only table change → restyle', () => {
+    const plainList = markdownToBlocks('- alpha item\n- beta item\n');
+    const styledList = markdownToBlocks('- alpha **item**\n- beta item\n');
+    expect(diffBlocks(plainList, styledList).map((o) => o.op)).toEqual(['restyle']);
+
+    const plainTable = markdownToBlocks('| H | I |\n| --- | --- |\n| aa | bb |\n');
+    const styledTable = markdownToBlocks('| H | I |\n| --- | --- |\n| **aa** | bb |\n');
+    expect(diffBlocks(plainTable, styledTable).map((o) => o.op)).toEqual(['restyle']);
+    // Identical styling stays keep.
+    expect(diffBlocks(styledTable, styledTable).map((o) => o.op)).toEqual(['keep']);
+  });
+
+  it('orchestrator: list restyle sends per-item style patches, no deletes/inserts', async () => {
+    const listPara = (start: number, text: string, listId = 'kix.l1') => ({
+      startIndex: start,
+      endIndex: start + text.length + 1,
+      paragraph: {
+        elements: [{ textRun: { content: `${text}\n` } }],
+        paragraphStyle: { namedStyleType: 'NORMAL_TEXT' },
+        bullet: { listId, nestingLevel: 0 },
+      },
+    });
+    const doc: GDocDocument = {
+      revisionId: 'r1',
+      lists: { 'kix.l1': { listProperties: { nestingLevels: [{ glyphSymbol: '●', glyphType: 'GLYPH_TYPE_UNSPECIFIED' }] } } },
+      body: { content: [listPara(1, 'alpha item'), listPara(12, 'beta item')] },
+    };
+    const client = new FakeDocsClient(doc);
+    const plan = await updateFromMarkdown(client, 'fake', '- alpha **item**\n- beta item\n');
+    expect(plan.restyles).toBe(1);
+    expect(plan.regions).toBe(0);
+    const flat = client.batches.flat() as Req[];
+    expect(flat.some((r) => r.deleteContentRange || r.insertText)).toBe(false);
+    // The bold patch targets 'item' within the first item's doc range.
+    const bold = flat.find((r) => r.updateTextStyle?.textStyle?.bold)!;
+    expect(bold.updateTextStyle.range).toEqual({ startIndex: 7, endIndex: 11 });
+  });
+});
