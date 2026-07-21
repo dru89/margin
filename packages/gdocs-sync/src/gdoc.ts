@@ -9,6 +9,7 @@ import { withQuotaRetry } from './util.ts';
 /* ——— document read shapes (subset) ——— */
 
 export interface GDocTextRun {
+  inlineObjectElement?: { inlineObjectId?: string };
   textRun?: {
     content?: string;
     suggestedInsertionIds?: string[];
@@ -27,6 +28,7 @@ export interface GDocParagraph {
   elements?: GDocTextRun[];
   paragraphStyle?: {
     namedStyleType?: string;
+    alignment?: string;
     indentStart?: { magnitude?: number; unit?: string };
     borderBottom?: { width?: { magnitude?: number } };
   };
@@ -52,6 +54,18 @@ export interface GDocDocument {
   lists?: Record<
     string,
     { listProperties?: { nestingLevels?: { glyphType?: string; glyphSymbol?: string }[] } }
+  >;
+  inlineObjects?: Record<
+    string,
+    {
+      inlineObjectProperties?: {
+        embeddedObject?: {
+          title?: string;
+          description?: string;
+          imageProperties?: { contentUri?: string; sourceUri?: string };
+        };
+      };
+    }
   >;
 }
 

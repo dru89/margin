@@ -52,8 +52,10 @@ credentials).
       programmatic comments are unanchored (probed); needs the
       reference harness technique (asked in margin#10)
 - [ ] UREAD-8..10 remainder — chips read, subtitle policy
-- [ ] UIMG-1,3..6 — image index math, staging, sizing (v0 gap: images
-      still placeholder in builder)
+- [x] UIMG-1,3..6 — images: resolution, PNG dims, sizing, figure
+      emission with caption fold-back, unstaged degradation
+      (`src/images.ts`); RT-1 corpus includes a live URL figure.
+      Local-file staging (temp-docx contentUri trick) still deferred.
 - [ ] UCHIP-1..4 — metadata block (title/subtitle/chips) replacement
 - [ ] UAUTH-4 — auth flow end-to-end (fake flow)
 - [ ] Live tier: SI-*, TAB-*, IMG-*, META-* per the catalog.
