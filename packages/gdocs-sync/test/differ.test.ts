@@ -50,13 +50,16 @@ describe('UDIFF — block diff planner', () => {
     expect(ops.some((o) => o.op === 'keep')).toBe(false);
   });
 
-  it('UDIFF-7: formatting differences do not affect matching', () => {
+  it('UDIFF-7: formatting differences do not affect matching (restyle, never rebuild)', () => {
     const plain: CanonicalBlock = { kind: 'paragraph', spans: [{ text: 'hello world' }] };
     const styled: CanonicalBlock = {
       kind: 'paragraph',
       spans: [{ text: 'hello ' }, { text: 'world', bold: true }],
     };
-    expect(diffBlocks([plain], [styled]).map((o) => o.op)).toEqual(['keep']);
+    // Matching is by content: the block pairs up (no delete/insert
+    // churn) and the styling difference surfaces as an in-place
+    // restyle rather than being silently dropped.
+    expect(diffBlocks([plain], [styled]).map((o) => o.op)).toEqual(['restyle']);
   });
 });
 
