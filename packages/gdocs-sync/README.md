@@ -60,8 +60,10 @@ credentials).
 - [ ] UREAD-8..9 remainder — rich-link chips, adjacent-list separation
 - [x] UIMG-1,3..6 — images: resolution, PNG dims, sizing, figure
       emission with caption fold-back, unstaged degradation
-      (`src/images.ts`); RT-1 corpus includes a live URL figure.
-      Local-file staging (temp-docx contentUri trick) still deferred.
+      (`src/images.ts`); RT-1 corpus includes a live URL figure
+- [x] Local-file image staging: temp-docx contentUri trick (zip +
+      OOXML built from scratch, one temp doc per push, quota-wrapped);
+      JPEG dimensions; live-tested with a generated PNG on disk
 - [x] Multi-tab orchestration (`src/tabsync.ts`): UTAB plan execution
       (addDocumentTab/rename/delete/reorder-one-per-batch) + per-tab
       content sync via tab-scoped client views; TAB live test green
@@ -74,7 +76,7 @@ credentials).
       comments in the block are safe by construction); mixed-inline
       probe sentence pinned offline + live
 - [ ] UAUTH-4 — auth flow end-to-end (fake flow)
-- [ ] Live tier remainder: IMG-* (local-file staging), META live
+- [ ] Live tier remainder: IMG-2 (inline-in-text, issue #23), META live (issue #33)
 
 Known warts (deliberate, revisit): update regions at doc end can leave
 a trailing empty paragraph (the final segment newline is undeletable —

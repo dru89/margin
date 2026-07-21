@@ -10,7 +10,7 @@ import type { CanonicalBlock, InlineSpan } from './blocks.ts';
 import { spanText } from './blocks.ts';
 import { buildSegment, restyleListRequests, restyleRequests, restyleTableRequests } from './builder.ts';
 import { BLOCK_GAP_PT, BODY, TABLE_STYLE, rgb, textStyleOf } from './styles.ts';
-import { resolveImageSource, stageImage, type StagedImage } from './images.ts';
+import { resolveImageSource, stageImage, type LocalImageStager, type StagedImage } from './images.ts';
 import {
   buildMetaRequests,
   emitFrontmatter,
@@ -73,15 +73,30 @@ interface ApplyOptions {
   images?: Map<string, StagedImage | null>;
 }
 
-/** Stage every image block's source (URLs measured; local files deferred). */
+/** Stage every image block's source: URLs fetched-to-measure; local
+ * files batched through the temp-docx stager when one is provided. */
 async function stageImages(
   blocks: CanonicalBlock[],
   baseDir: string,
+  stager?: LocalImageStager,
 ): Promise<Map<string, StagedImage | null>> {
   const images = new Map<string, StagedImage | null>();
+  const localBySrc = new Map<string, string>(); // src → resolved path
   for (const block of blocks) {
     if (block.kind !== 'image' || images.has(block.src)) continue;
-    images.set(block.src, await stageImage(resolveImageSource(block.src, baseDir)));
+    const source = resolveImageSource(block.src, baseDir);
+    if (source?.kind === 'file' && stager) {
+      images.set(block.src, null); // placeholder until batch staging
+      localBySrc.set(block.src, source.path);
+    } else {
+      images.set(block.src, await stageImage(source));
+    }
+  }
+  if (stager && localBySrc.size > 0) {
+    const staged = await stager([...new Set(localBySrc.values())]);
+    for (const [src, path] of localBySrc) {
+      images.set(src, staged.get(path) ?? null);
+    }
   }
   return images;
 }
@@ -293,6 +308,8 @@ async function applyBlocksAt(
 export interface SyncOptions {
   /** Directory for resolving relative image paths in the markdown. */
   baseDir?: string;
+  /** Stages local image files (the temp-docx trick — images.makeDocxStager). */
+  imageStager?: LocalImageStager;
 }
 
 export async function createFromMarkdown(
@@ -315,7 +332,7 @@ export async function createFromMarkdown(
   const tableWidths = planDocumentWidths(
     blocks.filter((b) => b.kind === 'table').map((b) => (b as { rows: InlineSpan[][][] }).rows),
   );
-  const images = await stageImages(blocks, options?.baseDir ?? '');
+  const images = await stageImages(blocks, options?.baseDir ?? '', options?.imageStager);
   requestsSent += await applyBlocksAt(client, documentId, blocks, contentStart, {
     tablesBefore: 0,
     tableWidths,
@@ -459,7 +476,7 @@ export async function updateFromMarkdown(
     const widths = region.blocks
       .filter((b) => b.kind === 'table')
       .map((t) => widthByTable.get(t) ?? []);
-    const images = await stageImages(region.blocks, options?.baseDir ?? '');
+    const images = await stageImages(region.blocks, options?.baseDir ?? '', options?.imageStager);
     requestsSent += await applyBlocksAt(client, docId, region.blocks, insertAt, {
       tablesBefore,
       tableWidths: widths,
