@@ -140,9 +140,9 @@ function spansOf(nodes: PhrasingContent[], inherit: Partial<InlineSpan> = {}): I
         out.push({ ...inherit, text: '\n' });
         break;
       case 'image':
-        // Inline images are handled at block level for figures; mixed-in
-        // images surface as a placeholder span so text indices stay sane.
-        out.push({ ...inherit, text: '' });
+        // Mixed-in images become image spans (issue #23); one U+FFFC
+        // unit of text keeps indices honest on both sides.
+        out.push({ text: '\uFFFC', image: { src: node.url, alt: node.alt ?? '' } });
         break;
       default:
         // html, footnotes, etc.: flatten to their text if any.

@@ -84,14 +84,30 @@ async function stageImages(
 ): Promise<Map<string, StagedImage | null>> {
   const images = new Map<string, StagedImage | null>();
   const localBySrc = new Map<string, string>(); // src → resolved path
+  const srcs: string[] = [];
   for (const block of blocks) {
-    if (block.kind !== 'image' || images.has(block.src)) continue;
-    const source = resolveImageSource(block.src, baseDir);
+    if (block.kind === 'image') srcs.push(block.src);
+    // Inline-image spans (issue #23) in span-bearing blocks.
+    const spanLists =
+      block.kind === 'paragraph' || block.kind === 'heading' || block.kind === 'blockquote'
+        ? [block.spans]
+        : block.kind === 'list'
+          ? block.items.map((i) => i.spans)
+          : block.kind === 'table'
+            ? block.rows.flat()
+            : [];
+    for (const spans of spanLists) {
+      for (const sp of spans) if (sp.image) srcs.push(sp.image.src);
+    }
+  }
+  for (const src of srcs) {
+    if (images.has(src)) continue;
+    const source = resolveImageSource(src, baseDir);
     if (source?.kind === 'file' && stager) {
-      images.set(block.src, null); // placeholder until batch staging
-      localBySrc.set(block.src, source.path);
+      images.set(src, null); // placeholder until batch staging
+      localBySrc.set(src, source.path);
     } else {
-      images.set(block.src, await stageImage(source));
+      images.set(src, await stageImage(source));
     }
   }
   if (stager && localBySrc.size > 0) {

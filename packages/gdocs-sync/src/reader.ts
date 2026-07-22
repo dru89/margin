@@ -28,9 +28,23 @@ export interface ReadBlock {
   cells?: { row: number; col: number; start: number; end: number }[];
 }
 
-function spansOf(para: GDocParagraph): InlineSpan[] {
+function spansOf(doc: GDocDocument, para: GDocParagraph): InlineSpan[] {
   const spans: InlineSpan[] = [];
   for (const el of para.elements ?? []) {
+    // Inline images mixed with text (issue #23): one U+FFFC unit.
+    if (el.inlineObjectElement?.inlineObjectId) {
+      const embedded =
+        doc.inlineObjects?.[el.inlineObjectElement.inlineObjectId]?.inlineObjectProperties
+          ?.embeddedObject;
+      spans.push({
+        text: '\uFFFC',
+        image: {
+          src: embedded?.imageProperties?.sourceUri ?? embedded?.imageProperties?.contentUri ?? '',
+          alt: embedded?.description ?? '',
+        },
+      });
+      continue;
+    }
     // Smart chips render as text (lesson 5 / UREAD-9): content the
     // diff can't see gets deleted on the next region rebuild.
     if (el.person) {
@@ -74,6 +88,8 @@ function spansOf(para: GDocParagraph): InlineSpan[] {
       !!prev.code === !!s.code &&
       !prev.chip &&
       !s.chip &&
+      !prev.image &&
+      !s.image &&
       prev.link === s.link
     ) {
       prev.text += s.text;
@@ -148,7 +164,7 @@ export function docToBlocks(doc: GDocDocument, skipElements = 0): ReadBlock[] {
           const cellSpans: InlineSpan[] = [];
           for (const inner of cell.content ?? []) {
             if (inner.table) throw new Error('Nested tables are not supported by gdocs-sync yet.');
-            if (inner.paragraph) cellSpans.push(...spansOf(inner.paragraph));
+            if (inner.paragraph) cellSpans.push(...spansOf(doc, inner.paragraph));
           }
           const first = cell.content?.[0]?.startIndex;
           if (first !== undefined) {
@@ -184,7 +200,7 @@ export function docToBlocks(doc: GDocDocument, skipElements = 0): ReadBlock[] {
       let figure = false;
       const next = content[ci + 1];
       if (centered && next?.paragraph) {
-        const nextSpans = spansOf(next.paragraph);
+        const nextSpans = spansOf(doc, next.paragraph);
         const isCaption =
           nextSpans.length > 0 &&
           nextSpans.every((s) => s.italic) &&
@@ -204,7 +220,7 @@ export function docToBlocks(doc: GDocDocument, skipElements = 0): ReadBlock[] {
       continue;
     }
 
-    const spans = spansOf(para);
+    const spans = spansOf(doc, para);
     const text = spans.map((s) => s.text).join('');
     const style = para.paragraphStyle ?? {};
 

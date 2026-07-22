@@ -13,6 +13,12 @@ export interface InlineSpan {
   code?: boolean;
   link?: string;
   /**
+   * Inline image within text (issue #23). The span's text is U+FFFC
+   * (object replacement character) — exactly one index unit on both
+   * sides, so canonical identity matches without knowing the src.
+   */
+  image?: { src: string; alt: string };
+  /**
    * Rendered from a smart chip (person/date/rich-link) on read-back.
    * The text is the chip's display text so the diff sees what a human
    * sees (lesson 5 — invisible content gets destroyed). Not a style:
