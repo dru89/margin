@@ -37,6 +37,15 @@ export interface ListItem {
 
 export type CanonicalBlock =
   | { kind: 'heading'; level: number; spans: InlineSpan[] }
+  | {
+      kind: 'callout';
+      /** Canonical type (info/tip/important/warning/danger). */
+      type: string;
+      /** Styled title spans; empty = the type name renders uppercase. */
+      title: InlineSpan[];
+      /** Paragraphs, code blocks, lists — no tables/images/callouts. */
+      body: CanonicalBlock[];
+    }
   | { kind: 'paragraph'; spans: InlineSpan[] }
   | { kind: 'code'; lang: string | null; text: string }
   | { kind: 'list'; items: ListItem[]; /** blank-line-separated items → roomier spacing */ loose?: boolean }
@@ -83,6 +92,8 @@ export function identity(block: CanonicalBlock): string {
       return `q:${spanText(block.spans)}`;
     case 'hr':
       return 'hr';
+    case 'callout':
+      return `co:${block.type}:${spanText(block.title)}:${block.body.map(identity).join('|')}`;
     case 'image':
       // src excluded: read-back yields Google's contentUri, not the md
       // source, so including it would churn every image on every diff.

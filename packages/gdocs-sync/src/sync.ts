@@ -9,7 +9,7 @@
 import type { CanonicalBlock, InlineSpan } from './blocks.ts';
 import { spanText } from './blocks.ts';
 import { buildSegment, restyleListRequests, restyleRequests, restyleTableRequests } from './builder.ts';
-import { BLOCK_GAP_PT, BODY, TABLE_STYLE, rgb, textStyleOf } from './styles.ts';
+import { BLOCK_GAP_PT, BODY, CALLOUTS, TABLE_STYLE, rgb, textStyleOf } from './styles.ts';
 import { resolveImageSource, stageImage, type LocalImageStager, type StagedImage } from './images.ts';
 import {
   buildMetaRequests,
@@ -152,6 +152,75 @@ async function applyBlocksAt(
 
   let flushedFinal = false;
   for (const block of blocks) {
+    if (block.kind === 'callout') {
+      await flush();
+      const chrome = CALLOUTS[block.type] ?? CALLOUTS.info!;
+      const revision0 = await revisionOf(client, docId);
+      await client.batchUpdate(
+        docId,
+        [{ insertTable: { rows: 1, columns: 1, location: { index: cursor } } }],
+        revision0,
+      );
+      written += 1;
+      const doc0 = await client.getDocument(docId);
+      const tableEl = nthTable(doc0, tableOrdinal);
+      tableOrdinal++;
+      const cellStart = tableEl?.table?.tableRows?.[0]?.tableCells?.[0]?.content?.[0]?.startIndex;
+      if (cellStart === undefined || tableEl?.startIndex === undefined) {
+        throw new Error('inserted callout table not found on read-back');
+      }
+      // Title paragraph: emoji + bold title (or uppercase type name).
+      const titleSpans: InlineSpan[] =
+        block.title.length > 0
+          ? block.title.map((sp) => ({ ...sp, bold: true }))
+          : [{ text: block.type.toUpperCase(), bold: true }];
+      const innerBlocks: CanonicalBlock[] = [
+        { kind: 'paragraph', spans: [{ text: `${chrome.emoji} ` }, ...titleSpans] },
+        ...block.body,
+      ];
+      const segment = buildSegment(innerBlocks, cellStart, { images: opts.images });
+      await client.batchUpdate(docId, segment.requests, doc0.revisionId);
+      written += segment.requests.length;
+      // Chrome: tint, padding, invisible borders, full page width.
+      const tStart = { index: tableEl.startIndex };
+      const border = {
+        width: { magnitude: 0, unit: 'PT' },
+        dashStyle: 'SOLID',
+        color: rgb(chrome.tintHex),
+      };
+      const chromeRequests: GDocRequest[] = [
+        {
+          updateTableCellStyle: {
+            tableRange: {
+              tableCellLocation: { tableStartLocation: tStart, rowIndex: 0, columnIndex: 0 },
+              rowSpan: 1,
+              columnSpan: 1,
+            },
+            tableCellStyle: {
+              backgroundColor: rgb(chrome.tintHex),
+              borderTop: border,
+              borderBottom: border,
+              borderLeft: border,
+              borderRight: border,
+              paddingTop: { magnitude: 6, unit: 'PT' },
+              paddingBottom: { magnitude: 6, unit: 'PT' },
+              paddingLeft: { magnitude: 10, unit: 'PT' },
+              paddingRight: { magnitude: 10, unit: 'PT' },
+            },
+            fields:
+              'backgroundColor,borderTop,borderBottom,borderLeft,borderRight,paddingTop,paddingBottom,paddingLeft,paddingRight',
+          },
+        },
+        ...columnWidthRequests(tableEl.startIndex, [468]),
+      ];
+      await client.batchUpdate(docId, chromeRequests, undefined);
+      written += chromeRequests.length;
+      const after = await client.getDocument(docId);
+      const filled = nthTable(after, tableOrdinal - 1);
+      cursor = filled?.endIndex ?? cursor;
+      afterTable = true;
+      continue;
+    }
     if (block.kind !== 'table') {
       pending.push(block);
       continue;
@@ -502,7 +571,7 @@ export async function updateFromMarkdown(
     }
     const tablesBefore = readBlocks
       .slice(0, region.oldStart)
-      .filter((r) => r.block.kind === 'table').length;
+      .filter((r) => r.block.kind === 'table' || r.block.kind === 'callout').length;
     const widths = region.blocks
       .filter((b) => b.kind === 'table')
       .map((t) => widthByTable.get(t) ?? []);

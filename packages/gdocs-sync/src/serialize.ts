@@ -102,6 +102,15 @@ export function serializeBlocks(blocks: CanonicalBlock[]): string {
             .join('\n'),
         );
         break;
+      case 'callout': {
+        const head = `> [!${block.type}]${block.title.length > 0 ? ` ${serializeSpans(block.title)}` : ''}`;
+        const bodyMd = block.body.length > 0 ? serializeBlocks(block.body).trimEnd() : '';
+        const quoted = bodyMd
+          ? '\n' + bodyMd.split('\n').map((l) => (l === '' ? '>' : `> ${l}`)).join('\n')
+          : '';
+        parts.push(head + quoted);
+        break;
+      }
       case 'hr':
         parts.push('---');
         break;

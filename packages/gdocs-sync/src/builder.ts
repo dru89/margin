@@ -111,6 +111,8 @@ function blockText(block: CanonicalBlock): { text: string; spans: SpanRange[]; i
       return { text: '\n', spans: [] };
     case 'table':
       throw new Error('tables are handled by the orchestrator, not buildSegment');
+    case 'callout':
+      throw new Error('callouts are handled by the orchestrator, not buildSegment');
     case 'image':
       // v0: images are inserted by the orchestrator (URI staging); an
       // empty paragraph holds the spot in text-only segments.

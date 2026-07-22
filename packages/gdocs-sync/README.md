@@ -80,6 +80,11 @@ credentials).
       insert emission, staging-integrated); IMG-2 lives in the RT-1
       corpus. Inline images in lists/cells render as the literal
       placeholder character (stable but unlovely — documented)
+- [x] Callouts (issue #40): GFM/Obsidian alerts as tinted 1×1 tables
+      — first-line [!type] detection with aliases, styled titles,
+      multi-block bodies (paragraphs/lists/code; tables stay quotes),
+      emoji fold-back on read, full-width chrome. In the RT-1 corpus.
+      Chrome absorptions: bold inside titles, code langs in bodies.
 - [ ] Live tier remainder: META live (issue #33)
 
 Known warts remaining: UI-checked boxes whose text is not struck read

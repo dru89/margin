@@ -12,6 +12,7 @@
  */
 import type { CanonicalBlock, InlineSpan, ListItem } from './blocks.ts';
 import { coalesceCodeBlocks } from './blocks.ts';
+import { CALLOUTS } from './styles.ts';
 import type { GDocDocument, GDocParagraph, GDocStructuralElement } from './gdoc.ts';
 
 export const MONO_FONT = 'Roboto Mono';
@@ -151,6 +152,13 @@ export function docToBlocks(doc: GDocDocument, skipElements = 0): ReadBlock[] {
 
     if (el.table) {
       pendingEmpties = 0;
+      // Callout fold-back (issue #40): a 1×1 table whose cell text
+      // leads with a known callout emoji reads as a callout block.
+      const callout = calloutOf(doc, el);
+      if (callout) {
+        out.push({ block: callout, startIndex: start, endIndex: end });
+        continue;
+      }
       const cellRanges: { row: number; col: number; start: number; end: number }[] = [];
       const rows = (el.table.tableRows ?? []).map((row, r) =>
         (row.tableCells ?? []).map((cell, c) => {
@@ -325,4 +333,41 @@ export function docToBlocks(doc: GDocDocument, skipElements = 0): ReadBlock[] {
     result.push(rb);
   }
   return result;
+}
+
+/** 1×1 table + leading callout emoji → callout block (issue #40). */
+function calloutOf(doc: GDocDocument, el: GDocStructuralElement): CanonicalBlock | null {
+  const rows = el.table?.tableRows ?? [];
+  if (rows.length !== 1 || (rows[0]!.tableCells ?? []).length !== 1) return null;
+  const content = rows[0]!.tableCells![0]!.content ?? [];
+  const view: GDocDocument = { body: { content }, lists: doc.lists, inlineObjects: doc.inlineObjects };
+  let inner: ReadBlock[];
+  try {
+    inner = docToBlocks(view);
+  } catch {
+    return null; // guarded structures inside — treat as a plain table upstream
+  }
+  const first = inner[0]?.block;
+  if (first?.kind !== 'paragraph') return null;
+  const firstText = first.spans.map((s) => s.text).join('');
+  const entry = Object.entries(CALLOUTS).find(([, c]) => firstText.startsWith(c.emoji));
+  if (!entry) return null;
+  const [type, chrome] = entry;
+  // Strip the emoji prefix and the chrome bold from the title spans.
+  let toStrip = chrome.emoji.length + 1; // emoji + space
+  const title: InlineSpan[] = [];
+  for (const span of first.spans) {
+    let text = span.text;
+    if (toStrip > 0) {
+      const take = Math.min(toStrip, text.length);
+      text = text.slice(take);
+      toStrip -= take;
+    }
+    if (text !== '') title.push({ ...span, text, bold: undefined });
+  }
+  const body = inner.slice(1).map((r) => r.block);
+  // Synthesized uppercase-type titles fold back to an empty title.
+  const titleText = title.map((s) => s.text).join('');
+  const finalTitle = titleText === type.toUpperCase() ? [] : title;
+  return { kind: 'callout', type, title: finalTitle, body };
 }
