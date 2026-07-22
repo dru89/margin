@@ -7,7 +7,7 @@
  *
  * Conventions this reader shares with the builder (self-consistent
  * round-trip): code = monospace-font runs; blockquote = non-list
- * paragraph with indentStart ≥ 30pt; hr = empty paragraph with a
+ * paragraph with indentStart ≥ 24pt; hr = empty paragraph with a
  * bottom border.
  */
 import type { CanonicalBlock, InlineSpan, ListItem } from './blocks.ts';
@@ -15,8 +15,28 @@ import { coalesceCodeBlocks } from './blocks.ts';
 import { CALLOUTS } from './styles.ts';
 import type { GDocDocument, GDocParagraph, GDocStructuralElement } from './gdoc.ts';
 
+/** The font the builder writes for code. */
 export const MONO_FONT = 'Roboto Mono';
-const QUOTE_INDENT_PT = 30;
+/**
+ * Fonts recognized as code on read. Docs authored by hand or by the
+ * reference tool carry whatever monospace font their template chose;
+ * recognizing only our own write font flattens their code to prose.
+ */
+const MONO_FONTS = new Set([
+  MONO_FONT,
+  'Courier New',
+  'Consolas',
+  'Source Code Pro',
+  'Fira Code',
+  'JetBrains Mono',
+  'Noto Sans Mono',
+  'Ubuntu Mono',
+  'Inconsolata',
+]);
+// The builder writes 36pt; the reference tool writes 24pt per quote
+// nesting level. Accept both — the Docs UI itself indents in 36pt
+// steps, so 24pt only ever means a blockquote.
+const QUOTE_INDENT_PT = 24;
 
 export interface ReadBlock {
   block: CanonicalBlock;
@@ -71,7 +91,8 @@ function spansOf(doc: GDocDocument, para: GDocParagraph): InlineSpan[] {
     if (style.italic) span.italic = true;
     if (style.strikethrough) span.strike = true;
     if (style.link?.url) span.link = style.link.url;
-    if (style.weightedFontFamily?.fontFamily === MONO_FONT) span.code = true;
+    const font = style.weightedFontFamily?.fontFamily;
+    if (font && MONO_FONTS.has(font)) span.code = true;
     spans.push(span);
   }
   // Strip the paragraph's trailing newline from the last span.

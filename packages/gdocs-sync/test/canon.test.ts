@@ -101,6 +101,45 @@ describe('wart fixes (issue #24)', () => {
     expect(blocks[0]).toMatchObject({ kind: 'code', text: 'first();\n\nsecond();' });
   });
 
+  it('foreign monospace fonts read as code, not prose', async () => {
+    const { docToBlocks } = await import('../src/reader.ts');
+    const para = (font: string) => ({
+      startIndex: 1,
+      endIndex: 9,
+      paragraph: {
+        elements: [{ textRun: { content: 'x = 1;\n', textStyle: { weightedFontFamily: { fontFamily: font } } } }],
+        paragraphStyle: { namedStyleType: 'NORMAL_TEXT' },
+      },
+    });
+    for (const font of ['Courier New', 'Consolas', 'Source Code Pro', 'Roboto Mono']) {
+      const blocks = docToBlocks({ body: { content: [para(font)] } }).map((r) => r.block);
+      expect(blocks[0], font).toMatchObject({ kind: 'code', text: 'x = 1;' });
+    }
+    // A proportional font stays prose.
+    const blocks = docToBlocks({ body: { content: [para('Roboto')] } }).map((r) => r.block);
+    expect(blocks[0]?.kind).toBe('paragraph');
+  });
+
+  it('24pt indent (reference-tool blockquotes) reads as a blockquote', async () => {
+    const { docToBlocks } = await import('../src/reader.ts');
+    const doc = {
+      body: {
+        content: [
+          {
+            startIndex: 1,
+            endIndex: 8,
+            paragraph: {
+              elements: [{ textRun: { content: 'quoted\n' } }],
+              paragraphStyle: { namedStyleType: 'NORMAL_TEXT', indentStart: { magnitude: 24 } },
+            },
+          },
+        ],
+      },
+    };
+    const blocks = docToBlocks(doc).map((r) => r.block);
+    expect(blocks[0]?.kind).toBe('blockquote');
+  });
+
   it('adjacent indented paragraphs coalesce into one multi-paragraph blockquote', async () => {
     const { docToBlocks } = await import('../src/reader.ts');
     const quotePara = (start: number, text: string) => ({
