@@ -6,6 +6,22 @@ import { firstMarkdownIn } from './workspace';
 
 const isMac = process.platform === 'darwin';
 
+/** Open Settings in the focused window, any window, or a fresh one. */
+function openSettings(win?: BrowserWindow): void {
+  const target =
+    (win instanceof BrowserWindow ? win : undefined) ??
+    BrowserWindow.getFocusedWindow() ??
+    BrowserWindow.getAllWindows()[0] ??
+    createWindow();
+  if (target.webContents.isLoading()) {
+    target.webContents.once('did-finish-load', () =>
+      target.webContents.send(IPC.menuOpenSettings),
+    );
+  } else {
+    target.webContents.send(IPC.menuOpenSettings);
+  }
+}
+
 export async function showOpenDialog(win?: BrowserWindow): Promise<void> {
   const result = await dialog.showOpenDialog({
     title: 'Open Markdown File',
@@ -59,6 +75,13 @@ export async function rebuildMenu(): Promise<void> {
             submenu: [
               { role: 'about' },
               { type: 'separator' },
+              {
+                label: 'Settings…',
+                accelerator: 'CmdOrCtrl+,',
+                click: (_item, win) =>
+                  openSettings(win instanceof BrowserWindow ? win : undefined),
+              },
+              { type: 'separator' },
               { role: 'services' },
               { type: 'separator' },
               { role: 'hide' },
@@ -102,8 +125,18 @@ export async function rebuildMenu(): Promise<void> {
           click: (_item, win) => win instanceof BrowserWindow && win.webContents.send(IPC.menuSubmit),
         },
         { type: 'separator' },
-        ...(isMac ? [] : ([{ role: 'quit' }] as MenuItemConstructorOptions[])),
-        ...(isMac ? ([{ role: 'close' }] as MenuItemConstructorOptions[]) : []),
+        ...(isMac
+          ? ([{ role: 'close' }] as MenuItemConstructorOptions[])
+          : ([
+              {
+                label: 'Settings',
+                accelerator: 'CmdOrCtrl+,',
+                click: (_item, win) =>
+                  openSettings(win instanceof BrowserWindow ? win : undefined),
+              },
+              { type: 'separator' },
+              { role: 'quit' },
+            ] as MenuItemConstructorOptions[])),
       ],
     },
     {

@@ -1,9 +1,11 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type {
   AgentStatus,
+  AppSettingsState,
   DiscussionMessage,
   DocState,
   FileProposal,
+  GdocsAuthStatus,
   ProjectProposal,
   RecentFile,
   ReviewData,
@@ -55,6 +57,14 @@ const api = {
     ipcRenderer.invoke(IPC.setupMessage, transcript),
   createProject: (proposal: ProjectProposal, transcript: SetupMessage[]): Promise<string> =>
     ipcRenderer.invoke(IPC.createProject, proposal, transcript),
+  getAppSettings: (): Promise<AppSettingsState> => ipcRenderer.invoke(IPC.getAppSettings),
+  chooseProjectsDir: (): Promise<AppSettingsState> => ipcRenderer.invoke(IPC.chooseProjectsDir),
+  gdocsStatus: (): Promise<GdocsAuthStatus> => ipcRenderer.invoke(IPC.gdocsStatus),
+  gdocsConnect: (): Promise<void> => ipcRenderer.invoke(IPC.gdocsConnect),
+  gdocsCancelConnect: (): Promise<void> => ipcRenderer.invoke(IPC.gdocsCancelConnect),
+  gdocsDisconnect: (): Promise<void> => ipcRenderer.invoke(IPC.gdocsDisconnect),
+  gdocsImportClient: (json?: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC.gdocsImportClient, json),
 
   onDocLoaded: (cb: (doc: DocState) => void) => on(IPC.docLoaded, cb),
   onReviewUpdated: (cb: (review: ReviewData) => void) => on(IPC.reviewUpdated, cb),
@@ -68,6 +78,8 @@ const api = {
   onMenuTogglePreview: (cb: () => void) => on(IPC.menuTogglePreview, cb),
   onMenuAddComment: (cb: () => void) => on(IPC.menuAddComment, cb),
   onMenuFormatTable: (cb: () => void) => on(IPC.menuFormatTable, cb),
+  onMenuOpenSettings: (cb: () => void) => on(IPC.menuOpenSettings, cb),
+  onGdocsAuthChanged: (cb: (status: GdocsAuthStatus) => void) => on(IPC.gdocsAuthChanged, cb),
 };
 
 export type MarginApi = typeof api;

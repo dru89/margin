@@ -33,3 +33,10 @@ export async function getSettings(): Promise<AppSettings> {
     return defaults;
   }
 }
+
+export async function updateSettings(patch: Partial<AppSettings>): Promise<AppSettings> {
+  const next = { ...(await getSettings()), ...patch };
+  await fs.mkdir(path.dirname(settingsPath()), { recursive: true });
+  await fs.writeFile(settingsPath(), JSON.stringify(next, null, 2) + '\n', 'utf8');
+  return next;
+}

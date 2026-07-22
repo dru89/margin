@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain, shell } from 'electron';
+import { BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { nanoid } from 'nanoid';
@@ -14,7 +14,7 @@ import { attachDocument, createWindow, openFile } from './windows';
 import { showOpenDialog, showOpenFolderDialog } from './menu';
 import { commitCheckpoint, fileLog, initProjectRepo, initRepo, isInRepo, restoreFromCommit } from './git';
 import { runSetupTurn } from './agent';
-import { getSettings } from './settings';
+import { getSettings, updateSettings } from './settings';
 import { saveDiscussion } from './discussionStore';
 import { getWorkspace } from './workspace';
 import { getRecentFiles } from './recents';
@@ -171,6 +171,19 @@ export function registerIpcHandlers(): void {
   });
 
   ipcMain.handle(IPC.getProjectsDir, async () => (await getSettings()).projectsDir);
+
+  ipcMain.handle(IPC.getAppSettings, () => getSettings());
+
+  // Folder picker for the projects directory; returns the updated settings.
+  ipcMain.handle(IPC.chooseProjectsDir, async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+    const result = await dialog.showOpenDialog(win!, {
+      title: 'Choose Projects Folder',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return getSettings();
+    return updateSettings({ projectsDir: result.filePaths[0] });
+  });
 
   ipcMain.handle(IPC.setupMessage, (_event, transcript: SetupMessage[]) =>
     runSetupTurn(transcript),

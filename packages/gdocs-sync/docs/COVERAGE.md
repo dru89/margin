@@ -22,7 +22,7 @@ credentials).
 - [x] UMD-1..4 — dialect pins (`src/markdown.ts`)
 - [x] UMISC-1..5 — marker strip, width, tab titles, doc IDs, frontmatter
 - [x] UQUOTA-1..3 — retry wrapper (`src/util.ts`)
-- [x] UAUTH-1..3 — scope checks (pure part; UAUTH-4 needs the auth flow)
+- [x] UAUTH-1..4 — scope checks + full fake auth flow (`test/auth.test.ts`)
 - [x] UIMG-2 — figure/inline/empty-alt trichotomy (parse side)
 - [x] UBUILD-1..5 — request builder (phase ordering, bullet-tab index
       correction, explicit-styles invariant) (`src/builder.ts`)
@@ -74,7 +74,9 @@ credentials).
 - [x] Restyle op: styling-only changes patch in place (no delete —
       comments in the block are safe by construction); mixed-inline
       probe sentence pinned offline + live
-- [ ] UAUTH-4 — auth flow end-to-end (fake flow)
+- [x] UAUTH-4 — authorize() end-to-end offline: loopback + PKCE against
+      a fake token endpoint, state-mismatch rejection, AbortSignal
+      cancel (`test/auth.test.ts`; GDOCS_SYNC_CONFIG_DIR isolates)
 - [x] Inline images mixed with text (U+FFFC span model, interleaved
       insert emission, staging-integrated); IMG-2 lives in the RT-1
       corpus. Inline images in lists/cells render as the literal

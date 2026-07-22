@@ -25,6 +25,13 @@ export const IPC = {
   setupMessage: 'setup:message',
   createProject: 'setup:create-project',
   getProjectsDir: 'setup:get-projects-dir',
+  getAppSettings: 'settings:get',
+  chooseProjectsDir: 'settings:choose-projects-dir',
+  gdocsStatus: 'gdocs:status',
+  gdocsConnect: 'gdocs:connect',
+  gdocsCancelConnect: 'gdocs:cancel-connect',
+  gdocsDisconnect: 'gdocs:disconnect',
+  gdocsImportClient: 'gdocs:import-client',
 
   // renderer -> main (send)
   caretContext: 'doc:caret-context',
@@ -41,4 +48,6 @@ export const IPC = {
   menuTogglePreview: 'menu:toggle-preview',
   menuAddComment: 'menu:add-comment',
   menuFormatTable: 'menu:format-table',
+  menuOpenSettings: 'menu:open-settings',
+  gdocsAuthChanged: 'gdocs:auth-changed',
 } as const;
