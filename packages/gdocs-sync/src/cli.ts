@@ -18,7 +18,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { authorize, getAccessToken, DRIVE_FILE_SCOPE, DRIVE_SCOPE } from './auth.ts';
+import { authStatus, authorize, getAccessToken, loadClient, DRIVE_FILE_SCOPE, DRIVE_SCOPE } from './auth.ts';
 import { makeDocxStager } from './images.ts';
 import { HttpDocsClient } from './gdoc.ts';
 import { docIdFromUrl } from './util.ts';
@@ -36,6 +36,68 @@ async function client(): Promise<HttpDocsClient> {
   const token = await getAccessToken();
   if (!token) fail('not authenticated — run `gdocs auth` first');
   return new HttpDocsClient(async () => (await getAccessToken())!);
+}
+
+/**
+ * Explain a 403/404 on a doc the user asked for. Under the default
+ * drive.file scope those statuses are ambiguous: the doc may be
+ * missing, unshared, or perfectly readable in a browser but invisible
+ * to this tool. Tailor the advice to what would actually fix it here:
+ * a client config that already allows full drive just needs re-auth;
+ * otherwise the user needs a broader client (org-distributed or
+ * self-made) before re-auth can help.
+ */
+export function scopeHintLines(opts: {
+  docId: string;
+  status: number;
+  tokenScopes: string[];
+  clientScopes: string[];
+  configDir: string;
+}): string[] {
+  const lines = [`cannot open document ${opts.docId} (HTTP ${opts.status})`];
+  if (opts.tokenScopes.includes(DRIVE_SCOPE)) return lines;
+  lines.push(
+    'This does not necessarily mean the doc is missing: the cached token',
+    'has only the drive.file scope, which sees only documents this tool',
+    'created or opened. If the doc opens in your browser, the scope is',
+    'the problem.',
+  );
+  if (opts.clientScopes.includes(DRIVE_SCOPE)) {
+    lines.push(
+      'Your OAuth client config already allows full-drive access — run',
+      '`gdocs auth` to re-authorize, then retry.',
+    );
+  } else {
+    lines.push(
+      'To read docs this tool did not create, you need an OAuth client that',
+      'permits the full drive scope:',
+      '  - if your org distributes a gdocs-sync client config, install it and',
+      '    run `gdocs auth`;',
+      `  - otherwise add "scopes": ["${DRIVE_SCOPE}"] to the client JSON in`,
+      `    ${opts.configDir} and run \`gdocs auth\` (see README, one-time setup).`,
+    );
+  }
+  lines.push('If the doc does not exist or is not shared with you, scopes will not help.');
+  return lines;
+}
+
+async function explainOpenFailure(docId: string, err: unknown): Promise<never> {
+  const status = (err as { status?: number }).status;
+  if (status !== 403 && status !== 404) throw err;
+  const auth = await authStatus();
+  const clientScopes = await loadClient().then(
+    (c) => c.scopes ?? [],
+    () => [] as string[],
+  );
+  fail(
+    scopeHintLines({
+      docId,
+      status,
+      tokenScopes: auth.scopes,
+      clientScopes,
+      configDir: auth.configDir,
+    }).join('\n'),
+  );
 }
 
 function titleOf(markdown: string, filePath: string): string {
@@ -109,7 +171,10 @@ async function cmdPush(args: string[]): Promise<void> {
     const baseDir = path.dirname(path.resolve(input.file));
     const imageStager = makeDocxStager(async () => (await getAccessToken())!);
     if (target) {
-      const plan = await updateFromMarkdown(c, target, input.markdown, { baseDir, imageStager });
+      const id = target;
+      const plan = await updateFromMarkdown(c, id, input.markdown, { baseDir, imageStager }).catch(
+        (err) => explainOpenFailure(id, err),
+      );
       console.log(`updated: ${plan.regions} region(s), ${plan.requestsSent} request(s)`);
       console.log(`https://docs.google.com/document/d/${target}/edit`);
     } else {
@@ -131,10 +196,11 @@ async function cmdPush(args: string[]): Promise<void> {
   }
 
   if (!target) fail('multi-tab push needs --doc <url|docId>');
-  const result = await pushTabs(c, target, inputs, {
+  const id = target;
+  const result = await pushTabs(c, id, inputs, {
     baseDir: path.dirname(path.resolve(inputs[0]!.file)),
     imageStager: makeDocxStager(async () => (await getAccessToken())!),
-  });
+  }).catch((err) => explainOpenFailure(id, err));
   for (const step of result.steps) console.log(`  ${step}`);
   for (const [title, plan] of Object.entries(result.perTab)) {
     console.log(`  ${title}: ${plan.requestsSent === 0 ? 'unchanged' : `${plan.requestsSent} request(s)`}`);
@@ -157,7 +223,8 @@ async function cmdFetch(args: string[]): Promise<void> {
     const dir = out ?? '.';
     await fs.mkdir(dir, { recursive: true });
     const specs: string[] = [];
-    for (const tab of await fetchTabs(c, docId)) {
+    const tabs = await fetchTabs(c, docId).catch((err) => explainOpenFailure(docId, err));
+    for (const tab of tabs) {
       const file = path.join(dir, `${tab.title.replace(/[^\w.-]+/g, '-').replace(/^-|-$/g, '') || 'tab'}.md`);
       await fs.writeFile(file, tab.markdown, 'utf8');
       console.log(`wrote ${file}`);
@@ -169,7 +236,9 @@ async function cmdFetch(args: string[]): Promise<void> {
 
   // Fetch over an existing file preserves its unknown frontmatter keys.
   const existing = out ? await fs.readFile(out, 'utf8').catch(() => undefined) : undefined;
-  const markdown = await fetchAsMarkdown(c, docId, { preserveFrontmatterFrom: existing });
+  const markdown = await fetchAsMarkdown(c, docId, { preserveFrontmatterFrom: existing }).catch(
+    (err) => explainOpenFailure(docId, err),
+  );
   if (out) {
     await fs.writeFile(out, markdown, 'utf8');
     console.log(`wrote ${out}`);
