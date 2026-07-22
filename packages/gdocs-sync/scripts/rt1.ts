@@ -42,6 +42,8 @@ PLACEHOLDER_NOPE
 ---
 
 ![The Margin icon as a figure](https://raw.githubusercontent.com/dru89/margin/main/build/icon.png)
+
+An inline image ![icon](https://raw.githubusercontent.com/dru89/margin/main/build/icon.png) between text (IMG-2).
 `;
 
 const token = await getAccessToken();

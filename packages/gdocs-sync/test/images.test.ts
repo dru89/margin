@@ -4,6 +4,7 @@ import { buildSegment } from '../src/builder.ts';
 import { docToBlocks } from '../src/reader.ts';
 import { identity } from '../src/blocks.ts';
 import { markdownToBlocks } from '../src/markdown.ts';
+import { serializeBlocks } from '../src/serialize.ts';
 import type { GDocDocument } from '../src/gdoc.ts';
 
 type Req = Record<string, any>;
@@ -132,5 +133,40 @@ describe('staging machinery, offline half (issue #18)', () => {
     const text = new TextDecoder('latin1').decode(docx);
     expect(text).toContain('word/media/img1.png');
     expect(text).toContain('rIdImg1');
+  });
+});
+
+describe('inline images mixed with text (issue #23)', () => {
+  it('parses to a U+FFFC image span; serialize/re-parse is identity-equal', () => {
+    const blocks = markdownToBlocks('before ![x](https://e.co/i.png) after\n');
+    expect(blocks[0]!.kind).toBe('paragraph');
+    const spans = (blocks[0] as { spans: { text: string; image?: object }[] }).spans;
+    const img = spans.find((s) => s.image);
+    expect(img!.text).toBe('￼');
+    const md = serializeBlocks(blocks);
+    expect(md).toContain('![x](https://e.co/i.png)');
+    expect(markdownToBlocks(md).map(identity)).toEqual(blocks.map(identity));
+  });
+
+  it('builder interleaves insertText/insertInlineImage with exact index math', () => {
+    const blocks = markdownToBlocks('before ![x](u.png) after\n');
+    const images = new Map([['u.png', { uri: 'https://x.dev/u.png', widthPt: 50, heightPt: 40 }]]);
+    const { requests } = buildSegment(blocks, 1, { images }) as { requests: Req[] };
+    const inserts = requests.filter((r) => r.insertText || r.insertInlineImage);
+    // 'before ' at 1 (7 chars) → image at 8 (1 unit) → ' after\n' at 9.
+    expect(inserts[0]!.insertText.location.index).toBe(1);
+    expect(inserts[0]!.insertText.text).toBe('before ');
+    expect(inserts[1]!.insertInlineImage.location.index).toBe(8);
+    expect(inserts[1]!.insertInlineImage.objectSize.width.magnitude).toBe(50);
+    expect(inserts[2]!.insertText.location.index).toBe(9);
+    expect(inserts[2]!.insertText.text).toBe(' after\n');
+  });
+
+  it('unstaged inline image degrades to one space unit; indices hold', () => {
+    const blocks = markdownToBlocks('a ![m](missing.png) b\n');
+    const { requests } = buildSegment(blocks, 1, { images: new Map([['missing.png', null]]) }) as { requests: Req[] };
+    const inserts = requests.filter((r) => r.insertText);
+    expect(inserts.map((r) => r.insertText.text)).toEqual(['a ', ' ', ' b\n']);
+    expect(requests.some((r) => r.insertInlineImage)).toBe(false);
   });
 });

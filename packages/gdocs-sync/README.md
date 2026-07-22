@@ -76,7 +76,11 @@ credentials).
       comments in the block are safe by construction); mixed-inline
       probe sentence pinned offline + live
 - [ ] UAUTH-4 — auth flow end-to-end (fake flow)
-- [ ] Live tier remainder: IMG-2 (inline-in-text, issue #23), META live (issue #33)
+- [x] Inline images mixed with text (U+FFFC span model, interleaved
+      insert emission, staging-integrated); IMG-2 lives in the RT-1
+      corpus. Inline images in lists/cells render as the literal
+      placeholder character (stable but unlovely — documented)
+- [ ] Live tier remainder: META live (issue #33)
 
 Known warts remaining: UI-checked boxes whose text is not struck read
 back as unchecked (api-blocked — the API exposes no checked state).

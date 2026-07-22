@@ -18,6 +18,7 @@ function escapeText(text: string): string {
 }
 
 function serializeSpan(span: InlineSpan): string {
+  if (span.image) return `![${span.image.alt}](${span.image.src})`;
   if (span.code) return `\`${span.text}\``; // code suppresses other marks (UREAD-4)
   // Push whitespace outside emphasis markers (UREAD-5: `** bold **` is invalid).
   const lead = /^\s*/.exec(span.text)![0];

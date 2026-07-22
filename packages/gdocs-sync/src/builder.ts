@@ -345,7 +345,54 @@ export function buildSegment(
         lineStart += item.depth + item.spans.reduce((n, s) => n + s.text.length, 0) + 1;
       }
     }
-    inserts.push({ insertText: { location: { index: cursor }, text } });
+    // Paragraph-kind blocks containing inline-image spans (issue #23)
+    // emit interleaved insertText/insertInlineImage — the image is one
+    // index unit, exactly the span's U+FFFC placeholder, so all range
+    // math holds. Unstaged inline images degrade to a space (1 unit).
+    const hasInlineImages =
+      (block.kind === 'paragraph' || block.kind === 'heading' || block.kind === 'blockquote') &&
+      spans.some((s) => s.span.image);
+    if (hasInlineImages) {
+      let at = cursor;
+      let buffer = '';
+      const flushText = (): void => {
+        if (buffer === '') return;
+        inserts.push({ insertText: { location: { index: at }, text: buffer } });
+        at += buffer.length;
+        buffer = '';
+      };
+      for (const s of spans) {
+        if (!s.span.image) {
+          buffer += s.span.text;
+          continue;
+        }
+        flushText();
+        const staged = opts.images?.get(s.span.image.src);
+        if (staged) {
+          inserts.push({
+            insertInlineImage: {
+              location: { index: at },
+              uri: staged.uri,
+              ...(staged.widthPt && staged.heightPt
+                ? {
+                    objectSize: {
+                      width: { magnitude: staged.widthPt, unit: 'PT' },
+                      height: { magnitude: staged.heightPt, unit: 'PT' },
+                    },
+                  }
+                : {}),
+            },
+          });
+        } else {
+          inserts.push({ insertText: { location: { index: at }, text: ' ' } });
+        }
+        at += 1;
+      }
+      buffer += '\n';
+      flushText();
+    } else {
+      inserts.push({ insertText: { location: { index: cursor }, text } });
+    }
     layouts.push({
       block,
       start: cursor,
