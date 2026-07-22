@@ -60,6 +60,16 @@ describe('scopeHintLines — 403/404 advice matches what would actually fix it',
     expect(lines[0]).toContain('404');
   });
 
+  it('the underlying API message is preserved, not swallowed', () => {
+    const lines = scopeHintLines({
+      ...base,
+      tokenScopes: [DRIVE_FILE_SCOPE],
+      clientScopes: [],
+      detail: 'GET …/documents/x → 403: rateLimitExceeded',
+    });
+    expect(lines[1]).toContain('rateLimitExceeded');
+  });
+
   it('drive.file token + broader client config: advises re-running `gdocs auth`', () => {
     const lines = scopeHintLines({
       ...base,

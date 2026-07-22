@@ -53,8 +53,10 @@ export function scopeHintLines(opts: {
   tokenScopes: string[];
   clientScopes: string[];
   configDir: string;
+  detail?: string;
 }): string[] {
   const lines = [`cannot open document ${opts.docId} (HTTP ${opts.status})`];
+  if (opts.detail) lines.push(opts.detail);
   if (opts.tokenScopes.includes(DRIVE_SCOPE)) return lines;
   lines.push(
     'This does not necessarily mean the doc is missing: the cached token',
@@ -96,6 +98,7 @@ async function explainOpenFailure(docId: string, err: unknown): Promise<never> {
       tokenScopes: auth.scopes,
       clientScopes,
       configDir: auth.configDir,
+      detail: err instanceof Error ? err.message : undefined,
     }).join('\n'),
   );
 }
