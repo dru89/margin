@@ -1,7 +1,8 @@
 /**
- * OAuth for the live tier: installed-app loopback + PKCE against the
- * client in ~/.config/margin/google-oauth.json (Google's downloaded
+ * OAuth: installed-app loopback + PKCE against the client in
+ * ~/.config/gdocs-sync/google-oauth.json (Google's downloaded
  * `{"installed": {...}}` shape, or a flat `{clientId, clientSecret}`).
+ * ~/.config/margin/ is honored as a legacy fallback location.
  *
  * UAUTH lessons applied: the token cache persists *granted* scopes and
  * getAccessToken() compares them to what's required (an unexpired
@@ -13,14 +14,22 @@
  */
 import { createServer } from 'node:http';
 import { createHash, randomBytes } from 'node:crypto';
-import { promises as fs } from 'node:fs';
+import { existsSync, promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 
-const CONFIG_DIR = path.join(os.homedir(), '.config', 'margin');
+// Standalone-first config location, with the legacy Margin-era path as
+// a fallback so existing setups keep working.
+const CONFIG_CANDIDATES = [
+  path.join(os.homedir(), '.config', 'gdocs-sync'),
+  path.join(os.homedir(), '.config', 'margin'),
+];
+const CONFIG_DIR =
+  CONFIG_CANDIDATES.find((dir) => existsSync(path.join(dir, 'google-oauth.json'))) ??
+  CONFIG_CANDIDATES[0]!;
 const CLIENT_PATH = path.join(CONFIG_DIR, 'google-oauth.json');
 const TOKEN_PATH = path.join(CONFIG_DIR, 'google-token.json');
 

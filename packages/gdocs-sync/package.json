@@ -2,9 +2,9 @@
   "name": "gdocs-sync",
   "version": "0.0.1",
   "private": true,
-  "description": "Standalone markdown <-> Google Docs sync engine: push, fetch, comments, tabs, images. Fresh implementation against the dru89/doc-tools scenario catalog. Consumers: Margin (embedded) and a future gpush/gfetch-compatible CLI. Extracts to its own repo when stable.",
+  "description": "Markdown <-> Google Docs sync engine and CLI: incremental push, high-fidelity fetch, comments-safe updates, tabs, images, callouts. Built against the dru89/doc-tools scenario catalog.",
   "type": "module",
-  "main": "src/index.ts",
+  "main": "dist/index.js",
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
@@ -13,12 +13,14 @@
     "smoke": "node scripts/smoke.ts",
     "rt1": "node scripts/rt1.ts",
     "test:live": "vitest run --config vitest.live.config.ts",
-    "gdocs": "node src/cli.ts"
+    "gdocs": "node src/cli.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {
     "@types/mdast": "^4.0.4",
     "@types/node": "^22.20.1",
-    "typescript": "^5.6.0",
+    "typescript": "^5.9.3",
     "vitest": "^2.1.0"
   },
   "dependencies": {
@@ -27,6 +29,19 @@
     "micromark-extension-gfm": "^3.0.0"
   },
   "bin": {
-    "gdocs": "src/cli.ts"
+    "gdocs": "dist/cli.js"
+  },
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   }
 }

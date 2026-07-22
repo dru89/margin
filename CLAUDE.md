@@ -124,10 +124,12 @@ npm run rt1           # THE canary: noop re-push must plan zero writes
 npm run smoke         # client/scopes/APIs end-to-end
 npm run auth          # one-time interactive OAuth (loopback+PKCE)
 npm run gdocs -- …    # the CLI: auth | push | fetch
+npm run build         # tsc → dist/ (publishable output; bin = dist/cli.js)
 ```
 
-Auth lives in `~/.config/margin/google-oauth.json` (Google's downloaded
-Desktop-client shape) + a cached token; scope is `drive.file` only.
+Auth lives in `~/.config/gdocs-sync/google-oauth.json` (Google's
+downloaded Desktop-client shape) + a cached token; `~/.config/margin/`
+is honored as a legacy fallback. Scope is `drive.file` only.
 The live tier's durable fixture doc id is in `test/live/fixtures.ts` —
 **read-only, never recreate**; its anchored comments/suggestions were
 made by hand in the Docs UI and the API cannot recreate them.

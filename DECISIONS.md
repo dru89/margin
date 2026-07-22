@@ -609,6 +609,33 @@ catalog amendment (thread-survival vs anchor-state split) matches what
 the live tier already pins; anchor-state tests still need a UI-created
 durable fixture doc.
 
+## 45. gdocs-sync packaging: real build, standalone config path, user docs
+
+The package now compiles to `dist/` via `tsc -p tsconfig.build.json`
+with `rewriteRelativeImportExtensions` (the `.ts`-extension internal
+imports become `.js` in output — no bundler needed, source stays
+node-type-strippable for dev). `bin.gdocs` points at `dist/cli.js`
+(shebang on the source survives compilation); `main`/`types`/`exports`
+point at dist; `files: ["dist"]`; `prepublishOnly` runs typecheck +
+offline tests + build. **`private: true` stays until Drew decides to
+publish** — likely under a scoped name, which is his call.
+
+Config moved to `~/.config/gdocs-sync/` with `~/.config/margin/` as a
+read fallback (first candidate directory containing `google-oauth.json`
+wins; new tokens are written beside whichever client was found). Drew's
+existing margin-path setup keeps working untouched; new users never see
+a Margin-branded path for a standalone tool.
+
+`auth.ts` is now re-exported from the package index — library consumers
+(Margin included) need `getAccessToken`/`authorize` without deep
+imports. Its `import.meta.url` CLI guard is inert on import.
+
+README.md rewrote as user docs (install, bring-your-own Desktop OAuth
+client walkthrough, CLI + library usage); the scenario-coverage ledger
+moved to `docs/COVERAGE.md`. A package-level MIT LICENSE was added
+because npm requires one — the repo itself has no LICENSE file, so the
+choice needs Drew's confirmation before any publish.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:
