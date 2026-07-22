@@ -69,6 +69,9 @@ interface MarginState {
   rejectProposal: (id: string, comment?: string) => Promise<void>;
   submit: () => Promise<void>;
   cancelReview: () => Promise<void>;
+  /** Settings overlay (menu Settings… / Cmd-,). */
+  settingsOpen: boolean;
+  setSettingsOpen: (open: boolean) => void;
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -117,6 +120,7 @@ export const useStore = create<MarginState>((set, get) => {
     dirty: false,
     workspace: null,
     explorerOpen: true,
+    settingsOpen: false,
 
     loadWorkspace: async () => {
       const workspace = await window.margin.getWorkspace();
@@ -141,6 +145,7 @@ export const useStore = create<MarginState>((set, get) => {
     },
 
     toggleExplorer: () => set((s) => ({ explorerOpen: !s.explorerOpen })),
+    setSettingsOpen: (open) => set({ settingsOpen: open }),
 
     switchToFile: async (path) => {
       const { doc, save } = get();
@@ -208,6 +213,16 @@ export const useStore = create<MarginState>((set, get) => {
       window.margin.onMenuTogglePreview(() =>
         set((s) => ({ mode: s.mode === 'write' ? 'preview' : 'write' })),
       );
+      window.margin.onMenuOpenSettings(() => set({ settingsOpen: true }));
+      // Fallback for when the page has focus and no native menu fires
+      // (Linux without a menubar); open-only, so a menu-consumed
+      // accelerator never double-toggles.
+      window.addEventListener('keydown', (e) => {
+        if (e.key === ',' && (e.metaKey || e.ctrlKey)) {
+          e.preventDefault();
+          set({ settingsOpen: true });
+        }
+      });
     },
 
     setMode: (mode) => set({ mode }),

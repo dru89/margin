@@ -636,6 +636,49 @@ moved to `docs/COVERAGE.md`. A package-level MIT LICENSE was added
 because npm requires one — the repo itself has no LICENSE file, so the
 choice needs Drew's confirmation before any publish.
 
+## 46. Settings screen + Google auth: bundle the library, ship a default-client slot
+
+First Margin↔gdocs-sync integration (Settings only; no push/pull yet).
+Choices:
+
+**The library is bundled into the main bundle from source** via a vite
+alias (`'gdocs-sync'` → `packages/gdocs-sync/src/index.ts`) plus a
+matching `paths` entry in tsconfig.node.json (with
+`allowImportingTsExtensions` for its `.ts`-extension imports). No npm
+workspace, no `file:` dependency, no electron-builder changes — the
+package stays a normal externalized-world citizen while its code ships
+inside `out/main/index.js` like nanoid does. The standalone rule (§42)
+is untouched: the dependency direction is Margin → library only, and
+`src/main/gdocs.ts` is the integration layer. Rollup tree-shakes to the
+auth surface for now; sync entry points ride along free when needed.
+
+**Default OAuth client is a paste-slot, not a committed secret.**
+`src/main/defaultOAuthClient.ts` exports `DEFAULT_OAUTH_CLIENT` (null
+today) which is fed to the library's new `setFallbackClient()`. Drew
+decided the app default should be his client, but this repo is public —
+committing the client id/secret is his paste, not the agent's
+(installed-app secrets are non-confidential per Google's model and
+rclone ships one, but shared quota + a public credential is an owner's
+call). Until pasted: users with a config file work; others must import
+a client in Settings before Connect enables.
+
+**Library auth grew an app-facing surface** (still CLI-first, still
+standalone): dynamic config-dir resolution (`GDOCS_SYNC_CONFIG_DIR` env
+override → `~/.config/gdocs-sync/` → legacy `~/.config/margin/`, chosen
+per call, token written beside the client that was found), `authStatus`,
+`saveClientConfig` (validate-then-write 0600), `signOut`, and
+`authorize(scopes, { onUrl, signal })` — Margin opens the consent URL
+via `shell.openExternal` and Cancel aborts the loopback server. The env
+override made UAUTH-4 testable offline: the full loopback+PKCE flow now
+runs against a fake token endpoint in `test/auth.test.ts` (state
+mismatch rejects before code exchange; abort rejects cleanly).
+
+**Menu placement:** macOS gets Settings… in the app menu below About;
+Windows/Linux get it in File above Quit; both on CmdOrCtrl+, . The
+renderer also handles the chord directly as an open-only fallback
+(idempotent, so a menu-consumed accelerator can't double-toggle), which
+is also what makes the overlay drivable over CDP.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:

@@ -204,3 +204,18 @@ export function emptyReview(documentName: string): ReviewData {
     discussion: [],
   };
 }
+
+/** Google Docs auth state shown in Settings (mirrors gdocs-sync's AuthStatus). */
+export interface GdocsAuthStatus {
+  /** Where the OAuth client comes from: an imported file, the app's built-in default, or nowhere. */
+  clientSource: 'file' | 'default' | 'none';
+  clientPath: string | null;
+  connected: boolean;
+  scopes: string[];
+  /** An authorize() flow is waiting on browser consent. */
+  connecting: boolean;
+}
+
+export interface AppSettingsState {
+  projectsDir: string;
+}

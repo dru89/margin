@@ -9,6 +9,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { AgentBar } from '@/components/AgentBar';
 import { ConflictBar } from '@/components/ConflictBar';
 import { ProposalView } from '@/components/ProposalView';
+import { Settings } from '@/components/Settings';
 
 export function App() {
   const doc = useStore((s) => s.doc);
@@ -37,7 +38,13 @@ export function App() {
     };
   }, []);
 
-  if (!doc) return <Welcome />;
+  if (!doc)
+    return (
+      <>
+        <Welcome />
+        <Settings />
+      </>
+    );
 
   return (
     <div className="app">
@@ -57,6 +64,7 @@ export function App() {
         <Sidebar />
       </div>
       <AgentBar />
+      <Settings />
     </div>
   );
 }

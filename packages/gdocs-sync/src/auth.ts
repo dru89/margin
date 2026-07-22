@@ -2,7 +2,8 @@
  * OAuth: installed-app loopback + PKCE against the client in
  * ~/.config/gdocs-sync/google-oauth.json (Google's downloaded
  * `{"installed": {...}}` shape, or a flat `{clientId, clientSecret}`).
- * ~/.config/margin/ is honored as a legacy fallback location.
+ * ~/.config/margin/ is honored as a legacy fallback location, and
+ * GDOCS_SYNC_CONFIG_DIR overrides both (tests, embedding apps).
  *
  * UAUTH lessons applied: the token cache persists *granted* scopes and
  * getAccessToken() compares them to what's required (an unexpired
@@ -21,19 +22,33 @@ import { pathToFileURL } from 'node:url';
 
 export const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 
-// Standalone-first config location, with the legacy Margin-era path as
-// a fallback so existing setups keep working.
-const CONFIG_CANDIDATES = [
-  path.join(os.homedir(), '.config', 'gdocs-sync'),
-  path.join(os.homedir(), '.config', 'margin'),
-];
-const CONFIG_DIR =
-  CONFIG_CANDIDATES.find((dir) => existsSync(path.join(dir, 'google-oauth.json'))) ??
-  CONFIG_CANDIDATES[0]!;
-const CLIENT_PATH = path.join(CONFIG_DIR, 'google-oauth.json');
-const TOKEN_PATH = path.join(CONFIG_DIR, 'google-token.json');
+const CLIENT_FILE = 'google-oauth.json';
+const TOKEN_FILE = 'google-token.json';
 
-interface ClientConfig {
+function candidateDirs(): string[] {
+  const env = process.env.GDOCS_SYNC_CONFIG_DIR;
+  if (env) return [env];
+  return [
+    path.join(os.homedir(), '.config', 'gdocs-sync'),
+    path.join(os.homedir(), '.config', 'margin'),
+  ];
+}
+
+/** The active config dir: first candidate holding a client file, else the preferred one. */
+export function configDir(): string {
+  const dirs = candidateDirs();
+  return dirs.find((dir) => existsSync(path.join(dir, CLIENT_FILE))) ?? dirs[0]!;
+}
+
+function clientPath(): string {
+  return path.join(configDir(), CLIENT_FILE);
+}
+
+function tokenPath(): string {
+  return path.join(configDir(), TOKEN_FILE);
+}
+
+export interface ClientConfig {
   clientId: string;
   clientSecret: string;
   authUri: string;
@@ -49,13 +64,30 @@ interface TokenCache {
   scopes: string[];
 }
 
-export async function loadClient(): Promise<ClientConfig> {
-  const raw = JSON.parse(await fs.readFile(CLIENT_PATH, 'utf8')) as Record<string, unknown>;
+// An embedding app may ship a default client used when no client file
+// exists on disk (installed-app credentials are not confidential per
+// Google's model; the consent screen still gates everything).
+let fallbackClient: ClientConfig | null = null;
+
+export function setFallbackClient(
+  client: { clientId: string; clientSecret: string } | null,
+): void {
+  fallbackClient = client
+    ? {
+        clientId: client.clientId,
+        clientSecret: client.clientSecret,
+        authUri: 'https://accounts.google.com/o/oauth2/auth',
+        tokenUri: 'https://oauth2.googleapis.com/token',
+      }
+    : null;
+}
+
+function parseClientConfig(raw: Record<string, unknown>, source: string): ClientConfig {
   const installed = (raw.installed ?? raw.web ?? raw) as Record<string, string>;
   const clientId = installed.client_id ?? (raw.clientId as string | undefined);
   const clientSecret = installed.client_secret ?? (raw.clientSecret as string | undefined);
   if (!clientId || !clientSecret) {
-    throw new Error(`No client_id/client_secret found in ${CLIENT_PATH}`);
+    throw new Error(`No client_id/client_secret found in ${source}`);
   }
   return {
     clientId,
@@ -65,9 +97,71 @@ export async function loadClient(): Promise<ClientConfig> {
   };
 }
 
+export async function loadClient(): Promise<ClientConfig> {
+  const file = clientPath();
+  try {
+    const raw = JSON.parse(await fs.readFile(file, 'utf8')) as Record<string, unknown>;
+    return parseClientConfig(raw, file);
+  } catch (err) {
+    if (fallbackClient && (err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return fallbackClient;
+    }
+    throw err;
+  }
+}
+
+/**
+ * Validate and persist an OAuth client JSON (Google's downloaded shape
+ * or flat {clientId, clientSecret}). Writes to the preferred config dir
+ * and returns the path. Throws without writing if the JSON is unusable.
+ */
+export async function saveClientConfig(rawJson: string): Promise<string> {
+  const raw = JSON.parse(rawJson) as Record<string, unknown>;
+  parseClientConfig(raw, 'the provided client JSON'); // validate only
+  const dir = candidateDirs()[0]!;
+  const file = path.join(dir, CLIENT_FILE);
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(file, JSON.stringify(raw, null, 2) + '\n', { mode: 0o600 });
+  return file;
+}
+
+/** Forget the cached token (the client config stays). */
+export async function signOut(): Promise<void> {
+  await fs.rm(tokenPath(), { force: true });
+}
+
+export interface AuthStatus {
+  configDir: string;
+  /** Path of the client file if one exists on disk. */
+  clientPath: string | null;
+  clientSource: 'file' | 'fallback' | 'none';
+  /** A token with the required scopes is cached (refresh may still be needed). */
+  connected: boolean;
+  scopes: string[];
+  expiresAt: number | null;
+}
+
+export async function authStatus(
+  required: string[] = [DRIVE_FILE_SCOPE],
+): Promise<AuthStatus> {
+  const dir = configDir();
+  const file = path.join(dir, CLIENT_FILE);
+  const hasFile = existsSync(file);
+  const token = await loadToken();
+  const scoped = token !== null && required.every((s) => token.scopes.includes(s));
+  return {
+    configDir: dir,
+    clientPath: hasFile ? file : null,
+    clientSource: hasFile ? 'file' : fallbackClient ? 'fallback' : 'none',
+    connected: scoped && (token.refreshToken !== undefined || Date.now() < token.expiresAt),
+    scopes: token?.scopes ?? [],
+    expiresAt: token?.expiresAt ?? null,
+  };
+}
+
 async function loadToken(): Promise<TokenCache | null> {
   try {
-    const t = JSON.parse(await fs.readFile(TOKEN_PATH, 'utf8')) as TokenCache;
+    const t = JSON.parse(await fs.readFile(tokenPath(), 'utf8')) as TokenCache;
     return Array.isArray(t.scopes) && typeof t.accessToken === 'string' ? t : null;
   } catch {
     return null;
@@ -75,8 +169,8 @@ async function loadToken(): Promise<TokenCache | null> {
 }
 
 async function saveToken(token: TokenCache): Promise<void> {
-  await fs.mkdir(CONFIG_DIR, { recursive: true });
-  await fs.writeFile(TOKEN_PATH, JSON.stringify(token, null, 2) + '\n', { mode: 0o600 });
+  await fs.mkdir(configDir(), { recursive: true });
+  await fs.writeFile(tokenPath(), JSON.stringify(token, null, 2) + '\n', { mode: 0o600 });
 }
 
 interface TokenResponse {
@@ -102,7 +196,7 @@ async function tokenRequest(client: ClientConfig, params: Record<string, string>
   if (!res.ok || body.error) {
     if (body.error === 'invalid_client' || body.error === 'unauthorized_client') {
       throw new Error(
-        `OAuth client is invalid (${body.error}). Re-running auth will not help — the client ID in ${CLIENT_PATH} needs to be replaced.`,
+        `OAuth client is invalid (${body.error}). Re-running auth will not help — the client ID in ${clientPath()} needs to be replaced.`,
       );
     }
     throw new Error(`Token request failed: ${body.error ?? res.status} ${body.error_description ?? ''}`.trim());
@@ -119,12 +213,23 @@ function cacheFrom(body: TokenResponse, previous?: TokenCache | null): TokenCach
   };
 }
 
-/** Interactive loopback flow. Prints the consent URL; resolves when the user approves. */
-export async function authorize(scopes: string[] = [DRIVE_FILE_SCOPE]): Promise<TokenCache> {
+export interface AuthorizeOptions {
+  /** Receives the consent URL. Default prints it to the console (CLI). */
+  onUrl?: (url: string) => void;
+  /** Abort the flow: closes the loopback server and rejects. */
+  signal?: AbortSignal;
+}
+
+/** Interactive loopback flow. Surfaces the consent URL; resolves when the user approves. */
+export async function authorize(
+  scopes: string[] = [DRIVE_FILE_SCOPE],
+  options: AuthorizeOptions = {},
+): Promise<TokenCache> {
   const client = await loadClient();
   const verifier = randomBytes(32).toString('base64url');
   const challenge = createHash('sha256').update(verifier).digest('base64url');
   const state = randomBytes(16).toString('base64url');
+  const quiet = options.onUrl !== undefined;
   let redirectUri = '';
 
   const code = await new Promise<string>((resolve, reject) => {
@@ -145,6 +250,17 @@ export async function authorize(scopes: string[] = [DRIVE_FILE_SCOPE]): Promise<
       else if (!gotCode) reject(new Error('No code in callback'));
       else resolve(gotCode);
     });
+    if (options.signal) {
+      const onAbort = () => {
+        server.close();
+        reject(new Error('Authorization cancelled'));
+      };
+      if (options.signal.aborted) {
+        onAbort();
+        return;
+      }
+      options.signal.addEventListener('abort', onAbort, { once: true });
+    }
     server.listen(0, '127.0.0.1', () => {
       const address = server.address();
       const port = typeof address === 'object' && address ? address.port : 0;
@@ -161,7 +277,8 @@ export async function authorize(scopes: string[] = [DRIVE_FILE_SCOPE]): Promise<
         prompt: 'consent',
       }).toString();
       redirectUri = `http://127.0.0.1:${port}/callback`;
-      console.log(`\nOpen this URL in your browser to authorize:\n\n${authUrl.toString()}\n`);
+      if (quiet) options.onUrl!(authUrl.toString());
+      else console.log(`\nOpen this URL in your browser to authorize:\n\n${authUrl.toString()}\n`);
     });
     server.on('error', reject);
   });
@@ -174,15 +291,17 @@ export async function authorize(scopes: string[] = [DRIVE_FILE_SCOPE]): Promise<
   });
   const token = cacheFrom(body);
   await saveToken(token);
-  console.log(`Authorized. Granted scopes: ${token.scopes.join(', ')}`);
-  console.log(`Token cached at ${TOKEN_PATH}`);
+  if (!quiet) {
+    console.log(`Authorized. Granted scopes: ${token.scopes.join(', ')}`);
+    console.log(`Token cached at ${tokenPath()}`);
+  }
   return token;
 }
 
 /**
- * Access token for the live tier: cached if fresh and sufficiently
- * scoped, refreshed if expired, otherwise null (callers skip — the
- * live suite must skip, not fail, when unauthenticated).
+ * Access token for API calls: cached if fresh and sufficiently scoped,
+ * refreshed if expired, otherwise null (callers skip — the live suite
+ * must skip, not fail, when unauthenticated).
  */
 export async function getAccessToken(required: string[] = [DRIVE_FILE_SCOPE]): Promise<string | null> {
   const cached = await loadToken();
