@@ -51,20 +51,54 @@ async function readSpec(spec: string): Promise<TabInput & { file: string }> {
   return { title: title ?? titleOf(markdown, file), markdown, file };
 }
 
-async function cmdPush(args: string[]): Promise<void> {
+/**
+ * Split push arguments into file/tab specs and the doc target, before
+ * anything touches the filesystem. A non-flag argument that parses as
+ * a doc URL or bare docId is the target (the documented
+ * `push <file.md> [url|docId]` form); everything else is a spec.
+ * Throws on usage errors.
+ */
+export function parsePushArgs(args: string[]): {
+  specs: string[];
+  target: string | null;
+  writeUrl: boolean;
+} {
   const writeUrl = args.includes('--write-url');
   const docFlag = args.indexOf('--doc');
   const explicitDoc = docFlag !== -1 ? args[docFlag + 1] : undefined;
-  const specs = args.filter((a, i) => !a.startsWith('--') && (docFlag === -1 || i !== docFlag + 1));
-  if (specs.length === 0) fail('push needs at least one markdown file');
+  if (docFlag !== -1 && !explicitDoc) throw new Error('--doc requires a value');
+  let target = explicitDoc ? docIdFromUrl(explicitDoc) : null;
+  if (explicitDoc && !target) throw new Error(`not a Google Doc reference: ${explicitDoc}`);
+
+  const specs: string[] = [];
+  for (const [i, a] of args.entries()) {
+    if (a.startsWith('--') || (docFlag !== -1 && i === docFlag + 1)) continue;
+    const id = docIdFromUrl(a);
+    if (id) {
+      if (target) throw new Error('more than one doc target given');
+      target = id;
+    } else {
+      specs.push(a);
+    }
+  }
+  if (specs.length === 0) throw new Error('push needs at least one markdown file');
+  return { specs, target, writeUrl };
+}
+
+async function cmdPush(args: string[]): Promise<void> {
+  let parsed: ReturnType<typeof parsePushArgs>;
+  try {
+    parsed = parsePushArgs(args);
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err));
+  }
+  const { specs, writeUrl } = parsed;
+  let { target } = parsed;
 
   const inputs = await Promise.all(specs.map(readSpec));
   const c = await client();
 
-  // Target: --doc, else a bare trailing docId/url arg (single-file
-  // form), else the first file's frontmatter url.
-  let target = explicitDoc ? docIdFromUrl(explicitDoc) : null;
-  if (!target && inputs.length === 2 && !inputs[1]!.file.endsWith('.md')) fail('use --doc for the target');
+  // Target fallback: the first file's frontmatter url.
   if (!target) {
     const fm = splitFrontmatter(stripCommentsSection(inputs[0]!.markdown)).meta;
     if (fm.url) target = docIdFromUrl(fm.url);
