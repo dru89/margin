@@ -1,7 +1,6 @@
 {
-  "name": "gdocs-sync",
-  "version": "0.0.1",
-  "private": true,
+  "name": "@dru89/gdocs-sync",
+  "version": "0.1.0",
   "description": "Markdown <-> Google Docs sync engine and CLI: incremental push, high-fidelity fetch, comments-safe updates, tabs, images, callouts. Built against the dru89/doc-tools scenario catalog.",
   "type": "module",
   "main": "dist/index.js",
@@ -43,5 +42,20 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
-  }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dru89/margin.git",
+    "directory": "packages/gdocs-sync"
+  },
+  "keywords": [
+    "google-docs",
+    "markdown",
+    "sync",
+    "drive",
+    "cli"
+  ]
 }

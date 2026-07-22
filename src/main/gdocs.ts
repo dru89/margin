@@ -12,7 +12,7 @@ import {
   saveClientConfig,
   setFallbackClient,
   signOut,
-} from 'gdocs-sync';
+} from '@dru89/gdocs-sync';
 import type { GdocsAuthStatus } from '@shared/types';
 import { IPC } from '@shared/ipc';
 import { DEFAULT_OAUTH_CLIENT } from './defaultOAuthClient';

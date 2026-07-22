@@ -16,7 +16,7 @@
     "allowImportingTsExtensions": true,
     "paths": {
       "@shared/*": ["./src/shared/*"],
-      "gdocs-sync": ["./packages/gdocs-sync/src/index.ts"]
+      "@dru89/gdocs-sync": ["./packages/gdocs-sync/src/index.ts"]
     }
   },
   "include": ["src/main/**/*", "src/preload/**/*", "src/shared/**/*", "packages/gdocs-sync/src/**/*", "electron.vite.config.ts"]

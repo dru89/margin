@@ -18,7 +18,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { authorize, getAccessToken } from './auth.ts';
+import { authorize, getAccessToken, DRIVE_FILE_SCOPE, DRIVE_SCOPE } from './auth.ts';
 import { makeDocxStager } from './images.ts';
 import { HttpDocsClient } from './gdoc.ts';
 import { docIdFromUrl } from './util.ts';
@@ -147,15 +147,26 @@ async function cmdFetch(args: string[]): Promise<void> {
 export async function main(argv: string[]): Promise<void> {
   const [command, ...rest] = argv;
   switch (command) {
-    case 'auth':
-      await authorize();
+    case 'auth': {
+      // --scope drive|drive.file|<full url>; default = client JSON's
+      // "scopes" array, else drive.file.
+      const i = rest.indexOf('--scope');
+      let scopes: string[] | undefined;
+      if (i !== -1) {
+        const name = rest[i + 1];
+        if (!name) fail('--scope requires a value (drive | drive.file | full URL)');
+        const named: Record<string, string> = { drive: DRIVE_SCOPE, 'drive.file': DRIVE_FILE_SCOPE };
+        scopes = [named[name] ?? name];
+      }
+      await authorize(scopes);
       return;
+    }
     case 'push':
       return cmdPush(rest);
     case 'fetch':
       return cmdFetch(rest);
     default:
-      console.log('usage: gdocs auth | push <file.md|Title=file.md ...> [--doc <url>] [--write-url] | fetch <url> [out.md]');
+      console.log('usage: gdocs auth [--scope drive|drive.file] | push <file.md|Title=file.md ...> [--doc <url>] [--write-url] | fetch <url> [out.md]');
       process.exit(command ? 1 : 0);
   }
 }
