@@ -679,6 +679,22 @@ renderer also handles the chord directly as an open-only fallback
 (idempotent, so a menu-consumed accelerator can't double-toggle), which
 is also what makes the overlay drivable over CDP.
 
+## 47. Default OAuth client: build-time env injection, not a committed paste
+
+GitHub push protection rejected the commit carrying the pasted client
+(§46's paste-slot plan), and Drew chose the clean-repo route over
+allowlisting: the credential now enters at build time via
+`MARGIN_GOOGLE_OAUTH_CLIENT_ID` / `MARGIN_GOOGLE_OAUTH_CLIENT_SECRET` —
+read from an untracked `.env` locally and from same-named repo secrets
+in the release workflow (both build steps), injected through vite
+`define` into `defaultOAuthClient.ts`. Empty/missing values compile to
+a null default, so forks and secretless CI build fine; Settings then
+requires an imported client. The point is scraper resistance, not
+secrecy — the credential still ships in every binary, extractable by
+anyone who downloads the app. The prod client was verified live before
+this rework: consent → PKCE exchange → drive.file-only grant → doc
+created and deleted through the library.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:

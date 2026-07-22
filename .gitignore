@@ -3,3 +3,7 @@ out/
 dist/
 *.log
 .DS_Store
+
+# Build-time OAuth client (MARGIN_GOOGLE_OAUTH_*) — never commit
+.env
+.env.*

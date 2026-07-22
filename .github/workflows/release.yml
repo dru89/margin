@@ -60,6 +60,8 @@ jobs:
       - name: Build (macOS)
         if: matrix.platform == 'mac'
         env:
+          MARGIN_GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.MARGIN_GOOGLE_OAUTH_CLIENT_ID }}
+          MARGIN_GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.MARGIN_GOOGLE_OAUTH_CLIENT_SECRET }}
           CSC_LINK: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -81,6 +83,9 @@ jobs:
 
       - name: Build (Linux)
         if: matrix.platform == 'linux'
+        env:
+          MARGIN_GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.MARGIN_GOOGLE_OAUTH_CLIENT_ID }}
+          MARGIN_GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.MARGIN_GOOGLE_OAUTH_CLIENT_SECRET }}
         run: npx electron-vite build && npx electron-builder --linux --publish never
 
       - name: Upload artifacts
