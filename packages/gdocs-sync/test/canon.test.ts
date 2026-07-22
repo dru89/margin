@@ -78,3 +78,46 @@ describe('image trichotomy (lesson 8 / UIMG-2)', () => {
     expect(b?.kind).toBe('paragraph');
   });
 });
+
+describe('wart fixes (issue #24)', () => {
+  it('blank lines inside code blocks survive read-back coalescing', async () => {
+    const { docToBlocks } = await import('../src/reader.ts');
+    const codeLine = (start: number, text: string) => ({
+      startIndex: start,
+      endIndex: start + text.length + 1,
+      paragraph: {
+        elements: [{ textRun: { content: `${text}\n`, textStyle: { weightedFontFamily: { fontFamily: 'Roboto Mono' } } } }],
+        paragraphStyle: { namedStyleType: 'NORMAL_TEXT' },
+      },
+    });
+    const emptyPara = (start: number) => ({
+      startIndex: start,
+      endIndex: start + 1,
+      paragraph: { elements: [{ textRun: { content: '\n' } }], paragraphStyle: { namedStyleType: 'NORMAL_TEXT' } },
+    });
+    const doc = { body: { content: [codeLine(1, 'first();'), emptyPara(10), codeLine(11, 'second();')] } };
+    const blocks = docToBlocks(doc).map((r) => r.block);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({ kind: 'code', text: 'first();\n\nsecond();' });
+  });
+
+  it('adjacent indented paragraphs coalesce into one multi-paragraph blockquote', async () => {
+    const { docToBlocks } = await import('../src/reader.ts');
+    const quotePara = (start: number, text: string) => ({
+      startIndex: start,
+      endIndex: start + text.length + 1,
+      paragraph: {
+        elements: [{ textRun: { content: `${text}\n` } }],
+        paragraphStyle: { namedStyleType: 'NORMAL_TEXT', indentStart: { magnitude: 36 } },
+      },
+    });
+    const doc = { body: { content: [quotePara(1, 'first line'), quotePara(12, 'second line')] } };
+    const blocks = docToBlocks(doc).map((r) => r.block);
+    expect(blocks).toHaveLength(1);
+    if (blocks[0]!.kind !== 'blockquote') throw new Error('expected blockquote');
+    expect(blocks[0]!.spans.map((s) => s.text).join('')).toBe('first line\nsecond line');
+    // Matches the md side: a multi-paragraph quote is one block there too.
+    const md = markdownToBlocks('> first line\n> second line\n');
+    expect(identity(blocks[0]!)).toBe(identity(md[0]!));
+  });
+});

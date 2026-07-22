@@ -67,6 +67,8 @@ function nthTable(doc: GDocDocument, n: number): GDocStructuralElement | null {
  */
 interface ApplyOptions {
   tablesBefore: number;
+  /** The final segment ends at the doc end (issue #24). */
+  omitTrailingNewline?: boolean;
   /** Pre-planned (possibly pooled) widths for the tables in `blocks`, in order. */
   tableWidths?: number[][];
   /** Staged images by markdown src. */
@@ -122,6 +124,7 @@ async function applyBlocksAt(
     const segment = buildSegment(pending, cursor, {
       leadingSpaceAbovePt: afterTable ? BLOCK_GAP_PT : undefined,
       images: opts.images,
+      omitTrailingNewline: opts.omitTrailingNewline && flushedFinal,
     });
     afterTable = false;
     const revision = await revisionOf(client, docId);
@@ -131,6 +134,7 @@ async function applyBlocksAt(
     pending = [];
   };
 
+  let flushedFinal = false;
   for (const block of blocks) {
     if (block.kind !== 'table') {
       pending.push(block);
@@ -301,6 +305,7 @@ async function applyBlocksAt(
     cursor = filled?.endIndex ?? cursor;
     afterTable = true;
   }
+  flushedFinal = true;
   await flush();
   return written;
 }
@@ -450,10 +455,19 @@ export async function updateFromMarkdown(
   // Reverse region order: later edits never shift earlier indices.
   for (const region of [...regions].reverse()) {
     let insertAt: number;
+    // Regions touching the doc end swallow stray trailing paragraphs
+    // and omit their own final newline (issue #24) — otherwise every
+    // end-of-doc edit accumulates an empty paragraph.
+    const touchesEnd =
+      region.oldEnd === readBlocks.length &&
+      region.blocks.length > 0 &&
+      region.blocks[region.blocks.length - 1]!.kind !== 'table';
     if (region.oldEnd > region.oldStart) {
       const start = readBlocks[region.oldStart]!.startIndex;
       // The final segment newline cannot be deleted (lesson 13).
-      const end = Math.min(readBlocks[region.oldEnd - 1]!.endIndex, endIndex - 1);
+      const end = touchesEnd
+        ? endIndex - 1
+        : Math.min(readBlocks[region.oldEnd - 1]!.endIndex, endIndex - 1);
       if (end > start) {
         const revision = await revisionOf(client, docId);
         await client.batchUpdate(
@@ -481,6 +495,7 @@ export async function updateFromMarkdown(
       tablesBefore,
       tableWidths: widths,
       images,
+      omitTrailingNewline: touchesEnd,
     });
   }
 
