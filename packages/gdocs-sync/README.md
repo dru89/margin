@@ -36,9 +36,12 @@ Requires Node 22+.
 
 ## One-time setup: OAuth client + auth
 
-Google has no shared client for this tool yet, so each user brings their
-own (five minutes, free, no verification needed because `drive.file`
-is not a sensitive scope):
+The CLI deliberately ships without an OAuth client (the Margin app
+bundles one; the npm artifact does not). Either save a client JSON a
+colleague or org shared with you as
+`~/.config/gdocs-sync/google-oauth.json`, or create your own — five
+minutes, free, no verification needed because `drive.file` is not a
+sensitive scope:
 
 1. In [Google Cloud Console](https://console.cloud.google.com/), create
    a project (any name) and enable the **Google Docs API** and

@@ -715,6 +715,20 @@ files, dist+README+LICENSE only, no config/env leakage. Actual publish
 is Drew's (`npm login` + `npm publish` from the package dir;
 prepublishOnly gates on typecheck + offline tests + build).
 
+## 49. The npm artifact ships no OAuth client (app does, CLI does not)
+
+Considered embedding the shared client into the published package at
+prepublish time (mirroring the app's build-time injection) and decided
+against it: npm tarballs are the most aggressively crawled artifact
+channel, and an automated leak report to Google could get the secret
+flagged or reset — which would brick Connect in every shipped copy of
+the *app*, not just the CLI. The blast radius asymmetry decides it.
+CLI users skew technical and get a client via the shared-JSON paste
+path (documented in the internal runbook gist) or bring their own;
+the README states the split explicitly. Revisit only if a
+non-technical CLI audience materializes (rclone-style obfuscated
+embedding is the known escape hatch).
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:
