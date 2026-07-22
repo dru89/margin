@@ -174,14 +174,24 @@ function listItems(list: List, depth: number): ListItem[] {
   return items;
 }
 
+import { calloutType as calloutTypeOf } from './styles.ts';
+
+function nodesToBlocks(nodes: RootContent[]): CanonicalBlock[] {
+  return convertNodes(nodes);
+}
+
 /** Parse markdown (frontmatter and gpush section already handled by caller). */
 export function markdownToBlocks(body: string): CanonicalBlock[] {
   const tree: Root = fromMarkdown(body, {
     extensions: [gfm()],
     mdastExtensions: [gfmFromMarkdown()],
   });
+  return convertNodes(tree.children as RootContent[]);
+}
+
+function convertNodes(nodes: RootContent[]): CanonicalBlock[] {
   const blocks: CanonicalBlock[] = [];
-  for (const node of tree.children as RootContent[]) {
+  for (const node of nodes) {
     switch (node.type) {
       case 'heading':
         blocks.push({ kind: 'heading', level: node.depth, spans: spansOf(node.children) });
@@ -215,6 +225,11 @@ export function markdownToBlocks(body: string): CanonicalBlock[] {
         });
         break;
       case 'blockquote': {
+        const callout = calloutFrom(node);
+        if (callout) {
+          blocks.push(callout);
+          break;
+        }
         const spans: InlineSpan[] = [];
         for (const child of node.children) {
           if (child.type === 'paragraph') {
@@ -233,4 +248,65 @@ export function markdownToBlocks(body: string): CanonicalBlock[] {
     }
   }
   return blocks;
+}
+
+/**
+ * Callout detection (issue #40): a blockquote whose FIRST paragraph's
+ * FIRST LINE is `[!type]` or `[!type] Title` (Obsidian/GFM alerts).
+ * `[!x]` anywhere else stays a plain blockquote. Body children convert
+ * through the normal block pipeline — paragraphs, code, lists all work;
+ * tables/images/nested callouts are rejected back to a plain quote.
+ */
+function calloutFrom(node: import('mdast').Blockquote): CanonicalBlock | null {
+  const first = node.children[0];
+  if (first?.type !== 'paragraph') return null;
+  const spans = spansOf(first.children);
+  const firstText = spans[0]?.text ?? '';
+  const m = /^\[!([A-Za-z-]+)\]([^\n]*)(\n?)/.exec(firstText);
+  if (!m) return null;
+
+  // Split the first paragraph: marker line → type/title; rest → body.
+  const titleAndRest: InlineSpan[] = [
+    ...(m[2] || m[3] ? [{ ...spans[0]!, text: (m[2] ?? '') + (m[3] ?? '') + firstText.slice(m[0].length) }] : []),
+    ...spans.slice(1),
+  ];
+  const title: InlineSpan[] = [];
+  const firstBody: InlineSpan[] = [];
+  let inBody = false;
+  for (const span of titleAndRest) {
+    if (inBody) {
+      firstBody.push(span);
+      continue;
+    }
+    const nl = span.text.indexOf('\n');
+    if (nl === -1) {
+      title.push(span);
+    } else {
+      if (nl > 0) title.push({ ...span, text: span.text.slice(0, nl) });
+      const rest = span.text.slice(nl + 1);
+      if (rest) firstBody.push({ ...span, text: rest });
+      inBody = true;
+    }
+  }
+  const trimmedTitle = trimSpans(title);
+
+  const body: CanonicalBlock[] = [];
+  if (firstBody.length > 0) body.push({ kind: 'paragraph', spans: firstBody });
+  for (const child of node.children.slice(1)) {
+    // Reuse the block pipeline on the remaining children.
+    const converted = nodesToBlocks([child]);
+    for (const b of converted) {
+      if (b.kind === 'table' || b.kind === 'image' || b.kind === 'callout') return null; // stay a quote
+      body.push(b);
+    }
+  }
+  return { kind: 'callout', type: calloutTypeOf(m[1]!), title: trimmedTitle, body };
+}
+
+function trimSpans(spans: InlineSpan[]): InlineSpan[] {
+  const out = spans.map((s) => ({ ...s }));
+  if (out[0]) out[0].text = out[0].text.replace(/^\s+/, '');
+  const last = out[out.length - 1];
+  if (last) last.text = last.text.replace(/\s+$/, '');
+  return out.filter((s) => s.text !== '');
 }

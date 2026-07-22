@@ -39,6 +39,12 @@ PLACEHOLDER_NOPE
 > A quoted line of wisdom.
 > And a second quoted line.
 
+> [!warning] Deploy **freeze** active
+> No pushes after Friday.
+>
+> - check the calendar
+> - ping the on-call
+
 ---
 
 ![The Margin icon as a figure](https://raw.githubusercontent.com/dru89/margin/main/build/icon.png)

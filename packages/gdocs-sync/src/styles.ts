@@ -98,3 +98,25 @@ export function spacingStyle(spacing: ParaSpacing): Record<string, unknown> {
     spaceBelow: { magnitude: spacing.afterPt, unit: 'PT' },
   };
 }
+
+/** Callout chrome (issue #40): emoji + tint per canonical type. */
+export const CALLOUTS: Record<string, { emoji: string; tintHex: string }> = {
+  info: { emoji: 'ℹ️', tintHex: 'E8F0FE' },
+  tip: { emoji: '💡', tintHex: 'E6F4EA' },
+  important: { emoji: '❗', tintHex: 'F3E8FD' },
+  warning: { emoji: '⚠️', tintHex: 'FEF7E0' },
+  danger: { emoji: '🛑', tintHex: 'FCE8E6' },
+};
+
+/** Aliases fold to canonical types; unknown types become info. */
+export function calloutType(raw: string): string {
+  const t = raw.toLowerCase();
+  const aliases: Record<string, string> = {
+    note: 'info', info: 'info',
+    tip: 'tip', hint: 'tip',
+    important: 'important',
+    warning: 'warning', warn: 'warning',
+    caution: 'danger', danger: 'danger', error: 'danger',
+  };
+  return aliases[t] ?? 'info';
+}
