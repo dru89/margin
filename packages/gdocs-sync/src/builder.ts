@@ -129,6 +129,13 @@ function namedStyleFor(block: CanonicalBlock): string {
 export interface SegmentOptions {
   /** Extra spaceAbove on the segment's first paragraph (e.g. after a table). */
   leadingSpaceAbovePt?: number;
+  /**
+   * Drop the final inserted newline — for segments ending at the doc
+   * end, where the undeletable segment newline (lesson 13) serves as
+   * the last paragraph break. Prevents trailing-empty-paragraph
+   * accumulation on end-of-doc edits (issue #24).
+   */
+  omitTrailingNewline?: boolean;
   /** Staged images by markdown src; unstaged images fall back to a placeholder paragraph. */
   images?: Map<string, import('./images.ts').StagedImage | null>;
 }
@@ -451,13 +458,17 @@ export function buildSegment(
           spacingStyle(layout.block.level === 1 ? TITLE_SPACING : headingStyle(layout.block.level).spacing),
         );
         break;
-      case 'blockquote':
-        Object.assign(style, spacingStyle(QUOTE_SPACING));
+      case 'blockquote': {
+        // Multi-paragraph quotes: inner paragraphs 0/0, edges 10 —
+        // same pattern as code blocks (issue #24).
+        const multi = layout.block.spans.some((sp) => sp.text.includes('\n'));
+        Object.assign(style, spacingStyle(multi ? { beforePt: 0, afterPt: 0 } : QUOTE_SPACING));
         style.indentStart = QUOTE_INDENT;
         style.indentFirstLine = QUOTE_INDENT;
         style.borderLeft = QUOTE_BORDER;
         fields += ',indentStart,indentFirstLine,borderLeft';
         break;
+      }
       case 'code':
       case 'list': {
         // Inner spacing over the whole range; edge gaps patched after.
@@ -492,6 +503,16 @@ export function buildSegment(
       const lastStart = layout.end - (lines[lines.length - 1]!.length + 1);
       pushSpacing(layout.start, firstEnd, BLOCK_GAP_PT, lines.length === 1 ? BLOCK_GAP_PT : 0);
       if (lines.length > 1) pushSpacing(lastStart, layout.end, 0, BLOCK_GAP_PT);
+    }
+    if (layout.block.kind === 'blockquote') {
+      const text = layout.block.spans.map((sp) => sp.text).join('');
+      const lines = text.split('\n');
+      if (lines.length > 1) {
+        const firstEnd = layout.start + lines[0]!.length + 1;
+        const lastStart = layout.end - (lines[lines.length - 1]!.length + 1);
+        pushSpacing(layout.start, firstEnd, BLOCK_GAP_PT, 0);
+        pushSpacing(lastStart, layout.end, 0, BLOCK_GAP_PT);
+      }
     }
     if (layout.block.kind === 'list' && layout.items && layout.items.length > 0) {
       const gap = layout.block.loose ? LOOSE_ITEM_GAP_PT : LIST_ITEM_GAP_PT;
@@ -615,8 +636,26 @@ export function buildSegment(
     }
   }
 
-  return {
-    requests: [...inserts, ...bullets, ...paraStyles, ...textStyles],
-    insertedLength: correctedTotalEnd - insertAt,
-  };
+  let requests = [...inserts, ...bullets, ...paraStyles, ...textStyles];
+  let insertedLength = correctedTotalEnd - insertAt;
+  if (opts.omitTrailingNewline && insertedLength > 0) {
+    const lastInsert = [...requests].reverse().find(
+      (r) => (r as { insertText?: { text: string } }).insertText,
+    ) as { insertText: { text: string } } | undefined;
+    if (lastInsert?.insertText.text.endsWith('\n')) {
+      lastInsert.insertText.text = lastInsert.insertText.text.slice(0, -1);
+      insertedLength -= 1;
+      const finalEnd = insertAt + insertedLength;
+      requests = requests.filter((r) => {
+        const range = (r as { updateParagraphStyle?: { range: { startIndex: number; endIndex: number } }; updateTextStyle?: { range: { startIndex: number; endIndex: number } }; deleteParagraphBullets?: { range: { startIndex: number; endIndex: number } }; createParagraphBullets?: { range: { startIndex: number; endIndex: number } } }).updateParagraphStyle?.range ??
+          (r as { updateTextStyle?: { range: { startIndex: number; endIndex: number } } }).updateTextStyle?.range ??
+          (r as { deleteParagraphBullets?: { range: { startIndex: number; endIndex: number } } }).deleteParagraphBullets?.range ??
+          (r as { createParagraphBullets?: { range: { startIndex: number; endIndex: number } } }).createParagraphBullets?.range;
+        if (!range) return true;
+        if (range.endIndex > finalEnd) range.endIndex = finalEnd;
+        return range.endIndex > range.startIndex;
+      });
+    }
+  }
+  return { requests, insertedLength };
 }

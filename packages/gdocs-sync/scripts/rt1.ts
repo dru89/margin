@@ -34,12 +34,12 @@ Second paragraph so KEEP runs exist between block types.
 | apple | 3 |
 | watermelon | 12 |
 
-\`\`\`js
-const x = 1;
-console.log(x);
-\`\`\`
+PLACEHOLDER_NOPE
 
 > A quoted line of wisdom.
+> And a second quoted line.
+
+---
 
 ![The Margin icon as a figure](https://raw.githubusercontent.com/dru89/margin/main/build/icon.png)
 `;

@@ -124,6 +124,9 @@ function imageOf(doc: GDocDocument, para: GDocParagraph): { src: string; alt: st
 export function docToBlocks(doc: GDocDocument, skipElements = 0): ReadBlock[] {
   const out: ReadBlock[] = [];
   const content = (doc.body?.content ?? []).slice(skipElements);
+  let pendingEmpties = 0;
+  /** Empties between two code blocks are blank code lines. */
+  const empties = new Map<ReadBlock, number>();
 
   for (let ci = 0; ci < content.length; ci++) {
     const el = content[ci]!;
@@ -131,6 +134,7 @@ export function docToBlocks(doc: GDocDocument, skipElements = 0): ReadBlock[] {
     const end = el.endIndex ?? start;
 
     if (el.table) {
+      pendingEmpties = 0;
       const cellRanges: { row: number; col: number; start: number; end: number }[] = [];
       const rows = (el.table.tableRows ?? []).map((row, r) =>
         (row.tableCells ?? []).map((cell, c) => {
@@ -173,6 +177,7 @@ export function docToBlocks(doc: GDocDocument, skipElements = 0): ReadBlock[] {
     // paragraph is its caption (figure trichotomy, builder convention).
     const image = imageOf(doc, para);
     if (image) {
+      pendingEmpties = 0;
       const centered = para.paragraphStyle?.alignment === 'CENTER';
       let blockEnd = end;
       let alt = image.alt;
@@ -205,11 +210,13 @@ export function docToBlocks(doc: GDocDocument, skipElements = 0): ReadBlock[] {
 
     // hr: empty paragraph carrying a bottom border.
     if (text === '' && style.borderBottom?.width?.magnitude !== undefined) {
+      pendingEmpties = 0;
       out.push({ block: { kind: 'hr' }, startIndex: start, endIndex: end });
       continue;
     }
 
     if (para.bullet?.listId) {
+      pendingEmpties = 0;
       const depth = para.bullet.nestingLevel ?? 0;
       const item: ListItem = {
         depth,
@@ -243,7 +250,15 @@ export function docToBlocks(doc: GDocDocument, skipElements = 0): ReadBlock[] {
       continue;
     }
 
-    if (text === '') continue; // UREAD-1: skip empty padding paragraphs
+    if (text === '') {
+      // UREAD-1: empty padding paragraphs are skipped — but counted,
+      // so blank lines INSIDE code blocks survive the coalesce pass
+      // (issue #24: an empty line has no runs, hence no mono signal).
+      pendingEmpties++;
+      continue;
+    }
+    const emptiesBefore = pendingEmpties;
+    pendingEmpties = 0;
 
     const level = headingLevel(style.namedStyleType);
     if (level !== null) {
@@ -253,11 +268,9 @@ export function docToBlocks(doc: GDocDocument, skipElements = 0): ReadBlock[] {
 
     // Code line: every span monospace.
     if (spans.length > 0 && spans.every((s) => s.code)) {
-      out.push({
-        block: { kind: 'code', lang: null, text },
-        startIndex: start,
-        endIndex: end,
-      });
+      const rb: ReadBlock = { block: { kind: 'code', lang: null, text }, startIndex: start, endIndex: end };
+      if (emptiesBefore > 0) empties.set(rb, emptiesBefore);
+      out.push(rb);
       continue;
     }
 
@@ -269,17 +282,29 @@ export function docToBlocks(doc: GDocDocument, skipElements = 0): ReadBlock[] {
     out.push({ block: { kind: 'paragraph', spans }, startIndex: start, endIndex: end });
   }
 
-  // Coalesce adjacent code lines (UCANON-2/3), merging their ranges.
+  // Coalesce adjacent code lines (UCANON-2/3) — blank lines between
+  // them rejoin as empty code lines — and adjacent blockquote
+  // paragraphs (a multi-paragraph quote is ONE canonical block).
   const result: ReadBlock[] = [];
   for (const rb of out) {
     const prev = result[result.length - 1];
     if (rb.block.kind === 'code' && prev?.block.kind === 'code') {
-      const merged = coalesceCodeBlocks([prev.block, rb.block]);
-      if (merged.length === 1) {
-        prev.block = merged[0]!;
-        prev.endIndex = rb.endIndex;
-        continue;
-      }
+      const blanks = empties.get(rb) ?? 0;
+      prev.block = {
+        kind: 'code',
+        lang: null,
+        text: `${(prev.block as { text: string }).text}${'\n'.repeat(blanks + 1)}${rb.block.text}`,
+      };
+      prev.endIndex = rb.endIndex;
+      continue;
+    }
+    if (rb.block.kind === 'blockquote' && prev?.block.kind === 'blockquote') {
+      prev.block = {
+        kind: 'blockquote',
+        spans: [...prev.block.spans, { text: '\n' }, ...rb.block.spans],
+      };
+      prev.endIndex = rb.endIndex;
+      continue;
     }
     result.push(rb);
   }

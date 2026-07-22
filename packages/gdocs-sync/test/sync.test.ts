@@ -135,3 +135,15 @@ describe('USCOPE — orchestrator against the fake Docs service', () => {
     expect(deletes[1]!.deleteContentRange.range.startIndex).toBe(1);
   });
 });
+
+describe('end-of-doc edits (issue #24)', () => {
+  it('a region touching the doc end omits its trailing newline and swallows the range fully', async () => {
+    const client = new FakeDocsClient(threeParagraphDoc());
+    await updateFromMarkdown(client, 'fake-doc', 'first.\n\nsecond.\n\nthird, EDITED.\n');
+    const flat = client.batches.flat() as Record<string, any>[];
+    const insert = flat.find((r) => r.insertText)!;
+    expect(insert.insertText.text).toBe('third, EDITED.'); // no trailing \n
+    const del = flat.find((r) => r.deleteContentRange)!;
+    expect(del.deleteContentRange.range).toEqual({ startIndex: 16, endIndex: 22 }); // to endIndex-1
+  });
+});
