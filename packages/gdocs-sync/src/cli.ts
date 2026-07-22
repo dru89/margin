@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * The gpush/gfetch-replacement CLI — a thin wrapper over the library,
  * following the reference conventions (doc-tools conventions.md):

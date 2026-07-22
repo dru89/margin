@@ -1,108 +1,142 @@
 # gdocs-sync
 
-Standalone markdown ↔ Google Docs sync engine. **No Margin imports,
-ever** — Margin is one consumer; the other planned consumer is a CLI
-that replaces the reference gpush/gfetch tools. Lives in this repo for
-now; extracts to its own repo when stable.
+Sync markdown files to Google Docs and back, without losing your
+colleagues' comments.
 
-The specification is external:
+`gdocs push` turns a markdown file into a styled Google Doc — headings,
+lists, tables, code blocks, images, callouts, a title block with author
+and date chips. Pushing again after an edit diffs the live document
+against your markdown and rewrites **only the blocks that changed**, so
+comments anchored to untouched paragraphs survive. Styling-only edits
+(say, bolding a word) are patched in place without deleting anything, so
+even comments inside the edited block survive those. `gdocs fetch` pulls
+a doc back down as clean markdown.
 
-- Product spec: [`docs/specs/gdocs-sync.md`](../../docs/specs/gdocs-sync.md)
-- Behavior + scenario catalog: [`dru89/doc-tools`](https://github.com/dru89/doc-tools)
-  (`google-docs-api-lessons.md`, `test-scenarios.md`, `conventions.md`)
+It uses only the `drive.file` OAuth scope: the tool can touch documents
+it created (or that you explicitly open with it) and nothing else in
+your Drive.
 
-Tests are named by scenario ID from the catalog. Run with `npm test`
-(offline tier only; the live tier comes later and skips without
-credentials).
+## Install
 
-## Scenario coverage
+Not yet on npm. From a checkout:
 
-- [x] UCANON-1..3 — canonicalization parity (`src/blocks.ts`)
-- [x] UDIFF-1..7 — block diff planner (`src/differ.ts`)
-- [x] UREGION-1..5 — rebuild regions (`src/regions.ts`)
-- [x] UMD-1..4 — dialect pins (`src/markdown.ts`)
-- [x] UMISC-1..5 — marker strip, width, tab titles, doc IDs, frontmatter
-- [x] UQUOTA-1..3 — retry wrapper (`src/util.ts`)
-- [x] UAUTH-1..3 — scope checks (pure part; UAUTH-4 needs the auth flow)
-- [x] UIMG-2 — figure/inline/empty-alt trichotomy (parse side)
-- [x] UBUILD-1..5 — request builder (phase ordering, bullet-tab index
-      correction, explicit-styles invariant) (`src/builder.ts`)
-- [x] USCOPE-1..3 — orchestrator vs. fake Docs service (`src/sync.ts`)
-- [x] UREAD (partial) — run merging (UREAD-5), heading −1 shift, ranges;
-      remaining: chips, checkboxes, adjacent-list separation, subtitle
-- [x] **RT-1 (live) — PASSING.** Corpus: 3 heading levels, styled
-      paragraphs, nested + ordered lists, table, fenced code,
-      blockquote. Create ≈47 writes; identical re-push plans zero.
-      `npm run rt1` (needs `npm run auth` once).
-- [x] Serializer (fetch path): blocks → markdown, contract = re-parse
-      is identity-equal; UREAD-5 hygiene, checkbox round-trip
-      (`src/serialize.ts`)
-- [x] UTAB-1..9 — tab reconciliation planner (`src/tabs.ts`)
-- [x] UWIDTH-1..5 — **reference** column-sizing algorithm (percentile,
-      wrap tier, word floor, prefix pooling, water-fill, SI-4
-      centering) (`src/widths.ts`)
-- [x] Reference styles from reference.docx (`src/styles.ts`): Roboto
-      body, Lato headings, Roboto Mono code, extracted spacing
-- [x] Checkboxes end-to-end: BULLET_CHECKBOX + strikethrough encodes
-      checked (conventions option c); read detection probed live
-- [x] Live tier v1 (`npm run test:live`): comments persist across
-      region rebuilds, CP-5 edit-lands, edit→noop stability. Skips
-      without credentials; scratch docs self-clean.
-- [ ] CP anchored-survival (CP-1..4/8 proper) — **blocked**:
-      programmatic comments are unanchored (probed); needs the
-      reference harness technique (asked in margin#10)
-- [x] UCHIP-1..4 / META — metadata block (`src/meta.ts`): frontmatter
-      title/subtitle/author/date → TITLE/SUBTITLE paragraphs + person/
-      date chips; leading `#` lifts to title (both entry paths agree);
-      update replaces the region, never appends; fetch emits
-      frontmatter (subtitle round-trips there, not `##`); fetch→push
-      is a verified noop
-- [ ] UREAD-8..9 remainder — rich-link chips, adjacent-list separation
-- [x] UIMG-1,3..6 — images: resolution, PNG dims, sizing, figure
-      emission with caption fold-back, unstaged degradation
-      (`src/images.ts`); RT-1 corpus includes a live URL figure
-- [x] Local-file image staging: temp-docx contentUri trick (zip +
-      OOXML built from scratch, one temp doc per push, quota-wrapped);
-      JPEG dimensions; live-tested with a generated PNG on disk
-- [x] Multi-tab orchestration (`src/tabsync.ts`): UTAB plan execution
-      (addDocumentTab/rename/delete/reorder-one-per-batch) + per-tab
-      content sync via tab-scoped client views; TAB live test green
-- [x] SI-1..3 live — caught and fixed two real cell-styling bugs
-      (phased-fill index shift; namedStyleType wiping run styles)
-- [x] CLI (`src/cli.ts`, `npm run gdocs` / bin `gdocs`): auth, push
-      (single doc via frontmatter url or --doc; multi-tab Title=path
-      specs), fetch, --write-url — the gpush/gfetch replacement
-- [x] Restyle op: styling-only changes patch in place (no delete —
-      comments in the block are safe by construction); mixed-inline
-      probe sentence pinned offline + live
-- [ ] UAUTH-4 — auth flow end-to-end (fake flow)
-- [x] Inline images mixed with text (U+FFFC span model, interleaved
-      insert emission, staging-integrated); IMG-2 lives in the RT-1
-      corpus. Inline images in lists/cells render as the literal
-      placeholder character (stable but unlovely — documented)
-- [x] Callouts (issue #40): GFM/Obsidian alerts as tinted 1×1 tables
-      — first-line [!type] detection with aliases, styled titles,
-      multi-block bodies (paragraphs/lists/code; tables stay quotes),
-      emoji fold-back on read, full-width chrome. In the RT-1 corpus.
-      Chrome absorptions: bold inside titles, code langs in bodies.
-- [ ] Live tier remainder: META live (issue #33)
+```bash
+cd packages/gdocs-sync
+npm install
+npm run build       # compiles to dist/
+npm link            # puts `gdocs` on your PATH
+```
 
-Known warts remaining: UI-checked boxes whose text is not struck read
-back as unchecked (api-blocked — the API exposes no checked state).
-Fixed in issue #24: blank lines in code blocks coalesce on read-back;
-multi-paragraph blockquotes are one canonical block with edge-only
-spacing; end-of-doc edits omit their trailing newline and swallow
-strays (no more empty-paragraph accumulation); hr is in the RT-1
-corpus.
+Requires Node 22+.
 
-## Architecture
+## One-time setup: OAuth client + auth
 
-Pure decision logic, tested offline: markdown → `CanonicalBlock[]`
-(`markdown.ts`), block identity + canonical forms (`blocks.ts`), LCS
-diff with modify-fusion (`differ.ts`), contiguous rebuild regions
-(`regions.ts`). Everything API-facing arrives later behind the same
-canonical model: request builder (UBUILD), doc read-back (UREAD),
-orchestrator + fake Docs service (USCOPE), then the live tier.
+Google has no shared client for this tool yet, so each user brings their
+own (five minutes, free, no verification needed because `drive.file`
+is not a sensitive scope):
 
-Index math is UTF-16 code units throughout — in TS, `String.length` is
-already correct; do not "fix" it to code points (lesson 1).
+1. In [Google Cloud Console](https://console.cloud.google.com/), create
+   a project (any name) and enable the **Google Docs API** and
+   **Google Drive API** (APIs & Services → Library).
+2. Configure the OAuth consent screen (External, just app name + your
+   email; you can leave it in Testing and add yourself as a test user).
+3. Create credentials → **OAuth client ID** → application type
+   **Desktop app**, and download the JSON.
+4. Save it as `~/.config/gdocs-sync/google-oauth.json` (the downloaded
+   `{"installed": {...}}` shape works as-is).
+5. Run `gdocs auth`, open the printed URL, approve. The token is cached
+   at `~/.config/gdocs-sync/google-token.json` (mode 0600) and refreshes
+   itself.
+
+## CLI usage
+
+```bash
+# Create a new doc from a markdown file and record its URL in the
+# file's frontmatter (url: ...):
+gdocs push notes.md --write-url
+
+# Subsequent pushes read the URL from frontmatter and update in place:
+gdocs push notes.md
+
+# Or target a doc explicitly:
+gdocs push notes.md --doc https://docs.google.com/document/d/<id>/edit
+
+# Multi-tab documents: one markdown file per tab, Title=path specs.
+# Tabs are created/renamed/reordered/deleted to match the spec order.
+gdocs push "Overview=overview.md" "Design=design.md" --doc <url>
+
+# Pull a doc back down as markdown (frontmatter is preserved/updated
+# if the output file already exists):
+gdocs fetch <url> notes.md
+
+# Pull a multi-tab doc: writes one file per tab plus a push-back spec:
+gdocs fetch <url> --tabs out-dir/
+```
+
+Frontmatter drives the title block: `title`, `subtitle`, `author` (or
+`authors`), `author-email`, and `date` become the doc's TITLE/SUBTITLE
+paragraphs and smart chips. A leading `# Heading` also lifts to the doc
+title. `> [!note] Callouts` (GFM/Obsidian alert syntax) render as tinted
+boxes.
+
+Safety rails: every write batch is revision-guarded (a concurrent edit
+aborts the push, which you can simply re-run), and a push is **refused**
+while the doc has pending suggestions — resolve them first, because a
+block rebuild would silently discard them.
+
+## Library usage
+
+```ts
+import {
+  createFromMarkdown,
+  updateFromMarkdown,
+  fetchAsMarkdown,
+  HttpDocsClient,
+  getAccessToken,
+  makeDocxStager,
+} from 'gdocs-sync';
+
+const token = await getAccessToken(); // null → run authorize() first
+const client = new HttpDocsClient(() => getAccessToken());
+
+const { documentId } = await createFromMarkdown(client, markdown, {
+  baseDir: '/path/for/relative/images',
+  imageStager: makeDocxStager(() => getAccessToken()),
+});
+
+await updateFromMarkdown(client, documentId, editedMarkdown, opts);
+const md = await fetchAsMarkdown(client, documentId);
+```
+
+`updateFromMarkdown` returns a plan summary (`regions`, `requestsSent`)
+— zero for a no-op push, which the test suite holds as an invariant.
+For multi-tab documents use `pushTabs`/`fetchTabs` from the same entry
+point. All markdown↔block-model logic (`parseMarkdown`,
+`blocksToMarkdown`, the differ) is exported and runs offline.
+
+## What survives a round trip
+
+Headings (`#` = title, `##`–`####` = H1–H3 styles), paragraphs with
+bold/italic/strikethrough/code/links, tight and loose lists (bulleted,
+numbered, checkboxes), fenced code blocks, tables (with header chrome,
+zebra striping, and reference-derived column widths), blockquotes,
+callouts, horizontal rules, figure and inline images, and person/date/
+rich-link smart chips (chips read back as their display text or link).
+Known limits live in [docs/COVERAGE.md](docs/COVERAGE.md) and the
+repo's `api-blocked` issues — the biggest: comments can be *preserved*
+but not yet created/imported (v2), and a checkbox checked by hand in
+the UI is invisible to the API unless its text is struck through.
+
+## Development
+
+```bash
+npm test            # offline tier: 108 tests, no credentials needed
+npm run test:live   # live tier against real Docs API (skips w/o auth)
+npm run rt1         # round-trip canary: full-corpus doc, re-push = 0 writes
+npm run typecheck
+```
+
+Tests are named by scenario IDs from
+[dru89/doc-tools](https://github.com/dru89/doc-tools). Coverage ledger:
+[docs/COVERAGE.md](docs/COVERAGE.md). Splice/anchor API findings:
+[docs/splice-findings.md](docs/splice-findings.md).

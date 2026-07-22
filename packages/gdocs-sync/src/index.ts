@@ -4,6 +4,7 @@ export * from './differ.ts';
 export * from './regions.ts';
 export * from './util.ts';
 export * from './gdoc.ts';
+export * from './auth.ts';
 export * from './reader.ts';
 export * from './builder.ts';
 export * from './sync.ts';
