@@ -21,6 +21,19 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
+
+// Scope satisfaction is superset-aware: a token granted full drive
+// covers a drive.file requirement (issue #48 — internal clients can be
+// approved for /auth/drive so fetch works on any doc the user can read).
+const SCOPE_IMPLIES: Record<string, string[]> = {
+  [DRIVE_SCOPE]: [DRIVE_FILE_SCOPE],
+};
+
+function scopeSatisfied(granted: string[], required: string): boolean {
+  if (granted.includes(required)) return true;
+  return granted.some((g) => SCOPE_IMPLIES[g]?.includes(required) ?? false);
+}
 
 const CLIENT_FILE = 'google-oauth.json';
 const TOKEN_FILE = 'google-token.json';
@@ -53,6 +66,9 @@ export interface ClientConfig {
   clientSecret: string;
   authUri: string;
   tokenUri: string;
+  /** Default scopes to request, from a top-level "scopes" array in the
+   * client JSON (user-added; Google's downloaded shape has none). */
+  scopes?: string[];
 }
 
 interface TokenCache {
@@ -89,11 +105,16 @@ function parseClientConfig(raw: Record<string, unknown>, source: string): Client
   if (!clientId || !clientSecret) {
     throw new Error(`No client_id/client_secret found in ${source}`);
   }
+  const scopes =
+    Array.isArray(raw.scopes) && raw.scopes.every((x) => typeof x === 'string')
+      ? (raw.scopes as string[])
+      : undefined;
   return {
     clientId,
     clientSecret,
     authUri: installed.auth_uri ?? 'https://accounts.google.com/o/oauth2/auth',
     tokenUri: installed.token_uri ?? 'https://oauth2.googleapis.com/token',
+    ...(scopes !== undefined ? { scopes } : {}),
   };
 }
 
@@ -148,7 +169,7 @@ export async function authStatus(
   const file = path.join(dir, CLIENT_FILE);
   const hasFile = existsSync(file);
   const token = await loadToken();
-  const scoped = token !== null && required.every((s) => token.scopes.includes(s));
+  const scoped = token !== null && required.every((s) => scopeSatisfied(token.scopes, s));
   return {
     configDir: dir,
     clientPath: hasFile ? file : null,
@@ -220,12 +241,17 @@ export interface AuthorizeOptions {
   signal?: AbortSignal;
 }
 
-/** Interactive loopback flow. Surfaces the consent URL; resolves when the user approves. */
+/**
+ * Interactive loopback flow. Surfaces the consent URL; resolves when the
+ * user approves. Scope resolution: explicit argument, else the client
+ * JSON's "scopes" array, else drive.file.
+ */
 export async function authorize(
-  scopes: string[] = [DRIVE_FILE_SCOPE],
+  requestedScopes?: string[],
   options: AuthorizeOptions = {},
 ): Promise<TokenCache> {
   const client = await loadClient();
+  const scopes = requestedScopes ?? client.scopes ?? [DRIVE_FILE_SCOPE];
   const verifier = randomBytes(32).toString('base64url');
   const challenge = createHash('sha256').update(verifier).digest('base64url');
   const state = randomBytes(16).toString('base64url');
@@ -306,7 +332,7 @@ export async function authorize(
 export async function getAccessToken(required: string[] = [DRIVE_FILE_SCOPE]): Promise<string | null> {
   const cached = await loadToken();
   if (!cached) return null;
-  if (!required.every((s) => cached.scopes.includes(s))) return null; // narrow token ≠ valid token
+  if (!required.every((s) => scopeSatisfied(cached.scopes, s))) return null; // narrow token ≠ valid token
   if (Date.now() < cached.expiresAt) return cached.accessToken;
   if (!cached.refreshToken) return null;
   try {

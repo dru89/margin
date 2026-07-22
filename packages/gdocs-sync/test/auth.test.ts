@@ -210,3 +210,35 @@ describe('UAUTH-4 — authorize() end-to-end against a fake token endpoint', () 
     await expect(done).rejects.toThrow(/cancelled/);
   });
 });
+
+describe('scope satisfaction + config scopes (issue #48)', () => {
+  it('a full-drive token satisfies a drive.file requirement', async () => {
+    await writeToken({ scopes: ['https://www.googleapis.com/auth/drive'] });
+    expect(await getAccessToken()).toBe('tok');
+    expect((await authStatus()).connected).toBe(true);
+  });
+
+  it('drive.file does not satisfy a full-drive requirement', async () => {
+    await writeToken(); // drive.file only
+    expect(await getAccessToken(['https://www.googleapis.com/auth/drive'])).toBeNull();
+  });
+
+  it('a "scopes" array in the client JSON becomes the authorize default', async () => {
+    await saveClientConfig(
+      JSON.stringify({
+        installed: { client_id: 'cid', client_secret: 'cs' },
+        scopes: ['https://www.googleapis.com/auth/drive'],
+      }),
+    );
+    const ctl = new AbortController();
+    let consentScope = '';
+    await authorize(undefined, {
+      signal: ctl.signal,
+      onUrl: (url) => {
+        consentScope = new URL(url).searchParams.get('scope') ?? '';
+        ctl.abort();
+      },
+    }).catch(() => {});
+    expect(consentScope).toBe('https://www.googleapis.com/auth/drive');
+  });
+});

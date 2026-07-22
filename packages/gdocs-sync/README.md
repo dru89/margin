@@ -18,7 +18,12 @@ your Drive.
 
 ## Install
 
-Not yet on npm. From a checkout:
+```bash
+npm install -g @dru89/gdocs-sync   # CLI: `gdocs` on your PATH
+npm install @dru89/gdocs-sync      # library
+```
+
+Or from a checkout:
 
 ```bash
 cd packages/gdocs-sync
@@ -47,6 +52,12 @@ is not a sensitive scope):
 5. Run `gdocs auth`, open the printed URL, approve. The token is cached
    at `~/.config/gdocs-sync/google-token.json` (mode 0600) and refreshes
    itself.
+
+By default only `drive.file` is requested. If your OAuth client is
+approved for broader access (e.g. an org-internal client), add a
+top-level `"scopes"` array to the client JSON — it becomes the default
+for `gdocs auth` — or pass `--scope drive` explicitly. With full drive,
+`gdocs fetch` works on any doc you can read, not just tool-created ones.
 
 ## CLI usage
 
@@ -94,7 +105,7 @@ import {
   HttpDocsClient,
   getAccessToken,
   makeDocxStager,
-} from 'gdocs-sync';
+} from '@dru89/gdocs-sync';
 
 const token = await getAccessToken(); // null → run authorize() first
 const client = new HttpDocsClient(() => getAccessToken());

@@ -695,6 +695,26 @@ anyone who downloads the app. The prod client was verified live before
 this rework: consent → PKCE exchange → drive.file-only grant → doc
 created and deleted through the library.
 
+## 48. Scopes ride the client JSON; the package is npm-ready as @dru89/gdocs-sync
+
+Issue #48 implemented Drew's shape: a top-level `"scopes"` array in the
+OAuth client JSON becomes the default for `gdocs auth` (and Margin's
+Connect), so an org-internal client approved for `/auth/drive` grants
+full-drive fetch by copy-paste alone — no flags to teach. `gdocs auth
+--scope drive|drive.file|<url>` overrides per-run. Scope satisfaction
+is now superset-aware (`drive` covers a `drive.file` requirement) —
+previously literal string matching meant a drive-scoped token read as
+signed-out everywhere. The public app default stays drive.file (drive
+is a restricted scope; verification + admin blocks — see #46/#48).
+
+npm prep (issue #44): renamed to **@dru89/gdocs-sync** at 0.1.0,
+`private` removed, `publishConfig.access: public` (scoped packages
+default restricted), `repository.directory` set. Margin's alias/import
+specifier updated to match the published name. Dry-run tarball: 41
+files, dist+README+LICENSE only, no config/env leakage. Actual publish
+is Drew's (`npm login` + `npm publish` from the package dir;
+prepublishOnly gates on typecheck + offline tests + build).
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:

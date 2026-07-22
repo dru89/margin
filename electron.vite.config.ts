@@ -27,7 +27,7 @@ export default defineConfig({
         // (zero Margin imports) but ships inside the main bundle, so no
         // workspace symlinks or packaging changes are needed. Its mdast/
         // micromark deps are inlined along with it (ESM-only, like nanoid).
-        'gdocs-sync': resolve(__dirname, 'packages/gdocs-sync/src/index.ts'),
+        '@dru89/gdocs-sync': resolve(__dirname, 'packages/gdocs-sync/src/index.ts'),
       },
     },
   },
