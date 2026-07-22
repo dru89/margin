@@ -92,7 +92,7 @@ export function Settings() {
                 {status === null
                   ? 'Checking…'
                   : status.connecting
-                    ? 'Waiting for approval in your browser…'
+                    ? 'Waiting for approval in your browser… Blocked or stuck? Your organization may require a different OAuth client — import it below, then retry.'
                     : status.connected
                       ? 'Connected — Margin can sync documents it creates or opens.'
                       : hasClient
