@@ -729,6 +729,26 @@ the README states the split explicitly. Revisit only if a
 non-technical CLI audience materializes (rclone-style obfuscated
 embedding is the known escape hatch).
 
+## 50. Parity pick-off: --share and pageless (issues #53/#54)
+
+Pageless is settable after all: `documentStyle.documentFormat.
+documentMode: PAGELESS` exists in the current API discovery document
+(checked directly rather than trusting memory — long-standing "the API
+can't do pageless" lore is stale). Created docs and pushTabs-created
+tabs default to pageless (reference behavior); updates never touch the
+mode — a user's deliberate flip must survive pushes. RT-1's corpus doc
+is now pageless, and the noop re-push still plans zero writes.
+
+Sharing deviates from the reference's `--share [domain]` optional-value
+flag: a value-taking `--share-domain` plus boolean `--share` avoids the
+domain-vs-filename ambiguity in argument parsing (domains and files
+both contain dots). The default domain rides a top-level
+`"share-domain"` key in the client config JSON, same paste-once pattern
+as `"scopes"` (§48). Role names are user-facing (viewer/commenter/
+editor) and map to Drive's reader/commenter/writer. Live-verified:
+permission lands with correct role + allowFileDiscovery; probe doc
+deleted.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:

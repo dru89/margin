@@ -7,7 +7,7 @@ const DOC_URL = `https://docs.google.com/document/d/${DOC_ID}/edit`;
 
 describe('parsePushArgs — target resolution before file reads', () => {
   it('documented single-doc form: push <file.md> <url>', () => {
-    expect(parsePushArgs(['notes.md', DOC_URL])).toEqual({
+    expect(parsePushArgs(['notes.md', DOC_URL])).toMatchObject({
       specs: ['notes.md'],
       target: DOC_ID,
       writeUrl: false,
@@ -25,7 +25,7 @@ describe('parsePushArgs — target resolution before file reads', () => {
   });
 
   it('no target: specs only, --write-url picked up', () => {
-    expect(parsePushArgs(['notes.md', '--write-url'])).toEqual({
+    expect(parsePushArgs(['notes.md', '--write-url'])).toMatchObject({
       specs: ['notes.md'],
       target: null,
       writeUrl: true,
@@ -89,5 +89,27 @@ describe('scopeHintLines — 403/404 advice matches what would actually fix it',
     expect(text.indexOf('org distributes')).toBeLessThan(text.indexOf('"scopes"'));
     expect(text).toContain('/home/u/.config/gdocs-sync');
     expect(text).toContain('scopes will not help');
+  });
+});
+
+describe('parsePushArgs — share/pageless flags (issues #53/#54)', () => {
+  it('value flags are not swallowed as file specs', () => {
+    const parsed = parsePushArgs(['notes.md', '--share', '--share-role', 'viewer', '--share-domain', 'hays.fm']);
+    expect(parsed.specs).toEqual(['notes.md']);
+    expect(parsed).toMatchObject({ share: true, shareRole: 'viewer', shareDomain: 'hays.fm' });
+  });
+
+  it('--share-domain alone implies --share; defaults otherwise', () => {
+    expect(parsePushArgs(['a.md', '--share-domain', 'x.com']).share).toBe(true);
+    expect(parsePushArgs(['a.md'])).toMatchObject({ share: false, searchable: true, pageless: true });
+  });
+
+  it('--no-searchable and --no-pageless flip their defaults', () => {
+    const parsed = parsePushArgs(['a.md', '--share', '--no-searchable', '--no-pageless']);
+    expect(parsed).toMatchObject({ searchable: false, pageless: false });
+  });
+
+  it('rejects a bad role', () => {
+    expect(() => parsePushArgs(['a.md', '--share-role', 'owner'])).toThrow(/viewer \| commenter \| editor/);
   });
 });
