@@ -7,6 +7,7 @@ export * from './gdoc.ts';
 export * from './auth.ts';
 export * from './share.ts';
 export * from './comments.ts';
+export * from './anchormap.ts';
 export * from './reader.ts';
 export * from './builder.ts';
 export * from './sync.ts';

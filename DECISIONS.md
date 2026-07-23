@@ -875,6 +875,32 @@ highlight), collaborator chip + Docs badge rendered; Reply on Doc
 landed on the Drive thread; resolve-with-sync marked it resolved
 there. Scratch Doc deleted.
 
+## 55. Quote mapper (#28): mdast-position segment map, ground-truth-driven
+
+`src/anchormap.ts` renders the document the way Docs sees it — block
+texts joined by '\n' (one join rule for paragraphs, list items, and
+callout body lines; probes A7/A10/A13 agree), syntax markers absent —
+while recording per-segment source offsets from mdast positions.
+Quote resolution searches the rendered stream and maps back; a
+normalization variant (curly→straight quotes, EN dash→`--` — A6's
+finding; the dash is EN, not em) is tried when the literal form
+misses. Soft-wrapped text inside `> `-prefixed blocks maps per line
+(value ≠ source slice there). Ranges may legitimately begin or end
+inside styling markers when the selection did (A2/A10) — those are
+valid source characters and Margin anchors them fine.
+
+Deliberate non-goals, documented rather than half-built: first
+occurrence wins (Drive supplies no context or position — the fixture
+itself demonstrated the collision when A9's quote matched my own
+instruction text); title/chips/image-captions/cross-cell selections
+orphan gracefully.
+
+Margin's import tries source-literal `resolveQuote` first (exact,
+cheap, and correct for plain-text quotes), the mapper second. All 15
+fixture probes resolve offline against the harvested ground truth;
+e2e in the app, a comment quoting across a bold span — previously an
+orphan — anchored to the source range including the `**` markers.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:

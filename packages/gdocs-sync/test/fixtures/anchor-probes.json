@@ -36,7 +36,7 @@
     "comment": "Comment on A9"
   },
   "A10": {
-    "quotedText": "style inside it [A8 — select: &quot;with style inside&quot;]\nthird",
+    "quotedText": "style inside it [A8 — select: \"with style inside\"]\nthird",
     "comment": "Comment on A10 (what happened to A9?)"
   },
   "A11": {
