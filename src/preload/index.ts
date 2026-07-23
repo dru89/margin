@@ -6,6 +6,7 @@ import type {
   DocState,
   FileProposal,
   GdocsAuthStatus,
+  GdocsSyncState,
   ProjectProposal,
   RecentFile,
   ReviewData,
@@ -65,6 +66,12 @@ const api = {
   gdocsDisconnect: (): Promise<void> => ipcRenderer.invoke(IPC.gdocsDisconnect),
   gdocsImportClient: (json?: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC.gdocsImportClient, json),
+  gdocsSyncState: (): Promise<GdocsSyncState> => ipcRenderer.invoke(IPC.gdocsSyncState),
+  gdocsShareCreate: (): Promise<{ error?: string }> => ipcRenderer.invoke(IPC.gdocsShareCreate),
+  gdocsPushDoc: (force: boolean): Promise<{ error?: string; conflict?: boolean; regions?: number }> =>
+    ipcRenderer.invoke(IPC.gdocsPushDoc, force),
+  gdocsUnlink: (): Promise<void> => ipcRenderer.invoke(IPC.gdocsUnlink),
+  openUrl: (url: string): Promise<void> => ipcRenderer.invoke(IPC.openUrl, url),
 
   onDocLoaded: (cb: (doc: DocState) => void) => on(IPC.docLoaded, cb),
   onReviewUpdated: (cb: (review: ReviewData) => void) => on(IPC.reviewUpdated, cb),
@@ -80,6 +87,7 @@ const api = {
   onMenuFormatTable: (cb: () => void) => on(IPC.menuFormatTable, cb),
   onMenuOpenSettings: (cb: () => void) => on(IPC.menuOpenSettings, cb),
   onGdocsAuthChanged: (cb: (status: GdocsAuthStatus) => void) => on(IPC.gdocsAuthChanged, cb),
+  onGdocsSyncChanged: (cb: (state: GdocsSyncState) => void) => on(IPC.gdocsSyncChanged, cb),
 };
 
 export type MarginApi = typeof api;

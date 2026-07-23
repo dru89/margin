@@ -4,7 +4,7 @@ import path from 'path';
 import { createWindow, openFile } from './windows';
 import { initMenu } from './menu';
 import { registerIpcHandlers } from './ipc';
-import { registerGdocsIpc } from './gdocs';
+import { registerGdocsIpc, registerGdocsSyncIpc } from './gdocs';
 import { initUpdater } from './updater';
 import { firstMarkdownIn } from './workspace';
 
@@ -78,6 +78,7 @@ if (!gotLock) {
     initMenu();
     registerIpcHandlers();
     registerGdocsIpc();
+    registerGdocsSyncIpc();
 
     const target = pendingFile ?? targetFromArgv(process.argv);
     if (target) void openTarget(path.resolve(target));

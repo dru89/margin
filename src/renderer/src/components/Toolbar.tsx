@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocked, useStore } from '@/store';
 import { History } from '@/components/History';
+import { GdocsMenu } from '@/components/GdocsMenu';
 
 export function Toolbar() {
   const doc = useStore((s) => s.doc);
@@ -87,6 +88,7 @@ export function Toolbar() {
           + Comment
         </button>
         <History inGitRepo={doc.inGitRepo} />
+        <GdocsMenu />
         {!doc.inGitRepo && (
           <button
             className="status-chip status-warn"

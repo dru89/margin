@@ -32,6 +32,11 @@ export const IPC = {
   gdocsCancelConnect: 'gdocs:cancel-connect',
   gdocsDisconnect: 'gdocs:disconnect',
   gdocsImportClient: 'gdocs:import-client',
+  gdocsSyncState: 'gdocs:sync-state',
+  gdocsShareCreate: 'gdocs:share-create',
+  gdocsPushDoc: 'gdocs:push-doc',
+  gdocsUnlink: 'gdocs:unlink',
+  openUrl: 'app:open-url',
 
   // renderer -> main (send)
   caretContext: 'doc:caret-context',
@@ -50,4 +55,5 @@ export const IPC = {
   menuFormatTable: 'menu:format-table',
   menuOpenSettings: 'menu:open-settings',
   gdocsAuthChanged: 'gdocs:auth-changed',
+  gdocsSyncChanged: 'gdocs:sync-changed',
 } as const;
