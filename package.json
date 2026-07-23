@@ -1,7 +1,7 @@
 {
   "name": "margin",
   "productName": "Margin",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Agent-assisted writing app — co-edit markdown documents with Claude in review rounds",
   "main": "./out/main/index.js",
   "author": "Drew Hays <drew@hays.fm>",
