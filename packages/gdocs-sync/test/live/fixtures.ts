@@ -18,3 +18,12 @@
  * text) round-trip. Recorded as a known API-level loss.
  */
 export const CP_ANCHORS_FIXTURE_DOC_ID = '1gRN3xsJ7nE_0DNOUnwYD_8jIQqnC_afv2P_54IZq1K4';
+
+/**
+ * Anchor-mapping fixture (#28): 15 hand-anchored comments over styled
+ * and structural targets (probes A1–A15; ground truth snapshot in
+ * test/fixtures/anchor-probes.json). READ-ONLY, never recreate — the
+ * UI-made anchors cannot be rebuilt by the API. Drew holds a decorated
+ * clone as backup.
+ */
+export const ANCHOR_MAPPING_FIXTURE_DOC_ID = '1n8EQhAkQ4bLnNjrVnTyWXh2GzQPWsIiLsgGB9kdiQPE';

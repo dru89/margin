@@ -142,3 +142,18 @@ describe('comments section emission (issue #52)', () => {
     expect(commentsSection([])).toBe('');
   });
 });
+
+describe('quotedText entity decoding (#28 ground truth)', () => {
+  it('decodes the HTML entities Drive escapes in quotedFileContent', async () => {
+    const { fetchComments } = await import('../src/comments.ts');
+    const raw = {
+      id: 'c1',
+      content: 'A10',
+      createdTime: 't',
+      quotedFileContent: { value: 'select: &quot;with style inside&quot; &amp; more &lt;x&gt;' },
+    };
+    const impl = (async () => new Response(JSON.stringify({ comments: [raw] }), { status: 200 })) as typeof fetch;
+    const [rec] = (await fetchComments(async () => 'tok', 'd', { fetchImpl: impl }))!;
+    expect(rec!.quotedText).toBe('select: "with style inside" & more <x>');
+  });
+});
