@@ -14,7 +14,7 @@ export function GdocsMenu() {
   const locked = useLocked();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [conflict, setConflict] = useState(false);
+  const [conflict, setConflict] = useState<'push' | 'pull' | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -31,7 +31,7 @@ export function GdocsMenu() {
 
   const reset = () => {
     setError(null);
-    setConflict(false);
+    setConflict(null);
     setNote(null);
   };
 
@@ -47,7 +47,7 @@ export function GdocsMenu() {
     reset();
     await save();
     const result = await window.margin.gdocsPushDoc(force);
-    if (result.conflict) setConflict(true);
+    if (result.conflict) setConflict('push');
     else if (result.error) setError(result.error);
     else
       setNote(
@@ -55,6 +55,15 @@ export function GdocsMenu() {
           ? 'Already up to date — nothing to push.'
           : `Pushed — ${result.regions} section${result.regions === 1 ? '' : 's'} updated.`,
       );
+  };
+
+  const pull = async (force: boolean) => {
+    reset();
+    await save(); // editor state becomes the file; local edits count as "changed"
+    const result = await window.margin.gdocsPullDoc(force);
+    if (result.conflict) setConflict('pull');
+    else if (result.error) setError(result.error);
+    else setNote(result.upToDate ? 'Already up to date.' : 'Pulled — the document was updated.');
   };
 
   const suggestionRefusal = error !== null && /pending suggested edits/.test(error);
@@ -111,6 +120,9 @@ export function GdocsMenu() {
                 >
                   {sync.busy ? 'Pushing…' : 'Push to Google Docs'}
                 </button>
+                <button className="btn" disabled={sync.busy || locked} onClick={() => void pull(false)}>
+                  Pull
+                </button>
                 <button
                   className="btn btn-ghost"
                   onClick={() => sync.docUrl && void window.margin.openUrl(sync.docUrl)}
@@ -124,15 +136,32 @@ export function GdocsMenu() {
                   are rewritten; comments on unchanged text survive.
                 </p>
               )}
-              {conflict && (
+              {conflict === 'push' && (
                 <div className="gdocs-warn">
                   <p>
                     The Google Doc changed since the last push — collaborators may have edited
                     it. Pushing will make it match this markdown, overwriting their text
-                    changes in edited blocks.
+                    changes in edited blocks. Pull first to bring their changes here instead.
                   </p>
-                  <button className="btn btn-danger" disabled={sync.busy} onClick={() => void push(true)}>
-                    Push anyway
+                  <div className="gdocs-row">
+                    <button className="btn" disabled={sync.busy} onClick={() => void pull(false)}>
+                      Pull first
+                    </button>
+                    <button className="btn btn-danger" disabled={sync.busy} onClick={() => void push(true)}>
+                      Push anyway
+                    </button>
+                  </div>
+                </div>
+              )}
+              {conflict === 'pull' && (
+                <div className="gdocs-warn">
+                  <p>
+                    This document changed locally since the last sync. Pulling will overwrite
+                    those local changes with the Doc's content. (A git checkpoint is made
+                    first, so History can restore them.)
+                  </p>
+                  <button className="btn btn-danger" disabled={sync.busy} onClick={() => void pull(true)}>
+                    Pull anyway
                   </button>
                 </div>
               )}

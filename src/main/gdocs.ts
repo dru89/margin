@@ -104,6 +104,7 @@ export function registerGdocsIpc(): void {
 import path from 'path';
 import {
   createFromMarkdown,
+  fetchAsMarkdown,
   updateFromMarkdown,
   getAccessToken,
   makeDocxStager,
@@ -232,6 +233,58 @@ export function registerGdocsSyncIpc(): void {
           lastSyncAt: new Date().toISOString(),
         });
         return { regions: plan.regions };
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : String(err) };
+      } finally {
+        busyDocs.delete(link.docId);
+        void pushStateTo(event);
+      }
+    },
+  );
+
+  // Pull: Doc → markdown → the local file, through the existing
+  // external-change path (the session watcher reloads a clean editor).
+  // Symmetric conflict rule: pulling reverts local edits, so any local
+  // movement since last sync asks first.
+  ipcMain.handle(
+    IPC.gdocsPullDoc,
+    async (
+      event,
+      force: boolean,
+    ): Promise<{ error?: string; conflict?: boolean; upToDate?: boolean }> => {
+      const session = getSession(event.sender.id);
+      if (!session) return { error: 'No document open' };
+      const rel = path.relative(session.workspaceRoot, session.filePath);
+      const link = await linkFor(session.workspaceRoot, rel);
+      if (!link) return { error: 'Not linked to a Google Doc' };
+      if (busyDocs.has(link.docId)) return {};
+      busyDocs.add(link.docId);
+      void pushStateTo(event);
+      try {
+        const current = await fsp.readFile(session.filePath, 'utf8');
+        if (!force && contentRef(current) !== link.baseRef) return { conflict: true };
+        if (session.inGitRepo) {
+          await commitCheckpoint(session.filePath, `Before pulling ${rel} from Google Docs`).catch(() => false);
+        }
+        const c = docsClient();
+        const markdown = await fetchAsMarkdown(c, link.docId, {
+          preserveFrontmatterFrom: current,
+        });
+        const revisionId = (await c.getDocument(link.docId)).revisionId ?? '';
+        const upToDate = markdown === current;
+        if (!upToDate) {
+          await fsp.writeFile(session.filePath, markdown, 'utf8');
+          if (session.inGitRepo) {
+            await commitCheckpoint(session.filePath, `Pulled ${rel} from Google Docs`).catch(() => false);
+          }
+        }
+        await upsertLink(session.workspaceRoot, {
+          ...link,
+          revisionId,
+          baseRef: contentRef(markdown),
+          lastSyncAt: new Date().toISOString(),
+        });
+        return { upToDate };
       } catch (err) {
         return { error: err instanceof Error ? err.message : String(err) };
       } finally {

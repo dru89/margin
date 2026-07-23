@@ -70,6 +70,8 @@ const api = {
   gdocsShareCreate: (): Promise<{ error?: string }> => ipcRenderer.invoke(IPC.gdocsShareCreate),
   gdocsPushDoc: (force: boolean): Promise<{ error?: string; conflict?: boolean; regions?: number }> =>
     ipcRenderer.invoke(IPC.gdocsPushDoc, force),
+  gdocsPullDoc: (force: boolean): Promise<{ error?: string; conflict?: boolean; upToDate?: boolean }> =>
+    ipcRenderer.invoke(IPC.gdocsPullDoc, force),
   gdocsUnlink: (): Promise<void> => ipcRenderer.invoke(IPC.gdocsUnlink),
   openUrl: (url: string): Promise<void> => ipcRenderer.invoke(IPC.openUrl, url),
 

@@ -35,6 +35,7 @@ export const IPC = {
   gdocsSyncState: 'gdocs:sync-state',
   gdocsShareCreate: 'gdocs:share-create',
   gdocsPushDoc: 'gdocs:push-doc',
+  gdocsPullDoc: 'gdocs:pull-doc',
   gdocsUnlink: 'gdocs:unlink',
   openUrl: 'app:open-url',
 
