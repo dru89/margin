@@ -813,6 +813,32 @@ clean pull applied + editor reloaded silently; both-sides-changed →
 pull ask → forced pull won with before/after checkpoints in git log;
 scratch Doc deleted after.
 
+## 53. Comments module: read + reply + resolve only, marker-exact emission
+
+`src/comments.ts` (#25) deliberately offers **no comment creation**:
+positioned comments are unsupported (anchor format opaque — lesson 6,
+issue #37), and unanchored creations would float uselessly; the safe
+upstream writes are reply and resolve-via-reply, exactly the spec's
+Reply-on-Doc boundary. Records carry `quotedText` prominently (it is
+what Margin's re-anchoring consumes) plus `anchored` as presence-only
+(orphaned and healthy are indistinguishable, #38). A 403/404 from the
+comments endpoint returns null — "unavailable" must not read as
+"none".
+
+The fetch surface (#52) emits the `## Comments` section wrapped in the
+exact `gpush:comments-*` markers the push side already strips
+(UMISC-1), pinned by an offline round-trip test: fetch-append → push
+strips to byte-identical input. The section's *content* format is ours
+(author — quote — status, replies as nested blockquote lines); only
+the markers are interop contract. `gdocs fetch` appends by default
+(`--no-comments` opts out; unavailable degrades to no section);
+`gdocs comments <url>` works on any Drive file id and prints or writes
+the bare list.
+
+Verified live: full fetch→reply→resolve loop on a scratch doc, and the
+durable fixture's hand-anchored threads parse (BULLSEYE's UI-made
+reply included). 156 offline tests; RT-1 green.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:

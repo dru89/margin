@@ -80,8 +80,13 @@ gdocs push notes.md --doc https://docs.google.com/document/d/<id>/edit
 gdocs push "Overview=overview.md" "Design=design.md" --doc <url>
 
 # Pull a doc back down as markdown (frontmatter is preserved/updated
-# if the output file already exists):
+# if the output file already exists). Collaborator comments append as
+# a marked ## Comments section that push strips again (--no-comments
+# to skip):
 gdocs fetch <url> notes.md
+
+# Just the comment threads (any Drive file), newest state:
+gdocs comments <url> [--unresolved-only] [out.md]
 
 # Pull a multi-tab doc: writes one file per tab plus a push-back spec:
 gdocs fetch <url> --tabs out-dir/
