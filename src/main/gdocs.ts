@@ -106,6 +106,7 @@ import {
   createFromMarkdown,
   fetchAsMarkdown,
   fetchComments,
+  mapRenderedQuote,
   replyToComment,
   resolveComment,
   updateFromMarkdown,
@@ -163,7 +164,9 @@ async function mergeDocComments(session: DocumentSession, docId: string, markdow
         continue;
       }
       const quote = record.quotedText ?? '';
-      const range = quote ? resolveQuote(markdown, quote) : null;
+      // Source-literal match first (cheap, exact); rendered→source
+      // mapping second (quotes spanning styling/markers — issue #28).
+      const range = quote ? (resolveQuote(markdown, quote) ?? mapRenderedQuote(markdown, quote)) : null;
       const anchor = range
         ? makeAnchor(markdown, range.from, range.to)
         : { from: 0, to: 0, quote, orphaned: true };

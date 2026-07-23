@@ -100,6 +100,12 @@ credentials).
 - [x] Comments on fetch + `gdocs comments` (#52): section wrapped in
       the gpush markers push already strips (round-trip pinned
       offline); CLI command with --unresolved-only and file output
+- [x] Rendered-quote → source mapping (#28): mdast-position segment
+      map; all 15 hand-anchored fixture probes resolve offline against
+      the harvested ground truth (styling, markers, '\n' joins,
+      autocorrect normalization incl. the EN-dash finding, per-line
+      mapping for '> '-prefixed continuations). First-occurrence
+      limitation documented (Drive gives no context).
 - [ ] Live tier remainder: META live (issue #33)
 
 Known warts remaining: UI-checked boxes whose text is not struck read
