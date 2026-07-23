@@ -1,0 +1,62 @@
+{
+  "A1": {
+    "quotedText": "before two bolded words and",
+    "comment": "Comment on A1"
+  },
+  "A2": {
+    "quotedText": "italic stre",
+    "comment": "Comment on A2"
+  },
+  "A3": {
+    "quotedText": "run gdocs push to",
+    "comment": "Comment on A3"
+  },
+  "A4": {
+    "quotedText": "the spec document for",
+    "comment": "Comment on A4"
+  },
+  "A5": {
+    "quotedText": "has struck out words in",
+    "comment": "Comment on A5"
+  },
+  "A6": {
+    "quotedText": "RETYPE THIS SENTENCE by hand in Docs so autocorrect fires: It doesn’t “just work” – yet.",
+    "comment": "Comment on A6\n(I'm not sure what we're testing here. Hopefully I typed it correctly.)"
+  },
+  "A7": {
+    "quotedText": "spanning selection.\nSecond short paragraph completing",
+    "comment": "Comment on A7"
+  },
+  "A8": {
+    "quotedText": "with style inside",
+    "comment": "Comment on A8"
+  },
+  "A9": {
+    "quotedText": "with bold text",
+    "comment": "Comment on A9"
+  },
+  "A10": {
+    "quotedText": "style inside it [A8 — select: &quot;with style inside&quot;]\nthird",
+    "comment": "Comment on A10 (what happened to A9?)"
+  },
+  "A11": {
+    "quotedText": "second numbered",
+    "comment": "Comment on A11"
+  },
+  "A12": {
+    "quotedText": "completed task with",
+    "comment": "Comment on A12"
+  },
+  "A13": {
+    "quotedText": "one sentence here.\nAnd a second body",
+    "comment": "Comment on A13"
+  },
+  "A14": {
+    "quotedText": "blockquote line for",
+    "comment": "Comment on A14"
+  },
+  "A15": {
+    "quotedText": "Heading Probe",
+    "comment": "Comment on A15"
+  }
+}

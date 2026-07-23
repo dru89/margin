@@ -67,6 +67,18 @@ interface RawComment {
   replies?: RawReply[];
 }
 
+// quotedFileContent.value arrives HTML-entity-encoded (ground truth:
+// the #28 fixture's A10 probe contains &quot;); comment content does
+// not. Decode the minimal entity set, ampersand last.
+function decodeEntities(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
 function authorOf(raw?: { displayName?: string; me?: boolean }): CommentAuthor {
   return { displayName: raw?.displayName ?? 'Unknown', me: raw?.me ?? false };
 }
@@ -76,7 +88,7 @@ function recordOf(raw: RawComment): CommentRecord {
     id: raw.id,
     content: raw.content ?? '',
     author: authorOf(raw.author),
-    quotedText: raw.quotedFileContent?.value ?? null,
+    quotedText: raw.quotedFileContent?.value != null ? decodeEntities(raw.quotedFileContent.value) : null,
     anchored: typeof raw.anchor === 'string' && raw.anchor.length > 0,
     resolved: raw.resolved ?? false,
     createdTime: raw.createdTime,
