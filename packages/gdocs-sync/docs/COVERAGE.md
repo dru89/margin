@@ -93,6 +93,13 @@ credentials).
       PAGELESS on doc create and on pushTabs-created tabs (never on
       update), offline + live read-back verified; RT-1 corpus doc is
       now pageless and still re-pushes zero writes
+- [x] Typed comments module (#25): fetch (paginated, quotedText +
+      anchor presence, 403/404 → null not empty), reply, resolve-via-
+      reply — offline request-shape tests + live loop on a scratch doc
+      + durable-fixture read (anchored threads incl. the human reply)
+- [x] Comments on fetch + `gdocs comments` (#52): section wrapped in
+      the gpush markers push already strips (round-trip pinned
+      offline); CLI command with --unresolved-only and file output
 - [ ] Live tier remainder: META live (issue #33)
 
 Known warts remaining: UI-checked boxes whose text is not struck read

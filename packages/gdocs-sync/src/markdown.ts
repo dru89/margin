@@ -18,7 +18,8 @@ import type {
 } from 'mdast';
 import type { CanonicalBlock, InlineSpan, ListItem } from './blocks.ts';
 
-const COMMENTS_START = '<!-- gpush:comments-start -->';
+export const COMMENTS_START = '<!-- gpush:comments-start -->';
+export const COMMENTS_END = '<!-- gpush:comments-end -->';
 
 /**
  * UMISC-1: strip the fetched-comments section (start marker → EOF)

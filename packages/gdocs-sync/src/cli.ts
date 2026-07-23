@@ -21,6 +21,7 @@ import { pathToFileURL } from 'node:url';
 import { authStatus, authorize, getAccessToken, loadClient, DRIVE_FILE_SCOPE, DRIVE_SCOPE } from './auth.ts';
 import { makeDocxStager } from './images.ts';
 import { shareDocument, type ShareRole } from './share.ts';
+import { commentsAsMarkdown, commentsSection, fetchComments } from './comments.ts';
 import { HttpDocsClient } from './gdoc.ts';
 import { docIdFromUrl } from './util.ts';
 import { splitFrontmatter, stripCommentsSection } from './markdown.ts';
@@ -268,8 +269,9 @@ async function cmdPush(args: string[]): Promise<void> {
 }
 
 async function cmdFetch(args: string[]): Promise<void> {
+  const withComments = !args.includes('--no-comments');
   const tabsFlag = args.indexOf('--tabs');
-  const rest = args.filter((_, i) => i !== tabsFlag);
+  const rest = args.filter((a, i) => i !== tabsFlag && a !== '--no-comments');
   const [ref, out] = rest;
   if (!ref) fail('fetch needs a doc URL or id');
   const docId = docIdFromUrl(ref);
@@ -295,9 +297,14 @@ async function cmdFetch(args: string[]): Promise<void> {
 
   // Fetch over an existing file preserves its unknown frontmatter keys.
   const existing = out ? await fs.readFile(out, 'utf8').catch(() => undefined) : undefined;
-  const markdown = await fetchAsMarkdown(c, docId, { preserveFrontmatterFrom: existing }).catch(
+  let markdown = await fetchAsMarkdown(c, docId, { preserveFrontmatterFrom: existing }).catch(
     (err) => explainOpenFailure(docId, err),
   );
+  if (withComments) {
+    // null = comments endpoint denied; degrade to no section (lesson 6).
+    const records = await fetchComments(async () => (await getAccessToken())!, docId);
+    if (records && records.length > 0) markdown += commentsSection(records);
+  }
   if (out) {
     await fs.writeFile(out, markdown, 'utf8');
     console.log(`wrote ${out}`);
@@ -327,8 +334,29 @@ export async function main(argv: string[]): Promise<void> {
       return cmdPush(rest);
     case 'fetch':
       return cmdFetch(rest);
+    case 'comments': {
+      const unresolvedOnly = rest.includes('--unresolved-only');
+      const positional = rest.filter((a) => !a.startsWith('--'));
+      const [ref, out] = positional;
+      if (!ref) fail('comments needs a Drive file URL or id');
+      const id = /\/d\/([A-Za-z0-9_-]{10,})/.exec(ref)?.[1] ?? docIdFromUrl(ref);
+      if (!id) fail(`not a Drive file reference: ${ref}`);
+      if (!(await getAccessToken())) fail('not authenticated — run `gdocs auth` first');
+      const records = await fetchComments(async () => (await getAccessToken())!, id, {
+        unresolvedOnly,
+      });
+      if (records === null) fail('comments are unavailable for this file (permission denied)');
+      const md = commentsAsMarkdown(records);
+      if (out) {
+        await fs.writeFile(out, md, 'utf8');
+        console.log(`wrote ${out}`);
+      } else {
+        console.log(md);
+      }
+      return;
+    }
     default:
-      console.log('usage: gdocs auth [--scope drive|drive.file] | push [--share [--share-domain d] [--share-role r] [--no-searchable]] [--no-pageless] <file.md|Title=file.md ...> [--doc <url>] [--write-url] | fetch <url> [out.md]');
+      console.log('usage: gdocs auth [--scope drive|drive.file] | push [--share [--share-domain d] [--share-role r] [--no-searchable]] [--no-pageless] <file.md|Title=file.md ...> [--doc <url>] [--write-url] | fetch <url> [out.md] [--no-comments] | comments <url> [out.md] [--unresolved-only]');
       process.exit(command ? 1 : 0);
   }
 }
