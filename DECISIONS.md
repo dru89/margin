@@ -784,6 +784,35 @@ checkpointed; incremental push reported "1 section updated"; a
 simulated collaborator edit (direct batchUpdate) tripped the conflict
 banner; force push succeeded; link state survives app restarts.
 
+## 52. Pull v0: through the external-change path, symmetric conflict ask
+
+Pull fetches the Doc as markdown (frontmatter preserved from the local
+file) and writes the file on disk; the session's existing watcher does
+the rest — a clean editor reloads silently, exactly the spec's "write
+through Margin's existing external-change path". The chip's Pull
+action saves first, so editor state becomes the file and any unsaved
+edits correctly count as local movement.
+
+The conflict rule mirrors §51's push side: pull reverts local edits,
+so any local change since last sync (contentRef vs baseRef) asks
+before proceeding — with the note that a git checkpoint precedes the
+overwrite, so History can restore. The push-conflict banner gained a
+"Pull first" action; in the both-changed case that lands on the pull
+ask next, which is honest (their edits or yours — something gets
+overwritten, and the checkpoints keep both recoverable).
+
+"Already up to date" still refreshes revisionId/baseRef/lastSyncAt —
+a noop pull re-bases conflict detection, so a doc-side styling change
+that fetches identically stops re-triggering the push ask.
+
+Comments import is deliberately absent (needs the typed comments
+module, #25); v0 pull is content only.
+
+Verified in-app against the real API: collaborator batchUpdate →
+clean pull applied + editor reloaded silently; both-sides-changed →
+pull ask → forced pull won with before/after checkpoints in git log;
+scratch Doc deleted after.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:
