@@ -49,7 +49,8 @@ jobs:
       # pacman target needs bsdtar for the .MTREE manifest
       - name: Install Linux build dependencies
         if: matrix.platform == 'linux'
-        run: sudo apt-get install -y libarchive-tools
+        # update first: stale mirror indexes 404 otherwise
+        run: sudo apt-get update && sudo apt-get install -y libarchive-tools
 
       # macOS signing + notarization are optional until the secrets exist:
       # with no CSC_LINK, electron-builder produces an unsigned build (fine
