@@ -37,6 +37,8 @@ export const IPC = {
   gdocsPushDoc: 'gdocs:push-doc',
   gdocsPullDoc: 'gdocs:pull-doc',
   gdocsUnlink: 'gdocs:unlink',
+  gdocsReplyOnDoc: 'gdocs:reply-on-doc',
+  gdocsResolveOnDoc: 'gdocs:resolve-on-doc',
   openUrl: 'app:open-url',
 
   // renderer -> main (send)

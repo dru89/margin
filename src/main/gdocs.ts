@@ -105,19 +105,85 @@ import path from 'path';
 import {
   createFromMarkdown,
   fetchAsMarkdown,
+  fetchComments,
+  replyToComment,
+  resolveComment,
   updateFromMarkdown,
   getAccessToken,
   makeDocxStager,
   mdToCanonicalWithMeta,
   HttpDocsClient,
+  type CommentRecord,
 } from '@dru89/gdocs-sync';
-import type { GdocsSyncState } from '@shared/types';
+import type { CommentThread, GdocsSyncState, Reply } from '@shared/types';
+import { makeAnchor, resolveQuote } from '@shared/anchors';
+import { nanoid } from 'nanoid';
+import type { DocumentSession } from './session';
 import { commitCheckpoint } from './git';
 import { getSession } from './session';
 import { contentRef, linkFor, removeLink, upsertLink } from './gdocsLinks';
 import { promises as fsp } from 'fs';
 
 const busyDocs = new Set<string>();
+
+const gdocsToken = async (): Promise<string> => (await getAccessToken())!;
+
+function importedReply(r: CommentRecord['replies'][number]): Reply {
+  return {
+    id: nanoid(8),
+    author: 'user',
+    text: r.content,
+    createdAt: r.createdTime,
+    collaborator: r.author.displayName,
+    driveReplyId: r.id,
+  };
+}
+
+/**
+ * Merge Doc comment threads into the review sidecar, append-only by
+ * Drive id (spec §Sync actions). New threads anchor by quoted text
+ * against the freshly pulled markdown; misses import as orphaned.
+ * Local (shadow) replies are untouched; a Doc-side resolve wins over a
+ * locally open imported thread. Runs inside pull — the same
+ * external-change moment that rewrites the file (DECISIONS §54).
+ */
+async function mergeDocComments(session: DocumentSession, docId: string, markdown: string): Promise<void> {
+  const records = await fetchComments(gdocsToken, docId);
+  if (records === null) return; // comments unavailable ≠ none — change nothing
+  await session.mutateReview((review) => {
+    for (const record of records) {
+      const existing = review.comments.find((t) => t.driveCommentId === record.id);
+      if (existing) {
+        const known = new Set(existing.replies.map((r) => r.driveReplyId).filter(Boolean));
+        for (const reply of record.replies) {
+          if (reply.content === '') continue; // bare action replies
+          if (!known.has(reply.id)) existing.replies.push(importedReply(reply));
+        }
+        if (record.resolved && existing.status === 'open') existing.status = 'resolved';
+        continue;
+      }
+      const quote = record.quotedText ?? '';
+      const range = quote ? resolveQuote(markdown, quote) : null;
+      const anchor = range
+        ? makeAnchor(markdown, range.from, range.to)
+        : { from: 0, to: 0, quote, orphaned: true };
+      const thread: CommentThread = {
+        id: nanoid(8),
+        author: 'user',
+        createdAt: record.createdTime,
+        text: record.content,
+        anchor,
+        replies: record.replies.filter((r) => r.content !== '').map(importedReply),
+        status: record.resolved ? 'resolved' : 'open',
+        provenance: 'imported',
+        driveCommentId: record.id,
+        collaborator: record.author.displayName,
+      };
+      review.comments.push(thread);
+    }
+  });
+}
+
 
 function docUrl(docId: string): string {
   return `https://docs.google.com/document/d/${docId}/edit`;
@@ -284,12 +350,60 @@ export function registerGdocsSyncIpc(): void {
           baseRef: contentRef(markdown),
           lastSyncAt: new Date().toISOString(),
         });
+        await mergeDocComments(session, link.docId, markdown).catch((err) =>
+          console.warn(`comment merge failed: ${err instanceof Error ? err.message : err}`),
+        );
         return { upToDate };
       } catch (err) {
         return { error: err instanceof Error ? err.message : String(err) };
       } finally {
         busyDocs.delete(link.docId);
         void pushStateTo(event);
+      }
+    },
+  );
+
+  // Reply on Doc: sends exactly the given text as a Drive reply under
+  // the user's account (spec §Comments — the only safe upstream write).
+  // The renderer owns review state and records the sent reply itself.
+  ipcMain.handle(
+    IPC.gdocsReplyOnDoc,
+    async (
+      event,
+      driveCommentId: string,
+      text: string,
+    ): Promise<{ error?: string; displayName?: string; driveReplyId?: string }> => {
+      const session = getSession(event.sender.id);
+      if (!session) return { error: 'No document open' };
+      const link = await linkFor(
+        session.workspaceRoot,
+        path.relative(session.workspaceRoot, session.filePath),
+      );
+      if (!link) return { error: 'Not linked to a Google Doc' };
+      try {
+        const reply = await replyToComment(gdocsToken, link.docId, driveCommentId, text);
+        return { displayName: reply.author.displayName, driveReplyId: reply.id };
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : String(err) };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC.gdocsResolveOnDoc,
+    async (event, driveCommentId: string): Promise<{ error?: string }> => {
+      const session = getSession(event.sender.id);
+      if (!session) return { error: 'No document open' };
+      const link = await linkFor(
+        session.workspaceRoot,
+        path.relative(session.workspaceRoot, session.filePath),
+      );
+      if (!link) return { error: 'Not linked to a Google Doc' };
+      try {
+        await resolveComment(gdocsToken, link.docId, driveCommentId);
+        return {};
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : String(err) };
       }
     },
   );
