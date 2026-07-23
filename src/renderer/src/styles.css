@@ -1404,3 +1404,37 @@ button.status-chip:active { transform: translateY(1px); }
   margin: 10px 0 0;
   line-height: 1.5;
 }
+
+/* ——— google docs chip + popover ——— */
+
+.status-chip.status-muted {
+  background: var(--paper-inset);
+  color: var(--ink-soft);
+}
+
+.gdocs-popover {
+  width: 300px;
+  display: grid;
+  gap: 10px;
+}
+
+.gdocs-row { display: flex; gap: 8px; align-items: center; }
+
+.gdocs-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+
+.gdocs-warn {
+  border: 1px solid color-mix(in srgb, var(--comment-edge) 50%, transparent);
+  background: var(--comment-wash);
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: grid;
+  gap: 8px;
+}
+.gdocs-warn p { margin: 0; font-size: 12px; line-height: 1.45; }
+
+.gdocs-unlink { justify-self: start; font-size: 12px; }

@@ -219,3 +219,12 @@ export interface GdocsAuthStatus {
 export interface AppSettingsState {
   projectsDir: string;
 }
+
+/** Google Docs link/push state for the focused document. */
+export interface GdocsSyncState {
+  linked: boolean;
+  docUrl?: string;
+  lastSyncAt?: string;
+  busy: boolean;
+  connected: boolean;
+}

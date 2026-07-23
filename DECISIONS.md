@@ -749,6 +749,41 @@ editor) and map to Drive's reader/commenter/writer. Live-verified:
 permission lands with correct role + allowFileDiscovery; probe doc
 deleted.
 
+## 51. Margin link + push v0: file↔Doc links, conflict-ask, push-created only
+
+First in-app sync surface (spec §Product model). Choices within it:
+
+**`.margin/gdocs.json`** follows the spec's shape with one deviation:
+`baseRef` is a sha256 content hash, not a git blob — identical
+detection power, and it works in workspaces without a repo (the git
+checkpoint calls remain conditional on `inRepo` for the same reason).
+
+**Linking is push-created only.** "Share to Google Docs" creates the
+Doc from the saved file (title = frontmatter/# lift, pageless, images
+staged). No link-by-URL in the app: under drive.file it only works for
+docs this client already touched, which in practice means docs the app
+created — the honest v0 is create-only, with the Picker (#46) as the
+future path to existing docs. (The CLI keeps --doc URL targeting; its
+users hold full-drive tokens more often.)
+
+**The conflict ask fires whenever the Doc's revision moved since last
+sync**, not only when both sides changed: push forces the Doc to match
+local markdown, so a collaborator's text edit would be reverted even if
+the local file is untouched — that always deserves a confirm. The
+banner says what will happen; "Push anyway" re-invokes with force.
+Pending-suggestion refusals surface the library's message plus an
+"open in Docs" pointer.
+
+**Push reads the saved file, not renderer state**: the chip's actions
+save first, then main reads from disk — one content authority, no new
+writer (the review-state ownership rule extends unchanged). Actions
+disable while an agent round runs.
+
+Verified in-app against the real API: share created+linked+
+checkpointed; incremental push reported "1 section updated"; a
+simulated collaborator edit (direct batchUpdate) tripped the conflict
+banner; force push succeeded; link state survives app restarts.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:
