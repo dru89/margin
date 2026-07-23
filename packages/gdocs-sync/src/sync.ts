@@ -396,6 +396,8 @@ async function applyBlocksAt(
 }
 
 export interface SyncOptions {
+  /** Set the created doc to pageless mode (default true; create only). */
+  pageless?: boolean;
   /** Directory for resolving relative image paths in the markdown. */
   baseDir?: string;
   /** Stages local image files (the temp-docx trick — images.makeDocxStager). */
@@ -412,6 +414,20 @@ export async function createFromMarkdown(
   const { meta, blocks } = mdToCanonicalWithMeta(markdown);
   let requestsSent = 0;
   let contentStart = 1;
+  // Pageless by default (issue #53/#54): reference-tool behavior; the
+  // mode is set once at creation and never touched on update (the user
+  // may flip it deliberately).
+  if (options?.pageless !== false) {
+    await client.batchUpdate(documentId, [
+      {
+        updateDocumentStyle: {
+          documentStyle: { documentFormat: { documentMode: 'PAGELESS' } },
+          fields: 'documentFormat',
+        },
+      },
+    ]);
+    requestsSent += 1;
+  }
   if (hasMeta(meta)) {
     const built = buildMetaRequests(meta, 1);
     const revision = await revisionOf(client, documentId);

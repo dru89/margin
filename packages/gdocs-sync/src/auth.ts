@@ -69,6 +69,9 @@ export interface ClientConfig {
   /** Default scopes to request, from a top-level "scopes" array in the
    * client JSON (user-added; Google's downloaded shape has none). */
   scopes?: string[];
+  /** Default domain for push --share, from a top-level "share-domain"
+   * key in the client JSON (user-added). */
+  shareDomain?: string;
 }
 
 interface TokenCache {
@@ -109,12 +112,14 @@ function parseClientConfig(raw: Record<string, unknown>, source: string): Client
     Array.isArray(raw.scopes) && raw.scopes.every((x) => typeof x === 'string')
       ? (raw.scopes as string[])
       : undefined;
+  const shareDomain = typeof raw['share-domain'] === 'string' ? raw['share-domain'] : undefined;
   return {
     clientId,
     clientSecret,
     authUri: installed.auth_uri ?? 'https://accounts.google.com/o/oauth2/auth',
     tokenUri: installed.token_uri ?? 'https://oauth2.googleapis.com/token',
     ...(scopes !== undefined ? { scopes } : {}),
+    ...(shareDomain !== undefined ? { shareDomain } : {}),
   };
 }
 

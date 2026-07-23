@@ -20,6 +20,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { authStatus, authorize, getAccessToken, loadClient, DRIVE_FILE_SCOPE, DRIVE_SCOPE } from './auth.ts';
 import { makeDocxStager } from './images.ts';
+import { shareDocument, type ShareRole } from './share.ts';
 import { HttpDocsClient } from './gdoc.ts';
 import { docIdFromUrl } from './util.ts';
 import { splitFrontmatter, stripCommentsSection } from './markdown.ts';
@@ -123,21 +124,40 @@ async function readSpec(spec: string): Promise<TabInput & { file: string }> {
  * `push <file.md> [url|docId]` form); everything else is a spec.
  * Throws on usage errors.
  */
+const PUSH_VALUE_FLAGS = new Set(['--doc', '--share-role', '--share-domain']);
+const SHARE_ROLES = new Set(['viewer', 'commenter', 'editor']);
+
 export function parsePushArgs(args: string[]): {
   specs: string[];
   target: string | null;
   writeUrl: boolean;
+  share: boolean;
+  shareDomain?: string;
+  shareRole?: ShareRole;
+  searchable: boolean;
+  pageless: boolean;
 } {
   const writeUrl = args.includes('--write-url');
-  const docFlag = args.indexOf('--doc');
-  const explicitDoc = docFlag !== -1 ? args[docFlag + 1] : undefined;
-  if (docFlag !== -1 && !explicitDoc) throw new Error('--doc requires a value');
+  const valueOf = (flag: string): string | undefined => {
+    const i = args.indexOf(flag);
+    if (i === -1) return undefined;
+    const v = args[i + 1];
+    if (!v || v.startsWith('--')) throw new Error(`${flag} requires a value`);
+    return v;
+  };
+  const explicitDoc = valueOf('--doc');
   let target = explicitDoc ? docIdFromUrl(explicitDoc) : null;
   if (explicitDoc && !target) throw new Error(`not a Google Doc reference: ${explicitDoc}`);
+  const shareRole = valueOf('--share-role');
+  if (shareRole && !SHARE_ROLES.has(shareRole)) {
+    throw new Error(`--share-role must be viewer | commenter | editor, got: ${shareRole}`);
+  }
+  const shareDomain = valueOf('--share-domain');
 
   const specs: string[] = [];
   for (const [i, a] of args.entries()) {
-    if (a.startsWith('--') || (docFlag !== -1 && i === docFlag + 1)) continue;
+    if (a.startsWith('--')) continue;
+    if (i > 0 && PUSH_VALUE_FLAGS.has(args[i - 1]!)) continue; // a flag's value
     const id = docIdFromUrl(a);
     if (id) {
       if (target) throw new Error('more than one doc target given');
@@ -147,7 +167,36 @@ export function parsePushArgs(args: string[]): {
     }
   }
   if (specs.length === 0) throw new Error('push needs at least one markdown file');
-  return { specs, target, writeUrl };
+  return {
+    specs,
+    target,
+    writeUrl,
+    share: args.includes('--share') || shareDomain !== undefined,
+    ...(shareDomain !== undefined ? { shareDomain } : {}),
+    ...(shareRole !== undefined ? { shareRole: shareRole as ShareRole } : {}),
+    searchable: !args.includes('--no-searchable'),
+    pageless: !args.includes('--no-pageless'),
+  };
+}
+
+/** Share the pushed doc to a domain; the default domain rides the client config. */
+async function shareTarget(
+  docId: string,
+  parsed: { shareDomain?: string; shareRole?: ShareRole; searchable: boolean },
+): Promise<void> {
+  const domain =
+    parsed.shareDomain ?? (await loadClient().then((c) => c.shareDomain, () => undefined));
+  if (!domain) {
+    fail(
+      'no share domain: pass --share-domain <domain> or add "share-domain" to the client JSON',
+    );
+  }
+  await shareDocument(async () => (await getAccessToken())!, docId, {
+    domain,
+    role: parsed.shareRole ?? 'commenter',
+    searchable: parsed.searchable,
+  });
+  console.log(`shared: ${domain} (${parsed.shareRole ?? 'commenter'})`);
 }
 
 async function cmdPush(args: string[]): Promise<void> {
@@ -179,11 +228,17 @@ async function cmdPush(args: string[]): Promise<void> {
         (err) => explainOpenFailure(id, err),
       );
       console.log(`updated: ${plan.regions} region(s), ${plan.requestsSent} request(s)`);
+      if (parsed.share) await shareTarget(id, parsed);
       console.log(`https://docs.google.com/document/d/${target}/edit`);
     } else {
-      const { documentId } = await createFromMarkdown(c, input.title, input.markdown, { baseDir, imageStager });
+      const { documentId } = await createFromMarkdown(c, input.title, input.markdown, {
+        baseDir,
+        imageStager,
+        pageless: parsed.pageless,
+      });
       const url = `https://docs.google.com/document/d/${documentId}/edit`;
       console.log(`created: ${url}`);
+      if (parsed.share) await shareTarget(documentId, parsed);
       if (writeUrl) {
         const { meta, body } = splitFrontmatter(input.markdown);
         void meta;
@@ -204,6 +259,7 @@ async function cmdPush(args: string[]): Promise<void> {
     baseDir: path.dirname(path.resolve(inputs[0]!.file)),
     imageStager: makeDocxStager(async () => (await getAccessToken())!),
   }).catch((err) => explainOpenFailure(id, err));
+  if (parsed.share) await shareTarget(id, parsed);
   for (const step of result.steps) console.log(`  ${step}`);
   for (const [title, plan] of Object.entries(result.perTab)) {
     console.log(`  ${title}: ${plan.requestsSent === 0 ? 'unchanged' : `${plan.requestsSent} request(s)`}`);
@@ -272,7 +328,7 @@ export async function main(argv: string[]): Promise<void> {
     case 'fetch':
       return cmdFetch(rest);
     default:
-      console.log('usage: gdocs auth [--scope drive|drive.file] | push <file.md|Title=file.md ...> [--doc <url>] [--write-url] | fetch <url> [out.md]');
+      console.log('usage: gdocs auth [--scope drive|drive.file] | push [--share [--share-domain d] [--share-role r] [--no-searchable]] [--no-pageless] <file.md|Title=file.md ...> [--doc <url>] [--write-url] | fetch <url> [out.md]');
       process.exit(command ? 1 : 0);
   }
 }

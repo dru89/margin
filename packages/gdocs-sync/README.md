@@ -85,7 +85,16 @@ gdocs fetch <url> notes.md
 
 # Pull a multi-tab doc: writes one file per tab plus a push-back spec:
 gdocs fetch <url> --tabs out-dir/
+
+# Share the pushed doc with your whole domain in the same step
+# (default role commenter; default domain from "share-domain" in the
+# client JSON):
+gdocs push notes.md --share
+gdocs push notes.md --share-domain example.com --share-role viewer --no-searchable
 ```
+
+Created docs are **pageless** by default (`--no-pageless` opts out);
+existing docs are never flipped.
 
 Frontmatter drives the title block: `title`, `subtitle`, `author` (or
 `authors`), `author-email`, and `date` become the doc's TITLE/SUBTITLE

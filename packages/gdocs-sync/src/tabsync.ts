@@ -144,6 +144,7 @@ export async function pushTabs(
   const plan = planTabs(titles, existing.map((t) => t.title));
   const steps: string[] = [];
 
+  const createdTitles = new Set<string>();
   for (const step of plan) {
     if (step.op === 'update') continue;
     if (step.op === 'rename') {
@@ -158,6 +159,7 @@ export async function pushTabs(
       steps.push(`rename:${step.from}→${step.to}`);
     } else if (step.op === 'create') {
       await client.batchUpdate(docId, [{ addDocumentTab: { tabProperties: { title: step.title } } }]);
+      createdTitles.add(step.title);
       steps.push(`create:${step.title}`);
     } else if (step.op === 'delete') {
       await client.batchUpdate(docId, [
@@ -169,6 +171,23 @@ export async function pushTabs(
 
   // Re-read: creates/deletes changed ids and order.
   existing = await readTabs(client, docId);
+
+  // New tabs default to paged; match the doc-creation default (issue
+  // #54). Only tabs this push created — never flip pre-existing ones.
+  if (options?.pageless !== false) {
+    for (const tab of existing) {
+      if (!createdTitles.has(tab.title)) continue;
+      await client.batchUpdate(docId, [
+        {
+          updateDocumentStyle: {
+            documentStyle: { documentFormat: { documentMode: 'PAGELESS' } },
+            fields: 'documentFormat',
+            tabId: tab.id,
+          },
+        },
+      ]);
+    }
+  }
 
   // Reorder to exactly the input order — one batchUpdate per move.
   for (let target = 0; target < titles.length; target++) {

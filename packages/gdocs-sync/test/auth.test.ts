@@ -242,3 +242,12 @@ describe('scope satisfaction + config scopes (issue #48)', () => {
     expect(consentScope).toBe('https://www.googleapis.com/auth/drive');
   });
 });
+
+describe('share-domain in the client JSON (issue #53)', () => {
+  it('parses a top-level share-domain key', async () => {
+    await saveClientConfig(
+      JSON.stringify({ clientId: 'a', clientSecret: 'b', 'share-domain': 'hays.fm' }),
+    );
+    expect((await loadClient()).shareDomain).toBe('hays.fm');
+  });
+});

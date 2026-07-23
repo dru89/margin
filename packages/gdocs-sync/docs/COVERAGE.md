@@ -86,6 +86,13 @@ credentials).
       multi-block bodies (paragraphs/lists/code; tables stay quotes),
       emoji fold-back on read, full-width chrome. In the RT-1 corpus.
       Chrome absorptions: bold inside titles, code langs in bodies.
+- [x] Domain sharing on push (#53): shareDocument via Drive
+      permissions.create, role mapping + allowFileDiscovery pinned
+      offline, live-verified against hays.fm
+- [x] Pageless on create (#54): updateDocumentStyle documentFormat
+      PAGELESS on doc create and on pushTabs-created tabs (never on
+      update), offline + live read-back verified; RT-1 corpus doc is
+      now pageless and still re-pushes zero writes
 - [ ] Live tier remainder: META live (issue #33)
 
 Known warts remaining: UI-checked boxes whose text is not struck read
