@@ -839,6 +839,42 @@ Verified live: full fetch→reply→resolve loop on a scratch doc, and the
 durable fixture's hand-anchored threads parse (BULLSEYE's UI-made
 reply included). 156 offline tests; RT-1 green.
 
+## 54. Sidebar comments import: provenance on threads, renderer-owned writes
+
+Imported Doc threads are ordinary `CommentThread`s with three optional
+fields (`provenance: 'imported'`, `driveCommentId`, `collaborator`)
+rather than a parallel type — they ride the existing anchor remapping,
+archive, and agent-round plumbing for free, and Claude sees them in
+review context automatically (spec §Agent integration) with the
+collaborator's name attached.
+
+**Merge happens inside pull only**, via `session.mutateReview` — the
+same external-change moment that rewrites the file, so the single-
+writer rule holds (the renderer saved just before, reloads just
+after). Append-only by Drive id: new threads anchor by `quotedText`
+against the fresh markdown (`resolveQuote` → `makeAnchor`; misses
+import as orphaned); known threads only gain unseen Drive replies
+(`driveReplyId` is the merge key); a Doc-side resolve closes a locally
+open imported thread; local shadow replies are never touched and never
+sync. `fetchComments` returning null (unavailable) changes nothing.
+
+**Upstream writes stay renderer-owned:** Reply-on-Doc and
+resolve-on-Doc IPC handlers only make the Drive call and return the
+result — the renderer records the sent reply through its normal
+`updateReview` path (`addDocReply`), so main never becomes a second
+review writer outside pull. Reply on Doc is a separate button on the
+same composer (spec: sends exactly the typed text, under the user's
+account); the card notes that plain replies stay in Margin. Resolving
+an imported thread offers "Margin only" or "here and on the Doc"
+(resolve-via-reply), defaulting to an explicit choice rather than a
+setting.
+
+Verified in-app against the real API: a Doc comment with a reply
+imported on pull, anchored to the right sentence (live editor
+highlight), collaborator chip + Docs badge rendered; Reply on Doc
+landed on the Drive thread; resolve-with-sync marked it resolved
+there. Scratch Doc deleted.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:

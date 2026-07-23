@@ -46,6 +46,8 @@ interface MarginState {
   addComment: (text: string) => void;
   addSuggestion: (replacement: string, note?: string) => void;
   replyToThread: (threadId: string, text: string) => void;
+  /** Record a reply that was just sent to the linked Google Doc thread. */
+  addDocReply: (threadId: string, text: string, driveReplyId: string) => void;
   setThreadStatus: (threadId: string, status: 'open' | 'resolved') => void;
   acceptSuggestion: (id: string) => void;
   rejectSuggestion: (id: string, comment?: string) => void;
@@ -330,6 +332,29 @@ export const useStore = create<MarginState>((set, get) => {
         ],
       }));
       set({ composerAnchor: null });
+    },
+
+    addDocReply: (threadId, text, driveReplyId) => {
+      updateReview((r) => ({
+        ...r,
+        comments: r.comments.map((c) =>
+          c.id === threadId
+            ? {
+                ...c,
+                replies: [
+                  ...c.replies,
+                  {
+                    id: nanoid(8),
+                    author: 'user' as const,
+                    text,
+                    createdAt: new Date().toISOString(),
+                    driveReplyId,
+                  },
+                ],
+              }
+            : c,
+        ),
+      }));
     },
 
     replyToThread: (threadId, text) => {

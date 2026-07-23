@@ -6,7 +6,8 @@ import { DiscussionDock } from '@/components/DiscussionDock';
 import { MentionTextarea } from '@/components/MentionTextarea';
 import { Md } from '@/components/Md';
 
-function AuthorChip({ author }: { author: 'user' | 'agent' }) {
+function AuthorChip({ author, collaborator }: { author: 'user' | 'agent'; collaborator?: string }) {
+  if (collaborator) return <span className="chip chip-collab">{collaborator}</span>;
   return <span className={`chip chip-${author}`}>{author === 'user' ? 'You' : 'Claude'}</span>;
 }
 
@@ -194,9 +195,28 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
   const setThreadStatus = useStore((s) => s.setThreadStatus);
   const pair = usePair(thread.id, thread.anchor);
   const [reply, setReply] = useState('');
+  const [resolveOpen, setResolveOpen] = useState(false);
+  const [sendingToDoc, setSendingToDoc] = useState(false);
+  const [docError, setDocError] = useState<string | null>(null);
+  const imported = thread.provenance === 'imported';
+  const addDocReply = useStore((s) => s.addDocReply);
 
   const sendReply = () => {
     replyTo(thread.id, reply);
+    setReply('');
+  };
+
+  const sendReplyOnDoc = async () => {
+    if (!thread.driveCommentId) return;
+    setSendingToDoc(true);
+    setDocError(null);
+    const result = await window.margin.gdocsReplyOnDoc(thread.driveCommentId, reply);
+    setSendingToDoc(false);
+    if (result.error) {
+      setDocError(result.error);
+      return;
+    }
+    addDocReply(thread.id, reply, result.driveReplyId!);
     setReply('');
   };
 
@@ -208,24 +228,67 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
       {...pair.props}
     >
       <div className="card-head">
-        <AuthorChip author={thread.author} />
-        <button
-          className="btn btn-ghost"
-          disabled={locked}
-          title="Resolve thread"
-          onClick={(e) => {
-            e.stopPropagation();
-            setThreadStatus(thread.id, 'resolved');
-          }}
-        >
-          ✓ Resolve
-        </button>
+        <AuthorChip author={thread.author} collaborator={thread.collaborator} />
+        {imported && <span className="chip chip-source" title="Imported from the linked Google Doc">Docs</span>}
+        {imported ? (
+          <span className="resolve-wrap">
+            <button
+              className="btn btn-ghost"
+              disabled={locked}
+              title="Resolve thread"
+              onClick={(e) => {
+                e.stopPropagation();
+                setResolveOpen(!resolveOpen);
+              }}
+            >
+              ✓ Resolve
+            </button>
+            {resolveOpen && (
+              <span className="popover resolve-popover" onClick={(e) => e.stopPropagation()}>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setResolveOpen(false);
+                    setThreadStatus(thread.id, 'resolved');
+                  }}
+                >
+                  Resolve in Margin only
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setResolveOpen(false);
+                    setThreadStatus(thread.id, 'resolved');
+                    void window.margin
+                      .gdocsResolveOnDoc(thread.driveCommentId!)
+                      .then((r) => r.error && setDocError(r.error));
+                  }}
+                >
+                  Resolve here and on the Doc
+                </button>
+              </span>
+            )}
+          </span>
+        ) : (
+          <button
+            className="btn btn-ghost"
+            disabled={locked}
+            title="Resolve thread"
+            onClick={(e) => {
+              e.stopPropagation();
+              setThreadStatus(thread.id, 'resolved');
+            }}
+          >
+            ✓ Resolve
+          </button>
+        )}
       </div>
       <Quote text={thread.anchor.quote} orphaned={thread.anchor.orphaned} />
       <Md text={thread.text} />
       {thread.replies.map((r) => (
         <div key={r.id} className="reply">
-          <AuthorChip author={r.author} />
+          <AuthorChip author={r.author} collaborator={r.collaborator} />
+          {r.driveReplyId && !r.collaborator && <span className="chip chip-source">Docs</span>}
           <Md text={r.text} />
         </div>
       ))}
@@ -241,7 +304,23 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
             Reply
           </button>
         )}
+        {imported && reply.trim() && (
+          <button
+            className="btn"
+            disabled={locked || sendingToDoc}
+            title="Send this exact text as a reply on the Google Doc thread, under your account"
+            onClick={() => void sendReplyOnDoc()}
+          >
+            {sendingToDoc ? 'Sending…' : 'Reply on Doc'}
+          </button>
+        )}
       </div>
+      {imported && (
+        <p className="gdocs-shadow-note">
+          Replies stay in Margin unless sent with “Reply on Doc”.
+        </p>
+      )}
+      {docError && <p className="gdocs-doc-error">{docError}</p>}
     </div>
   );
 }

@@ -21,6 +21,10 @@ export interface Reply {
   author: Author;
   text: string;
   createdAt: string;
+  /** Display name when this reply came from (or was sent to) the linked Google Doc. */
+  collaborator?: string;
+  /** Drive reply id — presence means it exists on the Doc (merge key). */
+  driveReplyId?: string;
 }
 
 export type ThreadStatus = 'open' | 'resolved';
@@ -33,6 +37,13 @@ export interface CommentThread {
   anchor: Anchor;
   replies: Reply[];
   status: ThreadStatus;
+  /** 'imported' = from the linked Google Doc (read-down; replies stay local
+   * unless explicitly sent via Reply on Doc). Absent = local. */
+  provenance?: 'local' | 'imported';
+  /** Drive comment id on imported threads (merge key + reply target). */
+  driveCommentId?: string;
+  /** Collaborator display name on imported threads. */
+  collaborator?: string;
 }
 
 export type SuggestionStatus = 'pending' | 'accepted' | 'rejected';

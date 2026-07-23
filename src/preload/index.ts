@@ -73,6 +73,13 @@ const api = {
   gdocsPullDoc: (force: boolean): Promise<{ error?: string; conflict?: boolean; upToDate?: boolean }> =>
     ipcRenderer.invoke(IPC.gdocsPullDoc, force),
   gdocsUnlink: (): Promise<void> => ipcRenderer.invoke(IPC.gdocsUnlink),
+  gdocsReplyOnDoc: (
+    driveCommentId: string,
+    text: string,
+  ): Promise<{ error?: string; displayName?: string; driveReplyId?: string }> =>
+    ipcRenderer.invoke(IPC.gdocsReplyOnDoc, driveCommentId, text),
+  gdocsResolveOnDoc: (driveCommentId: string): Promise<{ error?: string }> =>
+    ipcRenderer.invoke(IPC.gdocsResolveOnDoc, driveCommentId),
   openUrl: (url: string): Promise<void> => ipcRenderer.invoke(IPC.openUrl, url),
 
   onDocLoaded: (cb: (doc: DocState) => void) => on(IPC.docLoaded, cb),
