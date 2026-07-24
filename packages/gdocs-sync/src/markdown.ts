@@ -124,13 +124,23 @@ export function splitFrontmatter(markdown: string): {
 function spansOf(
   nodes: PhrasingContent[],
   inherit: Partial<InlineSpan> = {},
-  soft: 'space' | 'keep' = 'space',
+  soft: 'space' | 'lines' = 'space',
 ): InlineSpan[] {
   const out: InlineSpan[] = [];
   for (const node of nodes) {
     switch (node.type) {
       case 'text':
-        out.push({ ...inherit, text: soft === 'space' ? node.value.replace(/\n[ \t]*/g, ' ') : node.value });
+        // 'space': prose - soft breaks collapse. 'lines': quote and
+        // callout context - soft breaks are tight in-paragraph lines
+        // (vertical tab), while a plain newline is reserved for real
+        // paragraph joins.
+        out.push({
+          ...inherit,
+          text:
+            soft === 'space'
+              ? node.value.replace(/\n[ \t]*/g, ' ')
+              : node.value.replace(/\n[ \t]*/g, '\u000b'),
+        });
         break;
       case 'inlineCode':
         // UREAD-4 mirror: code styling suppresses other formatting.
@@ -249,7 +259,7 @@ function convertNodes(nodes: RootContent[]): CanonicalBlock[] {
         for (const child of node.children) {
           if (child.type === 'paragraph') {
             if (spans.length > 0) spans.push({ text: '\n' });
-            spans.push(...spansOf(child.children, {}, 'keep'));
+            spans.push(...spansOf(child.children, {}, 'lines'));
           }
         }
         blocks.push({ kind: 'blockquote', spans });
@@ -275,9 +285,9 @@ function convertNodes(nodes: RootContent[]): CanonicalBlock[] {
 function calloutFrom(node: import('mdast').Blockquote): CanonicalBlock | null {
   const first = node.children[0];
   if (first?.type !== 'paragraph') return null;
-  const spans = spansOf(first.children, {}, 'keep');
+  const spans = spansOf(first.children, {}, 'lines');
   const firstText = spans[0]?.text ?? '';
-  const m = /^\[!([A-Za-z-]+)\]([^\n]*)(\n?)/.exec(firstText);
+  const m = /^\[!([A-Za-z-]+)\]([^\n\u000b]*)([\n\u000b]?)/.exec(firstText);
   if (!m) return null;
 
   // Split the first paragraph: marker line → type/title; rest → body.
@@ -293,7 +303,7 @@ function calloutFrom(node: import('mdast').Blockquote): CanonicalBlock | null {
       firstBody.push(span);
       continue;
     }
-    const nl = span.text.indexOf('\n');
+    const nl = span.text.search(/[\n\u000b]/);
     if (nl === -1) {
       title.push(span);
     } else {

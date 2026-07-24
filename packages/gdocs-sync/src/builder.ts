@@ -40,6 +40,7 @@ import {
   rgb,
   spacingStyle,
   textStyleOf,
+  LINK_COLOR_HEX,
 } from './styles.ts';
 
 const QUOTE_INDENT = { magnitude: 36, unit: 'PT' };
@@ -185,13 +186,18 @@ export function restyleRequests(block: CanonicalBlock, startIndex: number): GDoc
     if (span.bold) (style.bold = true), fields.push('bold');
     if (span.italic) (style.italic = true), fields.push('italic');
     if (span.strike) (style.strikethrough = true), fields.push('strikethrough');
-    if (span.link) (style.link = { url: span.link }), fields.push('link');
+    if (span.link) {
+      style.link = { url: span.link };
+      style.foregroundColor = rgb(LINK_COLOR_HEX);
+      style.underline = true;
+      fields.push('link', 'foregroundColor', 'underline');
+    }
     if (fields.length === 0) continue;
     requests.push({
       updateTextStyle: {
         range: { startIndex: startIndex + start, endIndex: startIndex + end },
         textStyle: style,
-        fields: fields.join(','),
+        fields: [...new Set(fields)].join(','),
       },
     });
   }
@@ -228,13 +234,18 @@ function spanStyleRequests(
     if (span.bold) (style.bold = true), fields.push('bold');
     if (span.italic) (style.italic = true), fields.push('italic');
     if (span.strike) (style.strikethrough = true), fields.push('strikethrough');
-    if (span.link) (style.link = { url: span.link }), fields.push('link');
+    if (span.link) {
+      style.link = { url: span.link };
+      style.foregroundColor = rgb(LINK_COLOR_HEX);
+      style.underline = true;
+      fields.push('link', 'foregroundColor', 'underline');
+    }
     if (fields.length > 0 && end > at) {
       requests.push({
         updateTextStyle: {
           range: { startIndex: at, endIndex: end },
           textStyle: style,
-          fields: fields.join(','),
+          fields: [...new Set(fields)].join(','),
         },
       });
     }
@@ -511,7 +522,12 @@ export function buildSegment(
         // Multi-paragraph quotes: inner paragraphs 0/0, edges 10 —
         // same pattern as code blocks (issue #24).
         const multi = layout.block.spans.some((sp) => sp.text.includes('\n'));
-        Object.assign(style, spacingStyle(multi ? { beforePt: 0, afterPt: 0 } : QUOTE_SPACING));
+        // '\n' joins are real quote paragraphs now (lines are \u000b),
+        // so interior paragraphs keep normal after-spacing.
+        Object.assign(
+          style,
+          spacingStyle(multi ? { beforePt: 0, afterPt: BODY_SPACING.afterPt } : QUOTE_SPACING),
+        );
         style.indentStart = QUOTE_INDENT;
         style.indentFirstLine = QUOTE_INDENT;
         style.borderLeft = QUOTE_BORDER;
@@ -678,14 +694,16 @@ export function buildSegment(
       }
       if (span.link) {
         style.link = { url: span.link };
-        fields.push('link');
+        style.foregroundColor = rgb(LINK_COLOR_HEX);
+        style.underline = true;
+        fields.push('link', 'foregroundColor', 'underline');
       }
       if (fields.length === 0) continue;
       textStyles.push({
         updateTextStyle: {
           range: { startIndex: corrected(start), endIndex: corrected(end) },
           textStyle: style,
-          fields: fields.join(','),
+          fields: [...new Set(fields)].join(','),
         },
       });
     }

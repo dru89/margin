@@ -146,6 +146,7 @@ function variants(quote: string): string[] {
     .replace(/[“”]/g, '"')
     .replace(/—/g, '---')
     .replace(/–/g, '--')
+    .replace(/\u000b/g, '\n')
     .replace(/ /g, ' ');
   if (normalized !== quote) out.push(normalized);
   return out;
