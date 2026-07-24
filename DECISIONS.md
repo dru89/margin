@@ -960,6 +960,17 @@ instead of launching an OAuth flow. Unknown commands now print usage to
 stderr and exit 1 (was stdout). USAGE/HELP are the single source of
 truth for the text.
 
+## 58. Agent skill ships in the package (skills/gdocs/)
+
+The agent-facing SKILL.md for the `gdocs` CLI lives at
+`packages/gdocs-sync/skills/gdocs/`, not in a separate skills repo —
+`npx skills add` discovers a SKILL.md anywhere in a repo, and keeping
+the skill next to the CLI means it versions with the flag surface it
+documents (the reference tools' skills drifted from their CLIs more
+than once). The skill documents the pending-suggestions push refusal
+as an expected, recoverable state with explicit next steps, so agents
+treat the guardrail as workflow rather than a tool failure.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:
