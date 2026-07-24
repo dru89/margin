@@ -41,6 +41,9 @@ export function headingStyle(level: number): { look: TextLook; spacing: ParaSpac
 }
 
 export const CODE: TextLook = { font: 'Roboto Mono', sizePt: 11, colorHex: '188038' };
+/** Docs' default link look — the API's link field does NOT auto-apply it. */
+export const LINK_COLOR_HEX = '1155CC';
+
 export const CODE_SPACING: ParaSpacing = { beforePt: 0, afterPt: 2 };
 
 export const QUOTE_SPACING: ParaSpacing = { beforePt: 10, afterPt: 10 };

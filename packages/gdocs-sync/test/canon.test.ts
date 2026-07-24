@@ -156,7 +156,9 @@ describe('wart fixes (issue #24)', () => {
     if (blocks[0]!.kind !== 'blockquote') throw new Error('expected blockquote');
     expect(blocks[0]!.spans.map((s) => s.text).join('')).toBe('first line\nsecond line');
     // Matches the md side: a multi-paragraph quote is one block there too.
-    const md = markdownToBlocks('> first line\n> second line\n');
+    // Two doc paragraphs = two quote paragraphs: '>' spacer form.
+    // (Soft-wrapped '> a\n> b' is now ONE paragraph with a line break.)
+    const md = markdownToBlocks('> first line\n>\n> second line\n');
     expect(identity(blocks[0]!)).toBe(identity(md[0]!));
   });
 });
@@ -180,12 +182,17 @@ describe('soft line breaks (showcase-doc bugs, 2026-07-29)', () => {
     const { markdownToBlocks } = await import('../src/markdown.ts');
     const [q] = markdownToBlocks('> line one\n> line two\n');
     if (q!.kind !== 'blockquote') throw new Error('expected quote');
-    expect(q!.spans.map((s) => s.text).join('')).toBe('line one\nline two');
+    // Soft-wrapped quote lines are tight in-paragraph breaks (VT);
+    // '\n' is reserved for real paragraph joins ('>' spacer lines).
+    expect(q!.spans.map((s) => s.text).join('')).toBe('line one\u000bline two');
+    const [q2] = markdownToBlocks('> para one\n>\n> para two\n');
+    if (q2!.kind !== 'blockquote') throw new Error('expected quote');
+    expect(q2!.spans.map((s) => s.text).join('')).toBe('para one\npara two');
     const [c] = markdownToBlocks('> [!note] T\n> body line one\n> body line two\n');
     if (c!.kind !== 'callout') throw new Error('expected callout');
     const body = c!.body[0];
     if (body!.kind !== 'paragraph') throw new Error('expected body paragraph');
-    expect(body!.spans.map((s) => s.text).join('')).toBe('body line one\nbody line two');
+    expect(body!.spans.map((s) => s.text).join('')).toBe('body line one\u000bbody line two');
   });
 });
 

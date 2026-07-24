@@ -96,14 +96,19 @@ export function serializeBlocks(blocks: CanonicalBlock[]): string {
       case 'table':
         parts.push(serializeTable(block.rows));
         break;
-      case 'blockquote':
-        parts.push(
-          serializeSpans(block.spans)
-            .split('\n')
-            .map((l) => `> ${l}`)
-            .join('\n'),
-        );
+      case 'blockquote': {
+        // Lines ending in the hard-break marker ('  ') stay in the
+        // same quote paragraph; a bare newline is a paragraph join and
+        // gets a '>' spacer so it re-parses as two paragraphs.
+        const lines = serializeSpans(block.spans).split('\n');
+        const out: string[] = [];
+        for (const [i, l] of lines.entries()) {
+          out.push(`> ${l}`);
+          if (i < lines.length - 1 && !l.endsWith('  ')) out.push('>');
+        }
+        parts.push(out.join('\n'));
         break;
+      }
       case 'callout': {
         const head = `> [!${block.type}]${block.title.length > 0 ? ` ${serializeSpans(block.title)}` : ''}`;
         const bodyMd = block.body.length > 0 ? serializeBlocks(block.body).trimEnd() : '';
