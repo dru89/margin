@@ -39,6 +39,10 @@ Second paragraph so KEEP runs exist between block types.
 PLACEHOLDER_NOPE with a hard-wrapped
 continuation line that must stay one paragraph
 
+Forced line one  
+forced line two  
+forced line three, hard breaks in one paragraph
+
 > A quoted line of wisdom.
 > And a second quoted line.
 

@@ -188,3 +188,32 @@ describe('soft line breaks (showcase-doc bugs, 2026-07-29)', () => {
     expect(body!.spans.map((s) => s.text).join('')).toBe('body line one\nbody line two');
   });
 });
+
+
+describe('hard line breaks (two trailing spaces)', () => {
+  it('parse: hard break becomes an in-paragraph vertical tab', async () => {
+    const { markdownToBlocks } = await import('../src/markdown.ts');
+    const [p] = markdownToBlocks('line one  \nline two  \nline three\n');
+    if (p!.kind !== 'paragraph') throw new Error('expected ONE paragraph');
+    expect(p!.spans.map((s) => s.text).join('')).toBe('line one\u000bline two\u000bline three');
+  });
+
+  it('round-trip: vertical tab serializes back to a two-space hard break', async () => {
+    const { markdownToBlocks } = await import('../src/markdown.ts');
+    const { serializeBlocks } = await import('../src/serialize.ts');
+    const md = 'line one  \nline two\n';
+    const blocks = markdownToBlocks(md);
+    const out = serializeBlocks(blocks);
+    expect(out).toBe('line one  \nline two\n');
+    expect(markdownToBlocks(out)).toEqual(blocks);
+  });
+
+  it('soft wrap and hard break coexist in one paragraph', async () => {
+    const { markdownToBlocks } = await import('../src/markdown.ts');
+    const [p] = markdownToBlocks('soft wrapped\nline then hard  \nbreak line\n');
+    if (p!.kind !== 'paragraph') throw new Error('expected paragraph');
+    expect(p!.spans.map((s) => s.text).join('')).toBe(
+      'soft wrapped line then hard\u000bbreak line',
+    );
+  });
+});

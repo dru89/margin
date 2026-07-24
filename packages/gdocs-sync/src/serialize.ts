@@ -34,7 +34,9 @@ function serializeSpan(span: InlineSpan): string {
 }
 
 export function serializeSpans(spans: InlineSpan[]): string {
-  return spans.map(serializeSpan).join('');
+  // Vertical tabs (in-paragraph line breaks) serialize as markdown
+  // hard breaks: two trailing spaces before the newline.
+  return spans.map(serializeSpan).join('').replace(/\u000b/g, '  \n');
 }
 
 function serializeListItem(item: ListItem, ordinal: number): string {
