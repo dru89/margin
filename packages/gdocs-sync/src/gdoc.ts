@@ -45,7 +45,14 @@ export interface GDocStructuralElement {
   table?: {
     rows?: number;
     columns?: number;
-    tableRows?: { tableCells?: { content?: GDocStructuralElement[] }[] }[];
+    tableRows?: {
+      tableCells?: {
+        content?: GDocStructuralElement[];
+        tableCellStyle?: {
+          backgroundColor?: { color?: { rgbColor?: { red?: number; green?: number; blue?: number } } };
+        };
+      }[];
+    }[];
   };
   sectionBreak?: unknown;
 }

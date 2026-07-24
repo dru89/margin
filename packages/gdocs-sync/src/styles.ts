@@ -61,7 +61,9 @@ export const QUOTE_BORDER = {
 export const TABLE_STYLE = {
   border: { widthPt: 0.5, colorHex: 'BFBFBF' },
   /** dxa 40/115 → pt. */
-  padding: { topPt: 2, bottomPt: 2, leftPt: 5.75, rightPt: 5.75 },
+  // Bumped from the reference-extracted 2/5.75 — cells read cramped in
+  // Docs' rendering (issue #63).
+  padding: { topPt: 4, bottomPt: 4, leftPt: 7.5, rightPt: 7.5 },
   header: {
     backgroundHex: 'F2F2F2',
     textColorHex: '333333',
@@ -100,13 +102,23 @@ export function spacingStyle(spacing: ParaSpacing): Record<string, unknown> {
 }
 
 /** Callout chrome (issue #40): emoji + tint per canonical type. */
-export const CALLOUTS: Record<string, { emoji: string; tintHex: string }> = {
-  info: { emoji: 'ℹ️', tintHex: 'E8F0FE' },
-  tip: { emoji: '💡', tintHex: 'E6F4EA' },
-  important: { emoji: '❗', tintHex: 'F3E8FD' },
-  warning: { emoji: '⚠️', tintHex: 'FEF7E0' },
-  danger: { emoji: '🛑', tintHex: 'FCE8E6' },
+/**
+ * Callout chrome (issue #40, restyled per feedback): no emoji — the
+ * tint background is the machine-readable type signal on read, the
+ * saturated accent colors the left border and the bold title.
+ */
+export const CALLOUTS: Record<string, { tintHex: string; accentHex: string }> = {
+  info: { tintHex: 'E8F0FE', accentHex: '1967D2' },
+  tip: { tintHex: 'E6F4EA', accentHex: '188038' },
+  important: { tintHex: 'F3E8FD', accentHex: '7627BB' },
+  warning: { tintHex: 'FEF7E0', accentHex: 'B05A00' },
+  danger: { tintHex: 'FCE8E6', accentHex: 'C5221F' },
 };
+
+/** Default (and fold-back) title for a callout with none in markdown. */
+export function calloutTitleFor(type: string): string {
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
 
 /** Aliases fold to canonical types; unknown types become info. */
 export function calloutType(raw: string): string {
