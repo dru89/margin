@@ -21,7 +21,7 @@ describe('UWIDTH — reference column-sizing algorithm (conventions @ ad145b3)',
     ];
     const widths = planColumnWidths(rows);
     // 80th percentile of body lengths (nine 5s, one 53) = 5 → one-line tier.
-    expect(widths[0]).toBe(Math.round(5 * 6.2 + 14));
+    expect(widths[0]).toBe(Math.round(5 * 6.2 + 18)); // PADDING_PT derived from cell padding (7.5×2+3)
   });
 
   it('UWIDTH-2: wrap tier for long-text columns (26·√typical − 20), word floor holds', () => {
