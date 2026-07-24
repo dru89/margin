@@ -15,7 +15,7 @@
  * `#` heading → frontmatter title → filename stem), argument order =
  * tab order.
  */
-import { promises as fs } from 'node:fs';
+import { promises as fs, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { authStatus, authorize, getAccessToken, loadClient, DRIVE_FILE_SCOPE, DRIVE_SCOPE } from './auth.ts';
@@ -313,8 +313,76 @@ async function cmdFetch(args: string[]): Promise<void> {
   }
 }
 
+const USAGE = `gdocs — markdown ↔ Google Docs sync
+
+usage:
+  gdocs auth [--scope drive|drive.file]
+  gdocs push <file.md|Title=file.md ...> [--doc <url>] [options]
+  gdocs fetch <url|docId> [out.md] [--tabs] [--no-comments]
+  gdocs comments <url|docId> [out.md] [--unresolved-only]
+
+Run \`gdocs <command> --help\` for command-specific options.`;
+
+const HELP: Record<string, string> = {
+  auth: `gdocs auth [--scope drive|drive.file|<full-url>]
+
+Authorize with Google (loopback + PKCE) and cache a token.
+
+  --scope drive       full Drive access
+          drive.file  only files this tool created or opened (default)
+          <url>       an explicit scope URL
+
+The default scope comes from the client JSON's "scopes" array, else
+drive.file.`,
+
+  push: `gdocs push <file.md|Title=file.md ...> [--doc <url|docId>] [options]
+
+Create or update a Google Doc from markdown. One file creates or updates a
+single doc; multiple "Title=file.md" specs push tabs into one doc.
+
+Target resolution: --doc, else a bare url/docId argument, else the first
+file's frontmatter \`url:\`.
+
+  --doc <url|docId>     target doc (required for multi-tab push)
+  --write-url          write the created doc's url into the file's frontmatter
+  --share              share the doc (domain from the client config)
+  --share-domain <d>   share to domain d (implies --share)
+  --share-role <r>     viewer | commenter | editor (default: commenter)
+  --no-searchable      don't make the shared doc searchable
+  --no-pageless        create in paged mode instead of pageless`,
+
+  fetch: `gdocs fetch <url|docId> [out.md] [options]
+
+Fetch a Google Doc as markdown. Writes to out.md, or stdout if omitted.
+
+  --tabs         one file per top-level tab (out is treated as a directory)
+  --no-comments  omit the trailing comments section`,
+
+  comments: `gdocs comments <url|docId> [out.md] [--unresolved-only]
+
+Print a document's comments as markdown (to out.md, or stdout if omitted).
+
+  --unresolved-only   only comments that aren't resolved`,
+};
+
+const isHelpFlag = (a: string): boolean => a === '--help' || a === '-h';
+
 export async function main(argv: string[]): Promise<void> {
   const [command, ...rest] = argv;
+
+  // Top-level help: `gdocs`, `gdocs --help`, `gdocs help [command]`.
+  if (command === undefined || isHelpFlag(command) || command === 'help') {
+    const topic = command === 'help' ? rest[0] : undefined;
+    console.log(topic && HELP[topic] ? HELP[topic] : USAGE);
+    return;
+  }
+  // Per-command help, intercepted before the command runs so that e.g.
+  // `gdocs auth --help` prints help instead of attempting to authorize.
+  if (HELP[command] && rest.some(isHelpFlag)) {
+    console.log(HELP[command]);
+    return;
+  }
+
   switch (command) {
     case 'auth': {
       // --scope drive|drive.file|<full url>; default = client JSON's
@@ -356,12 +424,26 @@ export async function main(argv: string[]): Promise<void> {
       return;
     }
     default:
-      console.log('usage: gdocs auth [--scope drive|drive.file] | push [--share [--share-domain d] [--share-role r] [--no-searchable]] [--no-pageless] <file.md|Title=file.md ...> [--doc <url>] [--write-url] | fetch <url> [out.md] [--no-comments] | comments <url> [out.md] [--unresolved-only]');
-      process.exit(command ? 1 : 0);
+      console.error(`gdocs: unknown command: ${command}\n\n${USAGE}`);
+      process.exit(1);
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// process.argv[1] is the path used to invoke us; when installed as a
+// global bin it's a symlink into node_modules, while import.meta.url is
+// the resolved real path. Compare realpaths so the guard holds under npm's
+// symlinked bin (issue #72) — direct `node src/cli.ts` runs still match.
+function invokedDirectly(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return import.meta.url === pathToFileURL(realpathSync(entry)).href;
+  } catch {
+    return import.meta.url === pathToFileURL(entry).href;
+  }
+}
+
+if (invokedDirectly()) {
   main(process.argv.slice(2)).catch((err) => {
     console.error(err instanceof Error ? err.message : err);
     process.exit(1);
