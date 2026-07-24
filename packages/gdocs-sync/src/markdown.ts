@@ -149,7 +149,10 @@ function spansOf(
         out.push(...spansOf(node.children, { ...inherit, link: node.url }, soft));
         break;
       case 'break':
-        out.push({ ...inherit, text: '\n' });
+        // Hard break (trailing two spaces / backslash): a line break
+        // WITHIN the paragraph — Docs' vertical tab (Shift+Enter), so
+        // no paragraph spacing appears between the lines.
+        out.push({ ...inherit, text: '\u000b' });
         break;
       case 'image':
         // Mixed-in images become image spans (issue #23); one U+FFFC
