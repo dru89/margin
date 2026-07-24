@@ -941,6 +941,25 @@ first paragraph, 4pt below the last, middle paragraphs keep the body
 default 10pt gaps — replaces the bottom-heavy look from the trailing
 paragraph's default after-spacing.
 
+## 57. CLI entry guard uses realpath; real --help handling (#72)
+
+The `gdocs` CLI returned nothing for every command when installed
+globally — `npm i -g` links the bin as a symlink, and the entry guard
+compared `import.meta.url` (which ESM resolves through the symlink to
+the real file) against `pathToFileURL(process.argv[1])` (which keeps
+the symlink path). They never matched, so `main()` never ran; exit 0,
+no output, including `gdocs fetch <url>`. It only worked in dev because
+`node src/cli.ts` invokes the real path directly. Fix: realpath
+`process.argv[1]` before comparing (`invokedDirectly()`), with a
+try/catch fallback to the raw path so a broken/missing entry can't throw.
+
+While here, added real help: `--help`/`-h`/`help [command]` and
+per-command `<cmd> --help`, all exit 0; the per-command check is
+intercepted before the command body so `gdocs auth --help` prints help
+instead of launching an OAuth flow. Unknown commands now print usage to
+stderr and exit 1 (was stdout). USAGE/HELP are the single source of
+truth for the text.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:

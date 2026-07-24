@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { parsePushArgs, scopeHintLines } from '../src/cli.ts';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { main, parsePushArgs, scopeHintLines } from '../src/cli.ts';
 import { DRIVE_FILE_SCOPE, DRIVE_SCOPE } from '../src/auth.ts';
 
 const DOC_ID = '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdefg';
@@ -111,5 +111,37 @@ describe('parsePushArgs — share/pageless flags (issues #53/#54)', () => {
 
   it('rejects a bad role', () => {
     expect(() => parsePushArgs(['a.md', '--share-role', 'owner'])).toThrow(/viewer \| commenter \| editor/);
+  });
+});
+
+describe('main — help handling (#72)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const capture = async (argv: string[]): Promise<string> => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await main(argv);
+    return log.mock.calls.map((c) => String(c[0])).join('\n');
+  };
+
+  it('bare invocation, --help, and -h all print top-level usage', async () => {
+    for (const argv of [[], ['--help'], ['-h']]) {
+      expect(await capture(argv)).toMatch(/markdown ↔ Google Docs sync/);
+    }
+  });
+
+  it('per-command --help prints that command, not the top-level usage', async () => {
+    expect(await capture(['push', '--help'])).toMatch(/multiple "Title=file\.md" specs/);
+    expect(await capture(['fetch', '--help'])).toMatch(/one file per top-level tab/);
+    expect(await capture(['comments', '--help'])).toMatch(/comments that aren't resolved/);
+  });
+
+  it('auth --help prints help instead of starting an OAuth flow', async () => {
+    // If the guard failed, main() would call authorize() and hang/throw
+    // rather than return. Reaching the assertion is itself the test.
+    expect(await capture(['auth', '--help'])).toMatch(/loopback \+ PKCE/);
+  });
+
+  it('help <command> is an alias for <command> --help', async () => {
+    expect(await capture(['help', 'push'])).toMatch(/gdocs push/);
   });
 });
