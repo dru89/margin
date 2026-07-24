@@ -100,7 +100,9 @@ export function buildAnchorMap(markdown: string): AnchorMap {
         // accuracy is unnecessary.
         pushText(value, start, end, false);
       } else if (markdown.slice(start, end) === value) {
-        pushText(value, start, end, true);
+        // Soft breaks render as spaces in prose (same length — the
+        // 1:1 positional mapping holds).
+        pushText(value.replace(/\n/g, ' '), start, end, true);
       } else {
         // Value ≠ source slice: soft-wrapped text inside blockquotes/
         // callouts carries '> ' prefixes (and lists their indents) in

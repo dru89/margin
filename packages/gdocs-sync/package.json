@@ -1,6 +1,6 @@
 {
   "name": "@dru89/gdocs-sync",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Markdown <-> Google Docs sync engine and CLI: incremental push, high-fidelity fetch, comments-safe updates, tabs, images, callouts. Built against the dru89/doc-tools scenario catalog.",
   "type": "module",
   "main": "dist/index.js",

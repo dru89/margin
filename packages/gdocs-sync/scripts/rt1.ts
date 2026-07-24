@@ -34,7 +34,10 @@ Second paragraph so KEEP runs exist between block types.
 | apple | 3 |
 | watermelon | 12 |
 
-PLACEHOLDER_NOPE
+## Heading after the table
+
+PLACEHOLDER_NOPE with a hard-wrapped
+continuation line that must stay one paragraph
 
 > A quoted line of wisdom.
 > And a second quoted line.

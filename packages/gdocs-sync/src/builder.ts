@@ -575,6 +575,12 @@ export function buildSegment(
   // below the table (tables themselves can't carry spacing).
   if (opts.leadingSpaceAbovePt !== undefined && layouts.length > 0) {
     const firstLayout = layouts[0]!;
+    // A block with its own before-spacing (headings) keeps the larger
+    // of the two — the after-table gap is a floor, not an override.
+    const naturalBefore =
+      firstLayout.block.kind === 'heading'
+        ? headingStyle(firstLayout.block.level).spacing.beforePt
+        : 0;
     let firstParaEnd = firstLayout.end;
     if (firstLayout.block.kind === 'code') {
       firstParaEnd = firstLayout.start + firstLayout.block.text.split('\n')[0]!.length + 1;
@@ -584,7 +590,7 @@ export function buildSegment(
     paraStyles.push({
       updateParagraphStyle: {
         range: { startIndex: corrected(firstLayout.start), endIndex: corrected(firstParaEnd) },
-        paragraphStyle: { spaceAbove: { magnitude: opts.leadingSpaceAbovePt, unit: 'PT' } },
+        paragraphStyle: { spaceAbove: { magnitude: Math.max(opts.leadingSpaceAbovePt, naturalBefore), unit: 'PT' } },
         fields: 'spaceAbove',
       },
     });
