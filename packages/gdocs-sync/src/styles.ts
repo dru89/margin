@@ -111,7 +111,7 @@ export const CALLOUTS: Record<string, { tintHex: string; accentHex: string }> = 
   info: { tintHex: 'E8F0FE', accentHex: '1967D2' },
   tip: { tintHex: 'E6F4EA', accentHex: '188038' },
   important: { tintHex: 'F3E8FD', accentHex: '7627BB' },
-  warning: { tintHex: 'FEF7E0', accentHex: 'B05A00' },
+  warning: { tintHex: 'FEF7E0', accentHex: '8A4A00' }, // deeper than B05A00 — amber on pale yellow read muddy
   danger: { tintHex: 'FCE8E6', accentHex: 'C5221F' },
 };
 
