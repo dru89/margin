@@ -85,7 +85,10 @@ export function createWindow(filePath?: string): BrowserWindow {
     if (template.length > 0) Menu.buildFromTemplate(template).popup({ window: win });
   });
 
-  win.on('closed', () => dropSession(win.webContents.id));
+  // Capture the id now: by the time 'closed' fires (e.g. on Cmd-Q),
+  // win.webContents is destroyed and accessing it throws (issue #66).
+  const contentsId = win.webContents.id;
+  win.on('closed', () => dropSession(contentsId));
 
   if (process.env.ELECTRON_RENDERER_URL) {
     win.loadURL(process.env.ELECTRON_RENDERER_URL);
