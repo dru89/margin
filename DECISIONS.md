@@ -929,7 +929,11 @@ those shrink to 6pt/zero-spacing instead, which the reader ignores
 (empty paragraphs drop). Callout boxes lose their trailing blank via
 omitTrailingNewline into the cell's own final paragraph. Table cell
 padding bumped 2/5.75 → 4/7.5pt (deliberate deviation from the
-reference extraction; Docs renders the original cramped).
+reference extraction; Docs renders the original cramped). Cell
+paragraph spacing bookends (Drew's hand-tuned values): 4pt above the
+first paragraph, 4pt below the last, middle paragraphs keep the body
+default 10pt gaps — replaces the bottom-heavy look from the trailing
+paragraph's default after-spacing.
 
 ## Verification status (honest accounting)
 

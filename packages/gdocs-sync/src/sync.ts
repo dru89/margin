@@ -237,18 +237,39 @@ async function applyBlocksAt(
       });
       await client.batchUpdate(docId, segment.requests, doc0.revisionId);
       written += segment.requests.length;
-      if (titleLen > 0) {
-        await client.batchUpdate(docId, [
-          {
-            updateTextStyle: {
-              range: { startIndex: cellStart, endIndex: cellStart + titleLen },
-              textStyle: { foregroundColor: rgb(chrome.accentHex) },
-              fields: 'foregroundColor',
-            },
+      // Cell spacing bookends (beta feedback): 4pt above the first
+      // paragraph and 4pt below the last, replacing the body default
+      // 10pt after-spacing that made the box bottom-heavy. Middle
+      // paragraphs keep their normal 10pt gaps. One-char ranges pick
+      // the paragraph without touching namedStyleType (SI-2).
+      const cellEnd = cellStart + segment.insertedLength;
+      const spacingRequests: GDocRequest[] = [
+        {
+          updateParagraphStyle: {
+            range: { startIndex: cellStart, endIndex: cellStart + 1 },
+            paragraphStyle: { spaceAbove: { magnitude: 4, unit: 'PT' } },
+            fields: 'spaceAbove',
           },
-        ]);
-        written += 1;
+        },
+        {
+          updateParagraphStyle: {
+            range: { startIndex: Math.max(cellEnd - 1, cellStart), endIndex: cellEnd },
+            paragraphStyle: { spaceBelow: { magnitude: 4, unit: 'PT' } },
+            fields: 'spaceBelow',
+          },
+        },
+      ];
+      if (titleLen > 0) {
+        spacingRequests.push({
+          updateTextStyle: {
+            range: { startIndex: cellStart, endIndex: cellStart + titleLen },
+            textStyle: { foregroundColor: rgb(chrome.accentHex) },
+            fields: 'foregroundColor',
+          },
+        });
       }
+      await client.batchUpdate(docId, spacingRequests);
+      written += spacingRequests.length;
       // Chrome: tint, padding, accent left border, full page width.
       const tStart = { index: tableEl.startIndex };
       const border = {
