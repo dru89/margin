@@ -103,3 +103,30 @@ describe('UBUILD — request builder', () => {
     expect([...phases].sort((a, b) => a - b)).toEqual(phases);
   });
 });
+
+describe('after-table spacing floor (showcase-doc bug, 2026-07-29)', () => {
+  it('a heading after a table keeps its own larger before-spacing', async () => {
+    const { buildSegment } = await import('../src/builder.ts');
+    const seg = buildSegment(
+      [{ kind: 'heading', level: 2, spans: [{ text: 'After the table' }] }],
+      1,
+      { leadingSpaceAbovePt: 10 },
+    );
+    const spaceReqs = seg.requests.filter(
+      (r: any) => r.updateParagraphStyle?.paragraphStyle?.spaceAbove,
+    ) as any[];
+    const magnitudes = spaceReqs.map((r) => r.updateParagraphStyle.paragraphStyle.spaceAbove.magnitude);
+    expect(Math.max(...magnitudes)).toBe(20); // h1 natural 20 > gap 10
+  });
+
+  it('a paragraph after a table gets the 10pt gap', async () => {
+    const { buildSegment } = await import('../src/builder.ts');
+    const seg = buildSegment([{ kind: 'paragraph', spans: [{ text: 'x' }] }], 1, {
+      leadingSpaceAbovePt: 10,
+    });
+    const magnitudes = (seg.requests as any[])
+      .filter((r) => r.updateParagraphStyle?.paragraphStyle?.spaceAbove)
+      .map((r) => r.updateParagraphStyle.paragraphStyle.spaceAbove.magnitude);
+    expect(Math.max(...magnitudes)).toBe(10);
+  });
+});

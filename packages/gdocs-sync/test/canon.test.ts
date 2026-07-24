@@ -160,3 +160,31 @@ describe('wart fixes (issue #24)', () => {
     expect(identity(blocks[0]!)).toBe(identity(md[0]!));
   });
 });
+
+describe('soft line breaks (showcase-doc bugs, 2026-07-29)', () => {
+  it('a hard-wrapped source paragraph is ONE paragraph with spaces', async () => {
+    const { markdownToBlocks } = await import('../src/markdown.ts');
+    const [p] = markdownToBlocks('This paragraph is\nwrapped across three\nsource lines.\n');
+    if (p!.kind !== 'paragraph') throw new Error('expected paragraph');
+    expect(p!.spans).toEqual([{ text: 'This paragraph is wrapped across three source lines.' }]);
+  });
+
+  it('wrapping survives inline styling mid-wrap', async () => {
+    const { markdownToBlocks } = await import('../src/markdown.ts');
+    const [p] = markdownToBlocks('before **bold\ncontinues** after\n');
+    if (p!.kind !== 'paragraph') throw new Error('expected paragraph');
+    expect(p!.spans.map((s) => s.text).join('')).toBe('before bold continues after');
+  });
+
+  it('blockquote and callout-body lines keep their line structure', async () => {
+    const { markdownToBlocks } = await import('../src/markdown.ts');
+    const [q] = markdownToBlocks('> line one\n> line two\n');
+    if (q!.kind !== 'blockquote') throw new Error('expected quote');
+    expect(q!.spans.map((s) => s.text).join('')).toBe('line one\nline two');
+    const [c] = markdownToBlocks('> [!note] T\n> body line one\n> body line two\n');
+    if (c!.kind !== 'callout') throw new Error('expected callout');
+    const body = c!.body[0];
+    if (body!.kind !== 'paragraph') throw new Error('expected body paragraph');
+    expect(body!.spans.map((s) => s.text).join('')).toBe('body line one\nbody line two');
+  });
+});

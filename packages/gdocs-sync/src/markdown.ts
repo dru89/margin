@@ -114,28 +114,39 @@ export function splitFrontmatter(markdown: string): {
   return { meta, body: markdown.slice(m[0].length), entries };
 }
 
-function spansOf(nodes: PhrasingContent[], inherit: Partial<InlineSpan> = {}): InlineSpan[] {
+/**
+ * soft = 'space': soft line breaks collapse to spaces (markdown
+ * semantics — a hard-wrapped source paragraph is ONE paragraph).
+ * soft = 'keep': newlines survive — blockquotes and callouts render
+ * '>' continuation lines as lines, and callout detection splits the
+ * marker line on '\n'.
+ */
+function spansOf(
+  nodes: PhrasingContent[],
+  inherit: Partial<InlineSpan> = {},
+  soft: 'space' | 'keep' = 'space',
+): InlineSpan[] {
   const out: InlineSpan[] = [];
   for (const node of nodes) {
     switch (node.type) {
       case 'text':
-        out.push({ ...inherit, text: node.value });
+        out.push({ ...inherit, text: soft === 'space' ? node.value.replace(/\n[ \t]*/g, ' ') : node.value });
         break;
       case 'inlineCode':
         // UREAD-4 mirror: code styling suppresses other formatting.
         out.push({ text: node.value, code: true });
         break;
       case 'strong':
-        out.push(...spansOf(node.children, { ...inherit, bold: true }));
+        out.push(...spansOf(node.children, { ...inherit, bold: true }, soft));
         break;
       case 'emphasis':
-        out.push(...spansOf(node.children, { ...inherit, italic: true }));
+        out.push(...spansOf(node.children, { ...inherit, italic: true }, soft));
         break;
       case 'delete':
-        out.push(...spansOf(node.children, { ...inherit, strike: true }));
+        out.push(...spansOf(node.children, { ...inherit, strike: true }, soft));
         break;
       case 'link':
-        out.push(...spansOf(node.children, { ...inherit, link: node.url }));
+        out.push(...spansOf(node.children, { ...inherit, link: node.url }, soft));
         break;
       case 'break':
         out.push({ ...inherit, text: '\n' });
@@ -235,7 +246,7 @@ function convertNodes(nodes: RootContent[]): CanonicalBlock[] {
         for (const child of node.children) {
           if (child.type === 'paragraph') {
             if (spans.length > 0) spans.push({ text: '\n' });
-            spans.push(...spansOf(child.children));
+            spans.push(...spansOf(child.children, {}, 'keep'));
           }
         }
         blocks.push({ kind: 'blockquote', spans });
@@ -261,7 +272,7 @@ function convertNodes(nodes: RootContent[]): CanonicalBlock[] {
 function calloutFrom(node: import('mdast').Blockquote): CanonicalBlock | null {
   const first = node.children[0];
   if (first?.type !== 'paragraph') return null;
-  const spans = spansOf(first.children);
+  const spans = spansOf(first.children, {}, 'keep');
   const firstText = spans[0]?.text ?? '';
   const m = /^\[!([A-Za-z-]+)\]([^\n]*)(\n?)/.exec(firstText);
   if (!m) return null;
