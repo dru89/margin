@@ -50,19 +50,24 @@ describe('callouts — round trip', () => {
     }
   });
 
-  it('reader folds a 1×1 emoji table back into an identity-equal callout', () => {
-    const para = (start: number, text: string, opts: { bold?: boolean; mono?: boolean } = {}) => ({
+  it('reader folds a tinted 1×1 table (no emoji) back into an identity-equal callout', () => {
+    const para = (start: number, text: string, opts: { bold?: boolean } = {}) => ({
       startIndex: start,
       endIndex: start + text.length + 1,
       paragraph: {
-        elements: [{ textRun: { content: `${text}\n`, textStyle: {
-          ...(opts.bold ? { bold: true } : {}),
-          ...(opts.mono ? { weightedFontFamily: { fontFamily: 'Roboto Mono' } } : {}),
-        } } }],
+        elements: [{ textRun: { content: `${text}\n`, textStyle: opts.bold ? { bold: true } : {} } }],
         paragraphStyle: { namedStyleType: 'NORMAL_TEXT' },
       },
     });
-    const doc: GDocDocument = {
+    const tint = (hex: string) => {
+      const n = parseInt(hex, 16);
+      return {
+        backgroundColor: {
+          color: { rgbColor: { red: ((n >> 16) & 255) / 255, green: ((n >> 8) & 255) / 255, blue: (n & 255) / 255 } },
+        },
+      };
+    };
+    const table = (cellStyle: object | undefined, cells: object[]) => ({
       body: {
         content: [
           {
@@ -72,36 +77,44 @@ describe('callouts — round trip', () => {
               rows: 1,
               columns: 1,
               tableRows: [
-                {
-                  tableCells: [
-                    {
-                      content: [
-                        // Title paragraph is emoji + bold chrome.
-                        {
-                          startIndex: 3, endIndex: 25,
-                          paragraph: {
-                            elements: [
-                              { textRun: { content: '⚠️ ' } },
-                              { textRun: { content: 'Deploy freeze\n', textStyle: { bold: true } } },
-                            ],
-                            paragraphStyle: { namedStyleType: 'NORMAL_TEXT' },
-                          },
-                        },
-                        para(25, 'No pushes after Friday.'),
-                      ],
-                    },
-                  ],
-                },
+                { tableCells: [{ content: cells, ...(cellStyle ? { tableCellStyle: cellStyle } : {}) }] },
               ],
             },
           },
         ],
       },
-    };
-    const [rb] = docToBlocks(doc);
-    if (rb!.block.kind !== 'callout') throw new Error('expected callout');
-    expect(rb!.block.type).toBe('warning');
-    const mdSide = markdownToBlocks('> [!warning] Deploy freeze\n> No pushes after Friday.\n');
-    expect(identity(rb!.block)).toBe(identity(mdSide[0]!));
+    });
+
+    // Warning tint + bold title + body → callout with title.
+    const doc = table(tint('FEF7E0'), [
+      para(3, 'Deploy freeze', { bold: true }),
+      para(17, 'No pushes after Friday.'),
+    ]) as GDocDocument;
+    const [block] = docToBlocks(doc).map((r) => r.block);
+    expect(block).toMatchObject({ kind: 'callout', type: 'warning' });
+    if (block!.kind !== 'callout') throw new Error('expected callout');
+    expect(block!.title.map((s) => s.text).join('')).toBe('Deploy freeze');
+    expect(block!.title.every((s) => s.bold === undefined)).toBe(true);
+    expect(block!.body[0]).toMatchObject({ kind: 'paragraph' });
+
+    // The synthesized default title folds back to empty.
+    const dflt = table(tint('E8F0FE'), [para(3, 'Info', { bold: true }), para(8, 'Body.')]) as GDocDocument;
+    const [d] = docToBlocks(dflt).map((r) => r.block);
+    expect(d).toMatchObject({ kind: 'callout', type: 'info', title: [] });
+
+    // No tint background → plain table, not a callout.
+    const plain = table(undefined, [para(3, 'Just a cell')]) as GDocDocument;
+    const [t] = docToBlocks(plain).map((r) => r.block);
+    expect(t?.kind).toBe('table');
+
+    // Legacy emoji-era title text survives as literal title (no migration).
+    const legacy = table(tint('FEF7E0'), [
+      para(3, '⚠️ WARNING', { bold: true }),
+      para(15, 'Old-doc body.'),
+    ]) as GDocDocument;
+    const [l] = docToBlocks(legacy).map((r) => r.block);
+    if (l!.kind !== 'callout') throw new Error('expected callout');
+    expect(l!.title.map((s) => s.text).join('')).toBe('⚠️ WARNING');
   });
+
 });

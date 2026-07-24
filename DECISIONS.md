@@ -901,6 +901,36 @@ fixture probes resolve offline against the harvested ground truth;
 e2e in the app, a comment quoting across a bold span — previously an
 orphan — anchored to the source range including the `**` markers.
 
+## 56. Callouts without emoji; the blank-line-before-tables saga (#63)
+
+Emoji read as tacky on professional docs (beta feedback). New chrome:
+tint background + 3pt accent left border + bold accent-colored title,
+default title = capitalized type name. The type signal on read moves
+from emoji-prefix to **exact tint-background match** — machine-
+readable, and stricter than the emoji heuristic (a user's own 1×1
+table starting with ⚠️ can no longer false-positive into a callout).
+Considered and rejected: inline icon images (staging machinery on
+every push, fixed-pixel icons against resizable text, asset hosting).
+**No reader migration** for old emoji docs, per Drew: their tint still
+detects the callout; the emoji just rides along as literal title text.
+
+The #63 fixes surfaced a real API constraint: `insertTable` always
+inserts a newline first, and the API **refuses to delete** that
+newline afterward (Invalid deletion range — probed). So the blank
+line above tables is avoided at insert time: when the preceding block
+is a plain paragraph this call just wrote, the table is inserted AT
+that paragraph's trailing newline — the auto-newline becomes the
+terminator, the old newline becomes the mandatory post-table
+paragraph. Plain paragraphs only: an absorbed quote/heading/list
+newline carries its style into the separator and reads back as a
+phantom empty block (caught by RT-1 — exactly what the canary is
+for). Table-to-table separators are structurally required by Docs;
+those shrink to 6pt/zero-spacing instead, which the reader ignores
+(empty paragraphs drop). Callout boxes lose their trailing blank via
+omitTrailingNewline into the cell's own final paragraph. Table cell
+padding bumped 2/5.75 → 4/7.5pt (deliberate deviation from the
+reference extraction; Docs renders the original cramped).
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:

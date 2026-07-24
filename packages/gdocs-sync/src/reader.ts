@@ -12,7 +12,7 @@
  */
 import type { CanonicalBlock, InlineSpan, ListItem } from './blocks.ts';
 import { coalesceCodeBlocks } from './blocks.ts';
-import { CALLOUTS } from './styles.ts';
+import { CALLOUTS, calloutTitleFor } from './styles.ts';
 import type { GDocDocument, GDocParagraph, GDocStructuralElement } from './gdoc.ts';
 
 /** The font the builder writes for code. */
@@ -370,25 +370,26 @@ function calloutOf(doc: GDocDocument, el: GDocStructuralElement): CanonicalBlock
   }
   const first = inner[0]?.block;
   if (first?.kind !== 'paragraph') return null;
-  const firstText = first.spans.map((s) => s.text).join('');
-  const entry = Object.entries(CALLOUTS).find(([, c]) => firstText.startsWith(c.emoji));
+  // The tint background is the type signal (DECISIONS §56) — exact
+  // match against the CALLOUTS palette; anything else is a plain table.
+  const bg = rows[0]!.tableCells![0]!.tableCellStyle?.backgroundColor?.color?.rgbColor;
+  if (!bg) return null;
+  const hex = [bg.red ?? 0, bg.green ?? 0, bg.blue ?? 0]
+    .map((v) => Math.round(v * 255).toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase();
+  const entry = Object.entries(CALLOUTS).find(([, c]) => c.tintHex === hex);
   if (!entry) return null;
-  const [type, chrome] = entry;
-  // Strip the emoji prefix and the chrome bold from the title spans.
-  let toStrip = chrome.emoji.length + 1; // emoji + space
-  const title: InlineSpan[] = [];
-  for (const span of first.spans) {
-    let text = span.text;
-    if (toStrip > 0) {
-      const take = Math.min(toStrip, text.length);
-      text = text.slice(take);
-      toStrip -= take;
-    }
-    if (text !== '') title.push({ ...span, text, bold: undefined });
-  }
+  const [type] = entry;
+  // First paragraph is the chrome title (bold stripped; accent color is
+  // invisible to the span model). Old emoji-era titles keep their emoji
+  // as literal text — beta call, no migration (issue #63 discussion).
+  const title: InlineSpan[] = first.spans
+    .filter((span) => span.text !== '')
+    .map((span) => ({ ...span, bold: undefined }));
   const body = inner.slice(1).map((r) => r.block);
-  // Synthesized uppercase-type titles fold back to an empty title.
+  // The synthesized default title folds back to empty.
   const titleText = title.map((s) => s.text).join('');
-  const finalTitle = titleText === type.toUpperCase() ? [] : title;
+  const finalTitle = titleText === calloutTitleFor(type) ? [] : title;
   return { kind: 'callout', type, title: finalTitle, body };
 }

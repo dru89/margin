@@ -9,7 +9,7 @@
 import type { CanonicalBlock, InlineSpan } from './blocks.ts';
 import { spanText } from './blocks.ts';
 import { buildSegment, restyleListRequests, restyleRequests, restyleTableRequests } from './builder.ts';
-import { BLOCK_GAP_PT, BODY, CALLOUTS, TABLE_STYLE, rgb, textStyleOf } from './styles.ts';
+import { BLOCK_GAP_PT, BODY, CALLOUTS, TABLE_STYLE, calloutTitleFor, rgb, textStyleOf } from './styles.ts';
 import { resolveImageSource, stageImage, type LocalImageStager, type StagedImage } from './images.ts';
 import {
   buildMetaRequests,
@@ -48,6 +48,38 @@ function docEndIndex(doc: GDocDocument): number {
 }
 
 /** The n-th table element (document order) in the body. */
+
+
+
+/**
+ * Two adjacent tables require a separator paragraph (the API refuses
+ * to delete its newline). Shrink it so it reads as spacing, not a
+ * blank line (issue #63): tiny font, zero paragraph spacing. The
+ * reader drops empty paragraphs, so this is round-trip-invisible.
+ */
+function shrinkSeparatorRequests(tableStart: number): GDocRequest[] {
+  const range = { startIndex: tableStart - 1, endIndex: tableStart };
+  return [
+    {
+      updateTextStyle: {
+        range,
+        textStyle: { fontSize: { magnitude: 6, unit: 'PT' } },
+        fields: 'fontSize',
+      },
+    },
+    {
+      updateParagraphStyle: {
+        range,
+        paragraphStyle: {
+          spaceAbove: { magnitude: 0, unit: 'PT' },
+          spaceBelow: { magnitude: 0, unit: 'PT' },
+        },
+        fields: 'spaceAbove,spaceBelow',
+      },
+    },
+  ];
+}
+
 function nthTable(doc: GDocDocument, n: number): GDocStructuralElement | null {
   let seen = 0;
   for (const el of doc.body?.content ?? []) {
@@ -131,6 +163,16 @@ async function applyBlocksAt(
   let tableOrdinal = opts.tablesBefore;
   let widthIdx = 0;
   let afterTable = false;
+  // True when the character at cursor-1 is the trailing newline of a
+  // PLAIN paragraph THIS call just wrote — inserting a table there
+  // lets the auto-inserted newline terminate that paragraph instead of
+  // leaving a literal empty line above the table (issue #63; the API
+  // forbids deleting that newline after the fact). Plain paragraphs
+  // only: the leftover newline becomes the post-table separator and
+  // keeps the source paragraph's style — an empty NORMAL_TEXT
+  // paragraph is invisible to the reader, but an empty quote/heading/
+  // list paragraph would read back as a phantom block (RT-1 drift).
+  let absorbableNewline = false;
   let pending: CanonicalBlock[] = [];
 
   const flush = async (): Promise<void> => {
@@ -147,6 +189,10 @@ async function applyBlocksAt(
     await client.batchUpdate(docId, segment.requests, revision);
     written += segment.requests.length;
     cursor += segment.insertedLength;
+    absorbableNewline =
+      segment.insertedLength > 0 &&
+      !(opts.omitTrailingNewline && flushedFinal) &&
+      pending[pending.length - 1]?.kind === 'paragraph';
     pending = [];
   };
 
@@ -154,11 +200,14 @@ async function applyBlocksAt(
   for (const block of blocks) {
     if (block.kind === 'callout') {
       await flush();
+      const stacked = afterTable; // table→table: the separator is mandatory
       const chrome = CALLOUTS[block.type] ?? CALLOUTS.info!;
       const revision0 = await revisionOf(client, docId);
+      const calloutInsertAt = absorbableNewline ? cursor - 1 : cursor;
+      absorbableNewline = false;
       await client.batchUpdate(
         docId,
-        [{ insertTable: { rows: 1, columns: 1, location: { index: cursor } } }],
+        [{ insertTable: { rows: 1, columns: 1, location: { index: calloutInsertAt } } }],
         revision0,
       );
       written += 1;
@@ -169,24 +218,48 @@ async function applyBlocksAt(
       if (cellStart === undefined || tableEl?.startIndex === undefined) {
         throw new Error('inserted callout table not found on read-back');
       }
-      // Title paragraph: emoji + bold title (or uppercase type name).
+      // Title paragraph: bold, accent-colored (no emoji — the tint is
+      // the type signal; DECISIONS §56). Default title = type name.
       const titleSpans: InlineSpan[] =
         block.title.length > 0
           ? block.title.map((sp) => ({ ...sp, bold: true }))
-          : [{ text: block.type.toUpperCase(), bold: true }];
+          : [{ text: calloutTitleFor(block.type), bold: true }];
+      const titleLen = titleSpans.reduce((n, sp) => n + sp.text.length, 0);
       const innerBlocks: CanonicalBlock[] = [
-        { kind: 'paragraph', spans: [{ text: `${chrome.emoji} ` }, ...titleSpans] },
+        { kind: 'paragraph', spans: titleSpans },
         ...block.body,
       ];
-      const segment = buildSegment(innerBlocks, cellStart, { images: opts.images });
+      // omitTrailingNewline: the cell's own final paragraph absorbs the
+      // last block — no stray blank line at the box bottom (issue #63).
+      const segment = buildSegment(innerBlocks, cellStart, {
+        images: opts.images,
+        omitTrailingNewline: true,
+      });
       await client.batchUpdate(docId, segment.requests, doc0.revisionId);
       written += segment.requests.length;
-      // Chrome: tint, padding, invisible borders, full page width.
+      if (titleLen > 0) {
+        await client.batchUpdate(docId, [
+          {
+            updateTextStyle: {
+              range: { startIndex: cellStart, endIndex: cellStart + titleLen },
+              textStyle: { foregroundColor: rgb(chrome.accentHex) },
+              fields: 'foregroundColor',
+            },
+          },
+        ]);
+        written += 1;
+      }
+      // Chrome: tint, padding, accent left border, full page width.
       const tStart = { index: tableEl.startIndex };
       const border = {
         width: { magnitude: 0, unit: 'PT' },
         dashStyle: 'SOLID',
         color: rgb(chrome.tintHex),
+      };
+      const accentBorder = {
+        width: { magnitude: 3, unit: 'PT' },
+        dashStyle: 'SOLID',
+        color: rgb(chrome.accentHex),
       };
       const chromeRequests: GDocRequest[] = [
         {
@@ -200,7 +273,7 @@ async function applyBlocksAt(
               backgroundColor: rgb(chrome.tintHex),
               borderTop: border,
               borderBottom: border,
-              borderLeft: border,
+              borderLeft: accentBorder,
               borderRight: border,
               paddingTop: { magnitude: 6, unit: 'PT' },
               paddingBottom: { magnitude: 6, unit: 'PT' },
@@ -212,6 +285,7 @@ async function applyBlocksAt(
           },
         },
         ...columnWidthRequests(tableEl.startIndex, [468]),
+        ...(stacked ? shrinkSeparatorRequests(tableEl.startIndex) : []),
       ];
       await client.batchUpdate(docId, chromeRequests, undefined);
       written += chromeRequests.length;
@@ -226,12 +300,15 @@ async function applyBlocksAt(
       continue;
     }
     await flush();
+    const tableStacked = afterTable;
     const rows = block.rows.length;
     const columns = block.rows[0]?.length ?? 1;
+    const tableInsertAt = absorbableNewline ? cursor - 1 : cursor;
+    absorbableNewline = false;
     const revision = await revisionOf(client, docId);
     await client.batchUpdate(
       docId,
-      [{ insertTable: { rows, columns, location: { index: cursor } } }],
+      [{ insertTable: { rows, columns, location: { index: tableInsertAt } } }],
       revision,
     );
     written += 1;
@@ -379,6 +456,7 @@ async function applyBlocksAt(
       });
       // Reference column sizing (doc-tools conventions.md @ ad145b3).
       cellRequests.push(...columnWidthRequests(table.startIndex, widths));
+      if (tableStacked) cellRequests.push(...shrinkSeparatorRequests(table.startIndex));
     }
     if (cellRequests.length > 0) {
       await client.batchUpdate(docId, cellRequests, doc.revisionId);

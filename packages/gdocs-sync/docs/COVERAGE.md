@@ -81,11 +81,17 @@ credentials).
       insert emission, staging-integrated); IMG-2 lives in the RT-1
       corpus. Inline images in lists/cells render as the literal
       placeholder character (stable but unlovely — documented)
-- [x] Callouts (issue #40): GFM/Obsidian alerts as tinted 1×1 tables
-      — first-line [!type] detection with aliases, styled titles,
-      multi-block bodies (paragraphs/lists/code; tables stay quotes),
-      emoji fold-back on read, full-width chrome. In the RT-1 corpus.
-      Chrome absorptions: bold inside titles, code langs in bodies.
+- [x] Callouts (issue #40, restyled per beta feedback): tinted 1×1
+      tables with accent left border + colored bold title — no emoji;
+      the tint background is the type signal on read (exact palette
+      match). Default title = capitalized type, folds back to empty.
+      Legacy emoji titles round-trip as literal text (no migration —
+      beta call). In the RT-1 corpus. #63 fixes ride along: no
+      trailing blank inside the box (omitTrailingNewline in the cell),
+      no blank line above tables/callouts after a plain paragraph
+      (insert at the paragraph's trailing newline — the API forbids
+      deleting it afterward), mandatory table-to-table separators
+      shrunk to 6pt, table cell padding 4/7.5pt.
 - [x] Domain sharing on push (#53): shareDocument via Drive
       permissions.create, role mapping + allowFileDiscovery pinned
       offline, live-verified against hays.fm
