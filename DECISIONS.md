@@ -1044,6 +1044,34 @@ Copy-as-rich-text is **not** needed for the Workday case — copying out
 of Preview already pastes as rich text. Building an explicit affordance
 is wanted eventually but low priority.
 
+## 61. Model preference cascade: app default → project → round (#93/#86/#73)
+
+Drew's model, adopted: **Settings holds the app default**; a project
+inherits it and may override; the override is **sticky** and lives in
+`<workspaceRoot>/.margin/project.json`, so it travels with the folder
+instead of sitting in one machine's `localStorage` (which is where it
+used to live, keyed by workspace root — migrated once on first load,
+then the key is deleted).
+
+Three points his sketch didn't cover, decided here:
+- **Projects not created through New Project** (any folder opened
+  directly) have no `project.json` and fall back to the app default —
+  same rule, no special case.
+- **Effort rides the cascade with the model**, at every level. It is
+  cleared when the selected model has no effort control (Haiku
+  reports none) so a stale level can't leak onto a model that would
+  reject it.
+- **No session-only choice.** Claude Code's own picker offers "set as
+  default" vs "this session only"; Margin's is always sticky, per
+  Drew's wording. Add the transient option only if the absence is felt.
+
+One `ModelPicker` component serves all three surfaces so they cannot
+drift, and it is driven entirely by `supportedModels()` — the option
+list, the version strings, and which models even show an effort
+control. Rows display the family name, the description (which leads
+with the version, "Opus 5 · …"), and `resolvedModel` in monospace,
+because the audience knows the difference between Opus 4.8 and Opus 5.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:

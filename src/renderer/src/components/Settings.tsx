@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { GdocsAuthStatus } from '@shared/types';
+import type { GdocsAuthStatus, ModelPreference } from '@shared/types';
+import { ModelPicker } from '@/components/ModelPicker';
 import { useStore } from '@/store';
 
 /**
@@ -13,6 +14,7 @@ export function Settings() {
   const close = useStore((s) => s.setSettingsOpen);
   const [status, setStatus] = useState<GdocsAuthStatus | null>(null);
   const [projectsDir, setProjectsDir] = useState('');
+  const [defaults, setDefaults] = useState<ModelPreference>({});
   const [error, setError] = useState<string | null>(null);
   const [pasting, setPasting] = useState(false);
   const [pasteText, setPasteText] = useState('');
@@ -21,7 +23,10 @@ export function Settings() {
     if (!open) return;
     setError(null);
     void window.margin.gdocsStatus().then(setStatus);
-    void window.margin.getAppSettings().then((s) => setProjectsDir(s.projectsDir));
+    void window.margin.getAppSettings().then((s) => {
+      setProjectsDir(s.projectsDir);
+      setDefaults({ model: s.defaultModel, effort: s.defaultEffort });
+    });
     return window.margin.onGdocsAuthChanged(setStatus);
   }, [open]);
 
@@ -79,6 +84,25 @@ export function Settings() {
             >
               Change…
             </button>
+          </div>
+          <div className="settings-row settings-row-stack">
+            <div>
+              <div className="settings-label">Default model</div>
+              <div className="settings-detail">
+                Used by new projects. Each project keeps its own choice once set.
+              </div>
+            </div>
+            <ModelPicker
+              value={defaults}
+              onChange={(next) => {
+                setDefaults(next);
+                void window.margin.updateAppSettings({
+                  defaultModel: next.model,
+                  defaultEffort: next.effort,
+                });
+              }}
+              inheritLabel="Claude Code default"
+            />
           </div>
         </section>
 

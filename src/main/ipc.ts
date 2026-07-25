@@ -4,6 +4,7 @@ import path from 'path';
 import { nanoid } from 'nanoid';
 import type {
   DiscussionMessage,
+  ModelPreference,
   ProjectProposal,
   ReviewData,
   SetupMessage,
@@ -15,6 +16,8 @@ import { showOpenDialog, showOpenFolderDialog } from './menu';
 import { commitCheckpoint, fileLog, initProjectRepo, initRepo, isInRepo, restoreFromCommit } from './git';
 import { runSetupTurn } from './agent';
 import { getSettings, updateSettings } from './settings';
+import { listModels } from './models';
+import { loadProjectSettings, saveProjectSettings } from './projectSettings';
 import { saveDiscussion } from './discussionStore';
 import { getWorkspace } from './workspace';
 import { getRecentFiles } from './recents';
@@ -50,9 +53,9 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(
     IPC.submitReview,
-    async (event, content: string, review: ReviewData, model?: string) => {
+    async (event, content: string, review: ReviewData, model?: string, effort?: string) => {
       // Fire-and-return: progress flows back through agentStatus events.
-      void requireSession(event.sender.id).submitReview(content, review, model);
+      void requireSession(event.sender.id).submitReview(content, review, model, effort);
     },
   );
 
@@ -177,6 +180,40 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.getProjectsDir, async () => (await getSettings()).projectsDir);
 
   ipcMain.handle(IPC.getAppSettings, () => getSettings());
+
+  ipcMain.handle(IPC.updateAppSettings, (_event, patch: Record<string, unknown>) =>
+    updateSettings(patch),
+  );
+
+  // The catalog comes from the SDK's vendored CLI (DECISIONS §59).
+  ipcMain.handle(IPC.listModels, () => listModels());
+
+  /**
+   * The effective preference for this window: the project's own choice
+   * if it has one, else the app default. Migrates a value left behind
+   * by the old localStorage key when the project has none yet.
+   */
+  ipcMain.handle(
+    IPC.getProjectSettings,
+    async (event, migrateModel?: string): Promise<ModelPreference> => {
+      const session = getSession(event.sender.id);
+      if (!session) return {};
+      const project = await loadProjectSettings(session.workspaceRoot);
+      if (project.model) return { model: project.model, effort: project.effort };
+      if (migrateModel) {
+        await saveProjectSettings(session.workspaceRoot, { model: migrateModel });
+        return { model: migrateModel };
+      }
+      const app = await getSettings();
+      return { model: app.defaultModel, effort: app.defaultEffort };
+    },
+  );
+
+  // Changing the model at turn time sticks to the project (Drew's cascade).
+  ipcMain.handle(IPC.setProjectSettings, async (event, pref: ModelPreference) => {
+    const session = requireSession(event.sender.id);
+    await saveProjectSettings(session.workspaceRoot, pref);
+  });
 
   // Folder picker for the projects directory; returns the updated settings.
   ipcMain.handle(IPC.chooseProjectsDir, async (event) => {
