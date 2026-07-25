@@ -26,6 +26,14 @@ export function ProjectSetup({ onBack }: { onBack: () => void }) {
     endRef.current?.scrollIntoView({ block: 'end' });
   }, [transcript, proposal, busy]);
 
+  // Tell main this window holds an unsaved conversation so Open Folder
+  // routes to a new window instead of overwriting it (issue #82).
+  useEffect(() => {
+    const active = transcript.length > 0 || input.trim() !== '';
+    window.margin.setSetupActive(active);
+    return () => window.margin.setSetupActive(false);
+  }, [transcript, input]);
+
   const send = async () => {
     const text = input.trim();
     if (!text || busy) return;

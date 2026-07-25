@@ -48,6 +48,8 @@ const api = {
   openInWindow: (filePath: string): Promise<void> => ipcRenderer.invoke(IPC.openInWindow, filePath),
   /** Fire-and-forget caret context so the native right-click menu stays relevant. */
   setCaretContext: (ctx: { inTable: boolean }): void => ipcRenderer.send(IPC.caretContext, ctx),
+  /** Fire-and-forget: this window holds an unsaved setup conversation. */
+  setSetupActive: (active: boolean): void => ipcRenderer.send(IPC.setupActive, active),
   readProposal: (id: string): Promise<{ proposal: FileProposal; content: string } | null> =>
     ipcRenderer.invoke(IPC.readProposal, id),
   acceptProposal: (id: string): Promise<string> => ipcRenderer.invoke(IPC.acceptProposal, id),

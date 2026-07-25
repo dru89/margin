@@ -151,9 +151,6 @@ export function Toolbar() {
                   Cancel
                 </button>
               </div>
-              <p className="popover-hint">
-                Queued messages only travel with a round — nothing is sent live.
-              </p>
             </div>
           )}
         </div>

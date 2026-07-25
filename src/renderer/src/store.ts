@@ -295,12 +295,15 @@ export const useStore = create<MarginState>((set, get) => {
     addComment: (text) => {
       const { composerAnchor, content } = get();
       if (!composerAnchor || !text.trim()) return;
+      // Focus the new thread so the sidebar's activeAnchorId effect
+      // scrolls it into view instead of burying it (issue #88).
+      const newId = nanoid(8);
       updateReview((r) => ({
         ...r,
         comments: [
           ...r.comments,
           {
-            id: nanoid(8),
+            id: newId,
             author: 'user' as const,
             createdAt: new Date().toISOString(),
             text: text.trim(),
@@ -310,7 +313,7 @@ export const useStore = create<MarginState>((set, get) => {
           },
         ],
       }));
-      set({ composerAnchor: null });
+      set({ composerAnchor: null, activeAnchorId: newId });
     },
 
     addSuggestion: (replacement, note) => {

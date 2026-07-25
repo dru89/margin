@@ -280,6 +280,22 @@ export class DocumentSession {
 /** Registry: webContents.id -> session. */
 const sessions = new Map<number, DocumentSession>();
 
+/**
+ * Windows whose renderer is mid project-setup conversation. Opening a
+ * file into one of these would discard the transcript (issue #82), so
+ * openFile() routes to a new window instead.
+ */
+const activeSetups = new Set<number>();
+
+export function setSetupActive(webContentsId: number, active: boolean): void {
+  if (active) activeSetups.add(webContentsId);
+  else activeSetups.delete(webContentsId);
+}
+
+export function hasActiveSetup(webContentsId: number): boolean {
+  return activeSetups.has(webContentsId);
+}
+
 export function getSession(webContentsId: number): DocumentSession | undefined {
   return sessions.get(webContentsId);
 }
@@ -292,6 +308,7 @@ export function setSession(webContentsId: number, session: DocumentSession): voi
 export function dropSession(webContentsId: number): void {
   sessions.get(webContentsId)?.dispose();
   sessions.delete(webContentsId);
+  activeSetups.delete(webContentsId);
 }
 
 export function findSessionByPath(filePath: string): DocumentSession | undefined {

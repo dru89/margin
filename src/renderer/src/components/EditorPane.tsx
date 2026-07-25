@@ -116,5 +116,5 @@ export function EditorPane() {
     });
   }, [locked]);
 
-  return <div className="editor-pane" ref={containerRef} />;
+  return <div className={`editor-pane${locked ? ' editor-locked' : ''}`} ref={containerRef} />;
 }
