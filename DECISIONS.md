@@ -1136,3 +1136,39 @@ Two things this depends on, both easy to break:
   calling `openFile()`. Without that clear, creating a project opened
   the new document in a *second* window and left the setup screen
   behind in the first — which is what it did before this change.
+
+## 63. The project root is keyed off `.margin/`, not `.git/` (#123, #124)
+
+`findWorkspaceRoot()` resolves in this order, and where both apply the
+**deeper** wins:
+
+1. nearest ancestor holding a `.margin/`
+2. the git toplevel
+3. the file's own directory
+
+Drew's reasoning: `.margin/` is a directory we control and git is not.
+It also gives the user the only deliberate way to declare a project
+boundary — nested markers mean nested projects, nearest wins — which is
+the answer to "is `parent/` or `parent/child/` the project?" It is a
+declaration, not an ambiguity.
+
+The migration is a no-op: `.margin/` is written *at* whatever root (2)
+or (3) produced, so every existing project already carries the marker
+exactly where rule (1) looks.
+
+Two guards, both there because `.margin/` is created automatically
+rather than by the user, so stray markers are expected:
+
+- **Deeper wins over the marker.** Open a loose `~/Writing/notes.md`
+  once and `~/Writing/.margin/` exists; without this every git repo
+  underneath would resolve to the whole of `~/Writing`.
+- **The walk skips the home directory itself.** Same failure one level
+  up: `~/.margin/` would make every file anywhere under home one
+  project. A file sitting directly in home still resolves to home via
+  rule (3).
+
+This also fixes #123 for established projects: a nested file walks up,
+finds the marker, and keeps the project instead of narrowing to its own
+subfolder. It does not fix the case where no marker exists yet — both
+siblings still fall to rule (3) — which is what the sticky-root half of
+#123 is for.
