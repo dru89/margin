@@ -115,11 +115,32 @@ every reply refers to what came before it, and putting the newest at
 the top costs the reader that thread of reference to save a scroll the
 state edge has already made unnecessary.
 
-That means **the card head carries state, not an author**: the state
-label, the anchored quote, and the round of the latest activity.
-Authorship belongs to each message. A head showing the latest author
-above an older first message is what makes a thread look like it ran
-backwards.
+That means **the card head never carries an author** — only the state
+label, the anchored quote, and the round of the latest activity. The
+author chip always introduces the content it wrote: a message in a
+thread, or the diff in a suggestion. One position, whether or not a
+thread happens to have replies.
+
+The alternative — author in the head for single-message cards, inside
+for threads — puts the same fact in two places depending on a detail
+the reader shouldn't have to notice. It also reintroduces the reversed
+reading: a head showing the *latest* author sits above an older first
+message.
+
+**Long threads collapse in the middle, never at the ends.** Past four
+messages, the first and the last two stay open and everything between
+folds into one line ("3 earlier replies"). The first message is the
+question and the last is where things stand; those are the two a reader
+needs.
+
+Deliberately *not* collapsed by age. Folding anything from an earlier
+round would hide the question in a two-message thread — the very thing
+the reply is answering. Position, not age, is what makes a message
+skippable.
+
+Individual messages are not truncated. The agent's replies are short by
+prompt design, and hiding prose the reader needs is worse than a
+scroll.
 
 **Round stamps appear only on items older than the current round**, and
 are spelled out (`Round 3`). A stamp on every card is noise — while
