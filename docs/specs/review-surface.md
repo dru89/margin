@@ -1,7 +1,7 @@
 # Review surface — design spec
 
-**Status:** draft for review. Nothing here is built.
-**Covers:** #84, #88, #89, #90, #98, #100, #102, #103, #104, #121.
+**Status:** model settled with Drew (2026-07-25). Nothing here is built.
+**Covers:** #84, #88, #89, #90, #98, #100, #102, #103, #104, #121, #128.
 
 ## The problem
 
@@ -68,6 +68,16 @@ and the review's current round `r`:
 the above, and the thread still needs its state shown. It renders as a
 badge on the card plus loss of the document highlight.
 
+**An orphaned thread keeps its place in the list**, at the last
+position where its text was actually found. The data supports this:
+`reanchor()` preserves `from`/`to` when it orphans, and
+`refreshAnchors()` skips orphaned anchors on save, so the offsets
+freeze rather than drift. Its stored quote is the only remaining
+evidence of what it was about, so the card keeps showing it — which is
+most useful sitting where the text used to be. (Offsets are clamped
+for sorting: heavy editing can leave a frozen offset past the end of a
+now-shorter document.)
+
 Suggestions collapse to three: **Draft** (yours, unsent), **Pending**
 (awaiting your accept/reject), **Decided** (accepted or rejected).
 
@@ -118,13 +128,33 @@ Counts are always visible; the filter narrows the list without
 reordering it. This gives #104 its answer — what's new, what's queued,
 what's done — while a card stays where the document put it.
 
-**Settled threads collapse below a fold** at the end of the list, one
-line each, expandable. They are history, not work.
+**Settled threads stay in the list**, collapsed below a fold at the
+end, one line each, expandable. Keeping them is a decision to revisit
+only if documents accumulate enough to make the fold useless.
 
-**`seenRound` advances when the thread is expanded**, not when it
-scrolls past. Scroll-based read tracking marks things read that the
-user never looked at, and the cost of a false "read" here is a lost
-reply from Claude.
+**The sidebar and the document scroll independently**, as today. The
+alternative — floating each card beside its anchor, the Google Docs
+model — reads better until several comments cluster on one paragraph,
+and then it needs a collision solver. In a dense review that is the
+common case, not the edge case. Independent scrolling has a known
+weakness (a lone comment in a long document sits nowhere near its text
+until clicked) and no open-ended design work behind it.
+
+**What clears unread.** Cards render fully expanded today and there is
+no collapse gesture, so "seen" has to hang on something that already
+exists:
+
+| gesture | effect | why |
+| --- | --- | --- |
+| clicking the card | `seenRound` = latest agent round | Already focuses the thread and highlights its anchor — a deliberate "I'm looking at this" that needs no new control |
+| Mark all read | clears every unread | In the summary bar, for the round you skim and accept wholesale |
+| scrolling past | nothing | Scroll tracking marks things read that were never looked at, and the cost of a false read here is a lost reply |
+
+`seenRound` is the cheapest thing in this spec to remove. It earns its
+place on one case: taking another turn before finishing the previous
+one's replies. Round-only highlighting would drop the unread ones out
+of "new" the moment the next round lands, silently — #104 again, in a
+form that is harder to notice.
 
 ## 5. Where a turn's response lives (#100, #103)
 
@@ -176,7 +206,92 @@ that answer is that the colour describes what will happen to the text.
 no inserted half to hang the pill on today, which is why the control
 goes missing. The pill attaches to the struck range instead.
 
-## 7. Composer and editability (#121, #89)
+## 7. Linking a suggestion to the comment it answers
+
+Claude often replies to a comment *and* proposes an edit. Today those
+are two unrelated objects that reference each other only in prose —
+which is why it writes "see my thread reply", and why that reads as a
+layout problem (#100) when it is a data one. The tools cannot express
+the relationship, so it gets expressed in English, and English does not
+render.
+
+One optional field:
+
+```ts
+interface Suggestion { inReplyTo?: string; /* thread id */ }
+```
+
+Plus an optional `in_reply_to` on the `suggest_edit` tool, and a prompt
+line telling the agent to link an edit that answers a comment instead
+of describing the link.
+
+**The field lives on the suggestion, which gives both directions from
+one place.** A thread's linked edits are found by scanning suggestions
+for its id — no second field, nothing to keep in sync, no way for the
+two ends to disagree.
+
+### Link, don't merge
+
+The two stay separate cards. They have different lifecycles (open /
+resolved versus pending / accepted / rejected), different verbs (reply
+and resolve versus accept and reject), and often different anchors —
+you comment on a sentence and Claude edits three words inside it, or
+edits the introduction because that is what contradicts you. A merged
+card carries two status models and has to pick one anchor and lie about
+the other.
+
+### Pointers, not nesting
+
+**Every card keeps its own position in document order.** Nesting a
+suggestion inside its thread would have made a card sort somewhere
+other than its own anchor — the first exception to §4, and every later
+feature would have cited it.
+
+Instead each card carries a pointer to its counterpart:
+
+- On the **suggestion**: a row identifying the thread it answers.
+- On the **thread**: a row per linked edit, showing enough of the
+  quoted text to say *where* the change is. Several edits group under
+  one expandable row rather than becoming several chips.
+
+Clicking a pointer jumps to the counterpart. **Focusing a card also
+highlights its counterpart** — the sidebar already pairs a card with
+its anchor (`usePair`); extending that pairing to the linked card means
+you see the relationship without leaving where you are. Glance for
+free, jump when you want the detail.
+
+The cost: you cannot read both in full at once. Accepted — the
+alternative is duplicating a card in two places or breaking document
+order, and both are worse.
+
+### One comment, many edits
+
+The multiplicity that occurs is **one comment producing several edits**
+— "change all C+I to C&I", "give everyone a first and last name". The
+field on the suggestion handles this: N suggestions carry the same
+thread id. A single suggestion answering several unrelated comments is
+rare enough not to model, and a single id keeps the render unambiguous.
+
+**Deciding every linked edit does not resolve the thread, and does not
+prompt to.** The edits being handled is not evidence the comment is
+answered — the author may have meant something broader than the edits
+Claude found. Resolving stays a deliberate act. What changes is that
+the pointer rows stop being work: once an edit is decided its row is no
+longer a call to action. Rows for decided edits collapse into a single
+muted line recording what happened, rather than vanishing, because that
+line is the evidence you would resolve the thread *on*.
+
+**"Accept all" is deliberately not specified here.** It is the obvious
+affordance once N edits hang off one instruction, and it is also a
+bulk, irreversible action over changes that may be spread across more
+document than fits on screen. It should not be designed in the same
+pass as the model it depends on, and it should not ship before #128 —
+accepting a suggestion is currently unreversible in the review even
+though its text edit lands on CodeMirror's undo stack, so undo desyncs
+the document from the sidecar. A single accept has to be recoverable
+before a bulk one is offered.
+
+## 8. Composer and editability (#121, #89)
 
 Carried from #121, unchanged: **one composer.** Committing a comment
 already stages it without sending, so several drafts before a round
@@ -199,7 +314,7 @@ gets a line there saying it isn't included. A disabled primary action
 would have to explain itself, and this surface already exists to
 answer the question.
 
-## 8. @-references as chips (#90)
+## 9. @-references as chips (#90)
 
 Store as plain `@path` text; render as a chip. Storage stays plain so
 the reference survives a round trip through the agent unchanged, and so
@@ -211,7 +326,7 @@ a sidecar remains readable.
 - The agent can emit them, and they render identically. This is why
   the plain-text storage matters.
 
-## 9. TK markers (#84)
+## 10. TK markers (#84)
 
 Answering the question in the issue: TK handling **is** shipped, but
 only in the agent prompt — it treats `(TK: …)` as an author note and
@@ -224,7 +339,7 @@ Same texture as the draft anchor, different hue. If it makes the
 document noisy in practice, drop it — the prompt behaviour is the
 feature and it works.
 
-## 10. Build order
+## 11. Build order
 
 The state model is the dependency; everything else reads from it.
 
@@ -236,21 +351,29 @@ The state model is the dependency; everything else reads from it.
 5. Intra-suggestion word diff + removal rendering (§6) — closes #98,
    #102.
 6. Draft editing (§7) — closes #89, #121.
-7. Chips (§8) — closes #90. Independent of 1–6; can move earlier.
+7. Chips (§9) — closes #90. Independent of 1–6; can move earlier.
+8. `inReplyTo` + pointer rows (§7) — needs 1–2 for state, and #128
+   settled before any bulk accept.
 
-## Open questions
+## Settled with Drew (2026-07-25)
 
-1. **Ordering.** This spec commits to document order plus a filter.
-   The alternative is grouping by state, which surfaces work faster but
-   makes cards move as their state changes. Worth confirming — it is
-   the decision the rest of §4 hangs from.
-2. **Does an agent reply always deserve "unread"?** As specified, yes.
-   If a reply that merely acknowledges shouldn't demand attention, the
-   agent needs to say which kind it is, which means a tool-argument
-   change and a prompt change.
-3. **Settled threads: keep or archive?** Collapsed below a fold here.
-   If a document accumulates hundreds over its life, they may want to
-   leave the sidecar entirely.
-4. **Chips for anything besides files?** #90 mentions dates and links.
-   Only files are specified here, because only files have a defined
-   click target.
+1. **Ordering** — document order plus a filter, confirmed. Not grouped
+   by state.
+2. **Unread** — kept. The mechanism is `seenRound` advanced by clicking
+   the card; the case it earns its place on is taking another turn
+   before finishing the previous one's replies.
+3. **Settled threads** — keep in the sidecar, collapsed below a fold.
+   Revisit only if volume makes that useless.
+4. **Chips** — files only. Nothing else in the comment system needs
+   one. The nearest future candidate is skills as slash-commands, not
+   dates or links.
+5. **Linked suggestions** — pointers both ways, no nesting, no
+   auto-resolve, no prompt to resolve.
+
+## Still open
+
+- **Undo (#128)** is a prerequisite for "accept all" and a bug in its
+  own right. Not solved by this spec.
+- **A pointer to a far-away edit** leaves nothing at the edit's own
+  position for someone scanning that region. If that bites, the fix is
+  a light marker there with a jump link — not a change to the model.
