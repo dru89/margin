@@ -109,6 +109,18 @@ fighting over the same pixels.
 Nothing blinks, and nothing uses colour alone: the dot is a shape
 difference, the dash is a texture difference.
 
+**Within a card, messages run oldest first** — the order the
+conversation happened in. A thread read backwards is incoherent, since
+every reply refers to what came before it, and putting the newest at
+the top costs the reader that thread of reference to save a scroll the
+state edge has already made unnecessary.
+
+That means **the card head carries state, not an author**: the state
+label, the anchored quote, and the round of the latest activity.
+Authorship belongs to each message. A head showing the latest author
+above an older first message is what makes a thread look like it ran
+backwards.
+
 **Round stamps appear only on items older than the current round**, and
 are spelled out (`Round 3`). A stamp on every card is noise — while
 working in round 5, "round 5" tells the reader nothing the state has
