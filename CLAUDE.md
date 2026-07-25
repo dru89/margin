@@ -34,6 +34,28 @@ npm run test:tables      # GFM table formatting
 `scripts/lib/compile.mjs` does the esbuild-and-import; a new suite is
 ~10 lines of setup plus assertions.
 
+**Journey tests** drive the built app through Playwright's Electron
+support — they have replaced the ad-hoc CDP scripts for anything worth
+keeping:
+
+```bash
+npm run test:e2e     # builds, then runs test/e2e/
+```
+
+`test/e2e/margin.ts` launches with an isolated `--user-data-dir` and a
+seeded `projectsDir`, so a test never touches real settings, recents, or
+`~/Documents/Margin`. `MARGIN_FAKE_AGENT=1` is always set. Assert on what
+the user ends up with — which window holds what, sidecar contents, file
+contents — never on markup, or a restyle breaks the suite. Journeys 1 and
+3 are still to come (#134, #135).
+
+Two traps this suite already hit: `electron.launch()` resolves before any
+window exists (await `firstWindow()`), and clicking a link that
+`will-navigate` blocks needs `click({ noWaitAfter: true })`, since the
+navigation Playwright waits for is precisely the one that must never
+happen. Stub `shell.openExternal` via `app.evaluate` or the run opens a
+real browser.
+
 **When a change needs a test:**
 
 - A **bug fix** in `src/shared/` or `src/main/` logic ships with a case

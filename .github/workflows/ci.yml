@@ -16,7 +16,31 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm test
       - run: npx electron-vite build
+
+  # Journey tests drive the built app. Electron needs a display on Linux,
+  # hence xvfb-run. No credentials and no network: MARGIN_FAKE_AGENT scripts
+  # the round, and shell.openExternal is stubbed in the one test that would
+  # otherwise reach outward. Playwright downloads no browsers — its Electron
+  # support drives the Electron already in devDependencies.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: xvfb-run -a npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-failures
+          path: test-results/
+          retention-days: 7
 
   # Offline tier only: the live suite (smoke, RT-1, CP-*) needs real
   # credentials and stays local/manual per the doc-tools harness design.

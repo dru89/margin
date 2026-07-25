@@ -7,3 +7,5 @@ dist/
 # Build-time OAuth client (MARGIN_GOOGLE_OAUTH_*) — never commit
 .env
 .env.*
+test-results/
+playwright-report/
