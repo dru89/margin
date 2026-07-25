@@ -84,6 +84,10 @@ export function Toolbar() {
           className="btn btn-ghost"
           disabled={locked || (mode === 'write' ? !selection : !previewQuote)}
           title="Comment on selection (Cmd/Ctrl+M)"
+          // Keep focus in the editor: without this the button steals it on
+          // mousedown, the selection clears, and the click that follows has
+          // nothing left to comment on (#91).
+          onMouseDown={(e) => e.preventDefault()}
           onClick={openComposer}
         >
           + Comment

@@ -182,6 +182,62 @@ const annotationsField = StateField.define<{ anns: EditorAnnotation[]; deco: Dec
   provide: (f) => EditorView.decorations.from(f, (v) => v.deco),
 });
 
+export const setPendingAnchor = StateEffect.define<{ from: number; to: number } | null>();
+
+/** The composer's range, remapped through edits while it stays open. */
+const pendingAnchorField = StateField.define<{ from: number; to: number } | null>({
+  create: () => null,
+  update(value, tr) {
+    for (const effect of tr.effects) {
+      if (effect.is(setPendingAnchor)) value = effect.value;
+    }
+    if (!value) return null;
+    if (!tr.docChanged) return value;
+    return { from: tr.changes.mapPos(value.from), to: tr.changes.mapPos(value.to, 1) };
+  },
+});
+
+const pendingAnchorMark = Decoration.mark({ class: 'anchor-pending' });
+
+/**
+ * The subject of an open composer: a comment you have started but not
+ * submitted. Deliberately quieter than a real comment anchor (dashed,
+ * paler) — it marks an unfinished thought, and shouldn't look like
+ * something already in the review (#87).
+ *
+ * Only the composer earns this. A merely-selected range never does: a
+ * selection the editor has stopped painting is treated as no selection
+ * at all (#91), so there is nothing to mark.
+ */
+const pendingAnchorHighlight = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = this.build(view);
+    }
+
+    update(update: ViewUpdate) {
+      const retargeted = update.transactions.some((tr) =>
+        tr.effects.some((e) => e.is(setPendingAnchor)),
+      );
+      if (update.docChanged || retargeted) {
+        this.decorations = this.build(update.view);
+      }
+    }
+
+    build(view: EditorView): DecorationSet {
+      const range = view.state.field(pendingAnchorField);
+      if (!range) return Decoration.none;
+      const from = Math.max(0, range.from);
+      const to = Math.min(range.to, view.state.doc.length);
+      if (from >= to) return Decoration.none;
+      return Decoration.set([pendingAnchorMark.range(from, to)]);
+    }
+  },
+  { decorations: (v) => v.decorations },
+);
+
 const markdownHighlight = HighlightStyle.define([
   { tag: t.heading1, class: 'md-h1' },
   { tag: t.heading2, class: 'md-h2' },
@@ -405,14 +461,21 @@ export function createExtensions(callbacks: EditorCallbacks) {
     lineStyles,
     tablePill,
     annotationsField,
+    pendingAnchorField,
+    pendingAnchorHighlight,
     readOnlyCompartment.of(EditorState.readOnly.of(false)),
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         callbacks.onChange(update.state.doc.toString(), update.changes);
       }
-      if (update.selectionSet) {
+      if (update.selectionSet || update.focusChanged) {
+        // A selection the editor no longer paints is treated as no
+        // selection: "+ Comment" disables rather than acting on text the
+        // user can't see is still selected (#91). The button suppresses
+        // its own focus steal so this doesn't fire out from under it.
         const range = update.state.selection.main;
-        callbacks.onSelectionChange(range.empty ? null : { from: range.from, to: range.to });
+        const gone = range.empty || !update.view.hasFocus;
+        callbacks.onSelectionChange(gone ? null : { from: range.from, to: range.to });
       }
       if (update.selectionSet || update.docChanged) {
         const head = update.state.selection.main.head;

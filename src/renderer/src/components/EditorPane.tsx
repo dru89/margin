@@ -7,6 +7,7 @@ import {
   createExtensions,
   readOnlyCompartment,
   setAnnotations,
+  setPendingAnchor,
   type EditorAnnotation,
 } from '@/editor/extensions';
 
@@ -18,6 +19,7 @@ export function EditorPane() {
   const review = useStore((s) => s.review);
   const activeAnchorId = useStore((s) => s.activeAnchorId);
   const hoveredAnchorId = useStore((s) => s.hoveredAnchorId);
+  const composerAnchor = useStore((s) => s.composerAnchor);
   const locked = useLocked();
 
   // Create the editor once per document.
@@ -109,6 +111,17 @@ export function EditorPane() {
   useEffect(() => {
     viewRef.current?.dispatch({ effects: setAnnotations.of(annotations) });
   }, [annotations]);
+
+  // While the composer is open its subject stays marked in the document,
+  // so the text being commented on doesn't go blank when focus leaves the
+  // editor for the sidebar (#87).
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: setPendingAnchor.of(
+        composerAnchor ? { from: composerAnchor.from, to: composerAnchor.to } : null,
+      ),
+    });
+  }, [composerAnchor]);
 
   useEffect(() => {
     viewRef.current?.dispatch({
