@@ -130,13 +130,13 @@ export function ProjectSetup({ onBack }: { onBack: () => void }) {
             }
           }}
         />
+        <div className="setup-model">
+          <ModelPicker value={pref} onChange={setPref} />
+        </div>
         <div className="setup-compose-row">
           <button className="btn btn-ghost" onClick={onBack}>
             Back
           </button>
-          <div className="setup-model">
-            <ModelPicker value={pref} onChange={setPref} inheritLabel="Claude Code default" />
-          </div>
           <button className="btn btn-primary" disabled={busy || !input.trim()} onClick={() => void send()}>
             Send
           </button>
