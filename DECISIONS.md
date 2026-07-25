@@ -1224,3 +1224,38 @@ survives an arbitrary rename-and-move while the app is closed, but it
 writes into the author's document, which is the same objection that
 ruled out smart quotes and attribute lists (§60), and it duplicates on
 copy so two files would claim one review.
+
+## 65. Tests assert decisions, and bug fixes carry one (#131)
+
+Two rules, adopted after noticing that #125 and #126 — both silent
+data-corruption bugs — shipped with their reproductions written and then
+deleted.
+
+**A bug fix in shared or main logic ships with a case that fails without
+the fix.** The cost is near zero because debugging already produced the
+reproduction; the only work is committing it rather than throwing it
+away. Proof that this is worth it: the anchor suite written afterwards
+fails seven cases against the pre-#127 code, including one where a
+comment silently relocated onto a different sentence. That net existed
+during the debugging and was discarded.
+
+**Every case must be traceable to a decision, a spec rule, or a filed
+bug.** This is what keeps the suite from becoming the thing that breaks
+on every change. A case that can be named — "an anchor whose context is
+destroyed orphans rather than migrating" — survives refactoring, because
+it asserts a rule the code is *for*. A case that cannot be named is
+asserting how the code currently happens to work, and will fail the next
+time that changes for a good reason.
+
+The practical test when writing one: if this fails in six months, will
+the reader be able to tell whether it is a bug or a deliberate change?
+If not, the case is wrong.
+
+Consequences, both deliberate:
+
+- Coverage will be uneven and should be. High in `src/shared/`, where
+  the rules live and where a defect is invisible to the author. Low in
+  presentation, where the CDP screenshots are the honest check and a
+  test would assert markup that is expected to churn.
+- No coverage target. A percentage would reward exactly the tests this
+  entry exists to prevent.
