@@ -82,13 +82,17 @@ export function isUnread(t: CommentThread): boolean {
 
 export function threadState(t: CommentThread, currentRound: number): ThreadState {
   if (t.status === 'resolved') return 'settled';
-  if (isUnread(t)) return 'unread';
   const last = latestActivity(t);
-  // Only the author's own unsent writing is a draft. Someone else's
-  // activity in the current round is theirs, not something to send.
+  // The author's own last word wins over unread. Answering a thread is
+  // proof of having read it, and a thread carrying an unsent reply needs
+  // to say so — reporting it as unread hides the reply and keeps asking
+  // for attention already given. `markSeen` on reply keeps the stored
+  // marker honest too; this ordering is what makes the derivation right
+  // even for data that arrived without it.
   if (!last.external) {
     return last.round >= currentRound ? 'draft' : 'awaiting';
   }
+  if (isUnread(t)) return 'unread';
   return 'read';
 }
 

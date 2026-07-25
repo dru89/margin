@@ -12,6 +12,7 @@ import type {
   WorkspaceState,
 } from '@shared/types';
 import { makeAnchor, resolveQuote } from '@shared/anchors';
+import { markSeen } from '@shared/reviewState';
 import { applyReplacement, formatTableAtCaret } from './editorBridge';
 
 export type ViewMode = 'write' | 'preview';
@@ -375,7 +376,9 @@ export const useStore = create<MarginState>((set, get) => {
         ...r,
         comments: r.comments.map((c) =>
           c.id === threadId
-            ? {
+            ? // Replying is proof of having read what came before it, so the
+              // seen marker advances without waiting for a click.
+              markSeen({
                 ...c,
                 replies: [
                   ...c.replies,
@@ -387,7 +390,7 @@ export const useStore = create<MarginState>((set, get) => {
                     round: r.round,
                   },
                 ],
-              }
+              })
             : c,
         ),
       }));
