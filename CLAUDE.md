@@ -50,6 +50,15 @@ npx electron . --remote-debugging-port=9224 "path/to/doc.md" &   # background
   `externalizeDepsPlugin({ exclude: ['nanoid'] })` in
   `electron.vite.config.ts`. Any new ESM-only dependency used from main must
   go on that exclude list (inline) or be dynamically imported.
+- **The Agent SDK vendors its own `claude` binary** (compressed inside
+  the package; `manifest.json` names the CLI version, no `cli.js` on
+  disk). The system `claude` is never used. That binary pins the model
+  catalog `supportedModels()` returns, so **new Claude models need an
+  `@anthropic-ai/claude-agent-sdk` bump** — it's on the release
+  checklist. Deliberately not using `pathToClaudeCodeExecutable`
+  (DECISIONS §59): reproducibility over freshness. Check the vendored
+  version with `manifest.json`; print the live catalog with
+  `node scripts/model-catalog.mjs`.
 - **Nested-session auth.** The spawned agent CLI inherits Margin's env; if
   Margin was launched from inside a Claude Code session, `CLAUDECODE`/
   `CLAUDE_CODE_*` vars make it refuse credentials. `cleanEnv()` in
