@@ -22,10 +22,17 @@ over CDP (see below) plus targeted node scripts for pure logic — compile a
 module with esbuild and assert against it. Existing suites:
 
 ```bash
-npm run test:state     # review-state derivation + transitions
-npm run test:anchors   # anchor resolution, orphaning, position stability
-npm test               # both
+npm test                 # all suites
+npm run test:state       # review-state derivation + transitions
+npm run test:anchors     # anchor resolution, orphaning, position stability
+npm run test:paths       # agent-supplied path validation (the untrusted boundary)
+npm run test:workspace   # project-root derivation + its two guards (§63)
+npm run test:sidecar     # load, backfill, rename recovery, refusing a stranger's
+npm run test:tables      # GFM table formatting
 ```
+
+`scripts/lib/compile.mjs` does the esbuild-and-import; a new suite is
+~10 lines of setup plus assertions.
 
 **When a change needs a test:**
 
