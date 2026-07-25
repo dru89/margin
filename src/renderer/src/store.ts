@@ -53,6 +53,8 @@ interface MarginState {
   setThreadStatus: (threadId: string, status: 'open' | 'resolved') => void;
   acceptSuggestion: (id: string) => void;
   rejectSuggestion: (id: string, comment?: string) => void;
+  /** Put an accepted or rejected suggestion back to pending (#128). */
+  undoDecision: (id: string) => void;
   save: () => Promise<void>;
   /** Model + effort for this project's rounds (cascade: project → app default). */
   modelPref: ModelPreference;
@@ -259,9 +261,15 @@ export const useStore = create<MarginState>((set, get) => {
           review: {
             ...review,
             comments: review.comments.map((c) => ({ ...c, anchor: mapAnchor(c.anchor) })),
-            suggestions: review.suggestions.map((s) =>
-              s.status === 'pending' ? { ...s, anchor: mapAnchor(s.anchor) } : s,
-            ),
+            suggestions: review.suggestions.map((s) => {
+              if (s.status === 'pending') return { ...s, anchor: mapAnchor(s.anchor) };
+              // An accepted edit stays undoable, so its landing site has to
+              // follow the document too (#128).
+              if (!s.applied) return s;
+              const from = changes.mapPos(s.applied.from, 1);
+              const to = changes.mapPos(s.applied.to, -1);
+              return { ...s, applied: to < from ? undefined : { from, to } };
+            }),
           },
         });
       }
@@ -407,14 +415,39 @@ export const useStore = create<MarginState>((set, get) => {
       const { review } = get();
       const s = review?.suggestions.find((x) => x.id === id);
       if (!s || s.status !== 'pending') return;
+      const applied = s.anchor.orphaned
+        ? undefined
+        : { from: s.anchor.from, to: s.anchor.from + s.replacement.length };
       if (!s.anchor.orphaned) {
-        // Dispatching through the editor keeps every other anchor mapped correctly.
-        applyReplacement(s.anchor.from, s.anchor.to, s.replacement);
+        // Dispatching through the editor keeps every other anchor mapped
+        // correctly. Off the undo stack: this is a decision, and Cmd-Z
+        // reverting only its text half is what desynced the two (#128).
+        applyReplacement(s.anchor.from, s.anchor.to, s.replacement, { addToHistory: false });
       }
       updateReview((r) => ({
         ...r,
         suggestions: r.suggestions.map((x) =>
-          x.id === id ? { ...x, status: 'accepted' as const } : x,
+          x.id === id ? { ...x, status: 'accepted' as const, applied } : x,
+        ),
+      }));
+    },
+
+    undoDecision: (id) => {
+      const { review } = get();
+      const s = review?.suggestions.find((x) => x.id === id);
+      if (!s || s.status === 'pending') return;
+      // An accepted edit is put back by restoring the text it replaced. The
+      // applied range is remapped with every doc change, so this stays
+      // correct however much the author has written since.
+      if (s.status === 'accepted' && s.applied) {
+        applyReplacement(s.applied.from, s.applied.to, s.anchor.quote, { addToHistory: false });
+      }
+      updateReview((r) => ({
+        ...r,
+        suggestions: r.suggestions.map((x) =>
+          x.id === id
+            ? { ...x, status: 'pending' as const, applied: undefined, decisionComment: undefined }
+            : x,
         ),
       }));
     },

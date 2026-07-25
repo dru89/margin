@@ -333,6 +333,7 @@ kbd {
   background: color-mix(in srgb, var(--comment-wash) 80%, transparent);
   border-bottom: 2px dashed color-mix(in srgb, var(--comment-edge) 70%, transparent);
 }
+.undo-decision { margin-left: auto; font-size: 11px; padding: 2px 8px; }
 .anchor, .card { transition: background 0.12s ease, border-color 0.12s ease; }
 
 /* Once focus leaves, the selection no longer counts, so its same-word
