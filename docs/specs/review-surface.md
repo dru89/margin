@@ -247,6 +247,21 @@ deletions in `--danger`. #102 asks whether a deletion-only suggestion
 should read red rather than green — yes, and the rule that produces
 that answer is that the colour describes what will happen to the text.
 
+Two places carry it, and one deliberately does not:
+
+- **The kind label** — "Deletion" is set in `--danger`, "Edit" in the
+  agent colour. This is what makes the operation legible before the
+  reader parses the diff.
+- **The diff** — but at card strength, not document strength. The
+  inline decoration in the document uses `--danger` at 9%, tuned for
+  17px prose that has to stay readable underneath it. The same value in
+  a 13px sidebar card reads as a grey smudge rather than as red. Cards
+  run around 20%.
+- **Not the leading edge.** That is state, and only state. A deletion
+  sitting unread keeps a teal edge; colouring it red would mean an
+  unread deletion and a read one look identical, which is the exact
+  collapse §3 exists to prevent.
+
 **A deletion-only suggestion still gets an accept/reject pill.** It has
 no inserted half to hang the pill on today, which is why the control
 goes missing. The pill attaches to the struck range instead.
