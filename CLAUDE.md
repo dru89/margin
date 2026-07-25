@@ -18,13 +18,41 @@ MARGIN_FAKE_AGENT=1 npx electron . …   # scripted review round, no credentials
 ```
 
 There is no test framework. Verification is done by driving the built app
-over CDP (see below) plus targeted node scripts for pure logic (compile a
-single module with `npx esbuild src/shared/anchors.ts --format=esm --outfile=…`
-and assert against it). `npm run test:state` is one such suite —
-`scripts/test-review-state.mjs`, covering review-state derivation *and*
-its transitions. **Transitions are where the bugs are**: the state cases
-all passed while replying to an unread thread still left it reading as
-unread. When adding a rule, add the edge into it, not just the point.
+over CDP (see below) plus targeted node scripts for pure logic — compile a
+module with esbuild and assert against it. Existing suites:
+
+```bash
+npm run test:state     # review-state derivation + transitions
+npm run test:anchors   # anchor resolution, orphaning, position stability
+npm test               # both
+```
+
+**When a change needs a test:**
+
+- A **bug fix** in `src/shared/` or `src/main/` logic ships with a case
+  that *fails without the fix*. You already wrote the reproduction while
+  debugging — commit it instead of deleting it. (#125 and #126 both
+  shipped without one; the suite added afterwards fails 7 cases against
+  the pre-fix code, so the net was always available and simply thrown
+  away.)
+- A **new logic module** gets a suite.
+- A **changed rule** updates the case that asserted the old one, so the
+  diff shows the decision changing.
+
+Not required for presentation (CSS, layout, copy), for wiring with no
+branching, or for anything only judgeable by eye — that is what the CDP
+screenshots are for.
+
+**What to assert: the decision, not the code path.** Every case should be
+traceable to a DECISIONS entry, a spec rule, or a filed bug. If you can't
+name what a case protects, it is probably asserting an implementation
+detail and will break the next time someone touches the file. Never
+assert DOM structure or internal call order.
+
+**Cover transitions, not just states.** The review-state cases all passed
+while replying to an unread thread still left it reading as unread — the
+bug lived on an edge between two states that were each individually
+correct.
 
 ## Verifying changes (CDP smoke pattern)
 
