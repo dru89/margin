@@ -374,6 +374,3 @@ The state model is the dependency; everything else reads from it.
 
 - **Undo (#128)** is a prerequisite for "accept all" and a bug in its
   own right. Not solved by this spec.
-- **A pointer to a far-away edit** leaves nothing at the edit's own
-  position for someone scanning that region. If that bites, the fix is
-  a light marker there with a jump link — not a change to the model.
