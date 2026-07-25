@@ -109,6 +109,18 @@ fighting over the same pixels.
 Nothing blinks, and nothing uses colour alone: the dot is a shape
 difference, the dash is a texture difference.
 
+**Round stamps appear only on items older than the current round**, and
+are spelled out (`Round 3`). A stamp on every card is noise — while
+working in round 5, "round 5" tells the reader nothing the state has
+not already said. Restricting it to older items means the number always
+carries information: this has been sitting unanswered for two rounds.
+Because it is then rare, the full word fits where a code like `r3`
+would have been needed.
+
+`#3` is avoided deliberately. Margin borrows pull-request vocabulary
+throughout, so `#3` reads as an issue or PR number. The absolute date
+lives in the tooltip (`Round 3 · 24 Jul`) rather than on screen.
+
 ## 4. Ordering, grouping, and what clears "unread"
 
 **Order by document position. Always.** The sidebar is a margin; its
