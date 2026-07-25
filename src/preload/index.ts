@@ -7,6 +7,8 @@ import type {
   FileProposal,
   GdocsAuthStatus,
   GdocsSyncState,
+  ModelChoice,
+  ModelPreference,
   ProjectProposal,
   RecentFile,
   ReviewData,
@@ -28,8 +30,12 @@ const api = {
   updateReview: (review: ReviewData): Promise<void> => ipcRenderer.invoke(IPC.updateReview, review),
   updateDiscussion: (messages: DiscussionMessage[]): Promise<void> =>
     ipcRenderer.invoke(IPC.updateDiscussion, messages),
-  submitReview: (content: string, review: ReviewData, model?: string): Promise<void> =>
-    ipcRenderer.invoke(IPC.submitReview, content, review, model),
+  submitReview: (
+    content: string,
+    review: ReviewData,
+    model?: string,
+    effort?: string,
+  ): Promise<void> => ipcRenderer.invoke(IPC.submitReview, content, review, model, effort),
   cancelReview: (): Promise<void> => ipcRenderer.invoke(IPC.cancelReview),
   openFileDialog: (): Promise<void> => ipcRenderer.invoke(IPC.openFileDialog),
   openPath: (filePath: string): Promise<void> => ipcRenderer.invoke(IPC.openPath, filePath),
@@ -61,6 +67,13 @@ const api = {
   createProject: (proposal: ProjectProposal, transcript: SetupMessage[]): Promise<string> =>
     ipcRenderer.invoke(IPC.createProject, proposal, transcript),
   getAppSettings: (): Promise<AppSettingsState> => ipcRenderer.invoke(IPC.getAppSettings),
+  updateAppSettings: (patch: Partial<AppSettingsState>): Promise<AppSettingsState> =>
+    ipcRenderer.invoke(IPC.updateAppSettings, patch),
+  listModels: (): Promise<ModelChoice[]> => ipcRenderer.invoke(IPC.listModels),
+  getProjectSettings: (migrateModel?: string): Promise<ModelPreference> =>
+    ipcRenderer.invoke(IPC.getProjectSettings, migrateModel),
+  setProjectSettings: (pref: ModelPreference): Promise<void> =>
+    ipcRenderer.invoke(IPC.setProjectSettings, pref),
   chooseProjectsDir: (): Promise<AppSettingsState> => ipcRenderer.invoke(IPC.chooseProjectsDir),
   gdocsStatus: (): Promise<GdocsAuthStatus> => ipcRenderer.invoke(IPC.gdocsStatus),
   gdocsConnect: (): Promise<void> => ipcRenderer.invoke(IPC.gdocsConnect),

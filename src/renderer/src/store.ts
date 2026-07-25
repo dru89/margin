@@ -7,6 +7,7 @@ import type {
   DiscussionMessage,
   DocState,
   GdocsSyncState,
+  ModelPreference,
   ReviewData,
   WorkspaceState,
 } from '@shared/types';
@@ -52,8 +53,11 @@ interface MarginState {
   acceptSuggestion: (id: string) => void;
   rejectSuggestion: (id: string, comment?: string) => void;
   save: () => Promise<void>;
-  reviewModel: string | undefined;
-  setReviewModel: (model: string | undefined) => void;
+  /** Model + effort for this project's rounds (cascade: project → app default). */
+  modelPref: ModelPreference;
+  setModelPref: (pref: ModelPreference) => void;
+  /** Ask main for the effective preference, migrating the legacy key once. */
+  resolveModelPref: (workspaceRoot: string) => Promise<void>;
   hoveredAnchorId: string | null;
   setHoveredAnchor: (id: string | null) => void;
   /** Discussion dock expanded/collapsed (persisted per workspace). */
@@ -170,7 +174,7 @@ export const useStore = create<MarginState>((set, get) => {
       const load = (doc: DocState) =>
         set({
           dockOpen: localStorage.getItem(`margin-dock-open:${doc.workspaceRoot}`) === 'true',
-          reviewModel: localStorage.getItem(`margin-model:${doc.workspaceRoot}`) ?? undefined,
+          modelPref: {},
           doc,
           content: doc.content,
           review: doc.review,
@@ -190,12 +194,14 @@ export const useStore = create<MarginState>((set, get) => {
           load(doc);
           void get().loadWorkspace();
           void get().refreshGdocsSync();
+          void get().resolveModelPref(doc.workspaceRoot);
         }
       });
       window.margin.onDocLoaded((doc) => {
         load(doc);
         void get().loadWorkspace();
         void get().refreshGdocsSync();
+        void get().resolveModelPref(doc.workspaceRoot);
       });
       window.margin.onReviewUpdated((review) => set({ review }));
       window.margin.onDiscussionUpdated((discussion) => set({ discussion }));
@@ -431,15 +437,21 @@ export const useStore = create<MarginState>((set, get) => {
       set({ dirty: false });
     },
 
-    reviewModel: undefined,
-    setReviewModel: (reviewModel) => {
-      // Sticky per project: the picker sets a default, not a per-round choice.
-      const root = get().doc?.workspaceRoot;
-      if (root) {
-        if (reviewModel) localStorage.setItem(`margin-model:${root}`, reviewModel);
-        else localStorage.removeItem(`margin-model:${root}`);
-      }
-      set({ reviewModel });
+    modelPref: {},
+    resolveModelPref: async (workspaceRoot) => {
+      const legacyKey = `margin-model:${workspaceRoot}`;
+      const legacy = localStorage.getItem(legacyKey) ?? undefined;
+      const pref = await window.margin.getProjectSettings(legacy);
+      if (legacy) localStorage.removeItem(legacyKey);
+      set({ modelPref: pref });
+    },
+
+    setModelPref: (pref) => {
+      // Sticky per project: changing it at turn time becomes the
+      // project's choice, stored in .margin/project.json so it travels
+      // with the folder (Drew's cascade, DECISIONS §61).
+      set({ modelPref: pref });
+      void window.margin.setProjectSettings(pref);
     },
     hoveredAnchorId: null,
     setHoveredAnchor: (hoveredAnchorId) => set({ hoveredAnchorId }),
@@ -485,7 +497,7 @@ export const useStore = create<MarginState>((set, get) => {
     },
 
     submit: async () => {
-      const { doc, content, review, reviewModel } = get();
+      const { doc, content, review, modelPref } = get();
       if (!doc || !review) return;
       if (saveTimer) {
         clearTimeout(saveTimer);
@@ -498,7 +510,7 @@ export const useStore = create<MarginState>((set, get) => {
         activity: [],
         dirty: false,
       });
-      await window.margin.submitReview(content, refreshed, reviewModel);
+      await window.margin.submitReview(content, refreshed, modelPref.model, modelPref.effort);
     },
 
     cancelReview: async () => {

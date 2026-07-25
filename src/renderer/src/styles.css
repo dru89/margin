@@ -1508,3 +1508,25 @@ button.status-chip:active { transform: translateY(1px); }
 .agent-detail-button:hover { text-decoration: underline; }
 
 .agent-log { overflow-y: auto; max-height: 30vh; scroll-behavior: smooth; }
+
+/* ——— model picker (#93/#86) ——— */
+
+.model-picker { display: grid; gap: 6px; }
+.model-picker .model-row { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.model-picker select { flex: 1; min-width: 0; }
+
+.model-detail {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+.model-id {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+
+.settings-row-stack { flex-direction: column; align-items: stretch; gap: 8px; }

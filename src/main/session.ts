@@ -199,7 +199,12 @@ export class DocumentSession {
    * Submit the current state for an agent review round:
    * checkpoint via git, run the agent turn, checkpoint again.
    */
-  async submitReview(content: string, review: ReviewData, model?: string): Promise<void> {
+  async submitReview(
+    content: string,
+    review: ReviewData,
+    model?: string,
+    effort?: string,
+  ): Promise<void> {
     if (this.activeTurn) throw new Error('A review is already running');
     await this.saveContent(content);
     await this.setReview(review);
@@ -241,6 +246,7 @@ export class DocumentSession {
           },
         },
         model,
+        effort,
       );
       this.activeTurn = turn;
       const summary = await turn.done;

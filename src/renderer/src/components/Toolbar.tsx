@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocked, useStore } from '@/store';
 import { History } from '@/components/History';
+import { ModelPicker } from '@/components/ModelPicker';
 import { GdocsMenu } from '@/components/GdocsMenu';
 
 export function Toolbar() {
@@ -14,8 +15,8 @@ export function Toolbar() {
   const submit = useStore((s) => s.submit);
   const dirty = useStore((s) => s.dirty);
   const locked = useLocked();
-  const reviewModel = useStore((s) => s.reviewModel);
-  const setReviewModel = useStore((s) => s.setReviewModel);
+  const modelPref = useStore((s) => s.modelPref);
+  const setModelPref = useStore((s) => s.setModelPref);
   // Select stable references; derive arrays after (fresh arrays from a
   // zustand selector re-render forever — React #185).
   const discussion = useStore((s) => s.discussion);
@@ -110,18 +111,11 @@ export function Toolbar() {
           </button>
           {submitOpen && (
             <div className="popover" ref={popoverRef}>
-              <label className="model-row">
-                Model
-                <select
-                  value={reviewModel ?? ''}
-                  onChange={(e) => setReviewModel(e.target.value || undefined)}
-                >
-                  <option value="">Claude Code default</option>
-                  <option value="opus">Opus</option>
-                  <option value="sonnet">Sonnet</option>
-                  <option value="haiku">Haiku</option>
-                </select>
-              </label>
+              <ModelPicker
+                value={modelPref}
+                onChange={setModelPref}
+                inheritLabel="Use my default"
+              />
               <h4 className="sidebar-heading popover-manifest-head">Goes with this round</h4>
               {modifiedDocs.length > 0 && (
                 <p className="manifest-files">

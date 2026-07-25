@@ -6,6 +6,10 @@ import path from 'path';
 export interface AppSettings {
   /** Where "Start a new project" creates project folders. */
   projectsDir: string;
+  /** Default model for new projects; undefined = the CLI's own default. */
+  defaultModel?: string;
+  /** Default effort, when the chosen model supports one. */
+  defaultEffort?: string;
 }
 
 function settingsPath(): string {

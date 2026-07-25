@@ -229,6 +229,8 @@ export interface GdocsAuthStatus {
 
 export interface AppSettingsState {
   projectsDir: string;
+  defaultModel?: string;
+  defaultEffort?: string;
 }
 
 /** Google Docs link/push state for the focused document. */
@@ -238,4 +240,29 @@ export interface GdocsSyncState {
   lastSyncAt?: string;
   busy: boolean;
   connected: boolean;
+}
+
+/** One row of the Agent SDK's model catalog (issue #93). */
+export interface ModelChoice {
+  /** Pass back verbatim — not always a clean alias (e.g. 'claude-fable-5[1m]'). */
+  value: string;
+  /** Family name, e.g. 'Opus'. */
+  label: string;
+  /** Leads with the version, e.g. 'Opus 5 · Best for everyday, complex tasks'. */
+  description: string;
+  /** Exact wire id the value resolves to, e.g. 'claude-opus-5'. */
+  resolvedModel?: string;
+  /** Empty when the model has no effort control (Haiku today). */
+  effortLevels: string[];
+}
+
+/** How a round should run: which model, and at what effort. */
+export interface ModelPreference {
+  model?: string;
+  effort?: string;
+}
+
+/** `<workspaceRoot>/.margin/project.json` — travels with the project. */
+export interface ProjectSettings extends ModelPreference {
+  version: 1;
 }

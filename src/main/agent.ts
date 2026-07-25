@@ -318,6 +318,7 @@ export async function runReviewTurn(
   session: DocumentSession,
   callbacks: TurnCallbacks,
   model?: string,
+  effort?: string,
 ): Promise<ActiveTurn> {
   if (process.env.MARGIN_FAKE_AGENT) {
     return runFakeReviewTurn(session, callbacks);
@@ -383,6 +384,7 @@ export async function runReviewTurn(
       // spawn its CLI with the system Node instead.
       executable: 'node',
       env: cleanEnv(),
+      ...(effort ? { effort: effort as never } : {}),
       stderr: (data: string) => {
         console.error('[agent stderr]', data);
       },
@@ -535,7 +537,7 @@ function runFakeSetupTurn(transcript: SetupMessage[]): SetupReply {
  * terminal), the spawned CLI would otherwise detect a nested session and
  * refuse to use the stored credentials.
  */
-function cleanEnv(): Record<string, string | undefined> {
+export function cleanEnv(): Record<string, string | undefined> {
   const env: Record<string, string | undefined> = { ...process.env };
   for (const key of Object.keys(env)) {
     if (key === 'CLAUDECODE' || key.startsWith('CLAUDE_CODE_') || key.startsWith('CLAUDE_AGENT_')) {
