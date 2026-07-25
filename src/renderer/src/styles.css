@@ -351,7 +351,7 @@ kbd {
     to bottom, var(--comment-edge) 0 4px, transparent 4px 8px
   );
 }
-.state-read, .state-decided, .state-settled { --state-edge: transparent; }
+.state-read, .state-decided, .state-settled { --state-edge: var(--rule); }
 .state-unread { border-color: color-mix(in srgb, var(--agent) 45%, var(--rule)); }
 .state-draft {
   border-style: dashed;
@@ -391,7 +391,9 @@ kbd {
 /* A deletion has no inserted half to contrast against, so the card carries
    the operation's colour at a strength that reads at 13px — the document's
    9% wash is tuned for 17px prose and disappears here (#102). */
-.card-context-del {
+/* Two classes, so it does not depend on sitting after `.card-context` —
+   which sets the insertion colour and is defined further down the file. */
+.card-context.card-context-del {
   color: var(--ink);
   background: color-mix(in srgb, var(--danger) 16%, transparent);
   text-decoration: line-through;
@@ -642,7 +644,9 @@ kbd {
   border-radius: 0 3px 3px 0;
   background: var(--state-edge, var(--pair-accent, transparent));
   opacity: 1;
-  transition: opacity 0.12s ease;
+  /* Clicking an unread thread changes its spine; a fade reads as the state
+     settling, where a snap to nothing read as the card breaking. */
+  transition: background 0.18s ease, opacity 0.12s ease;
 }
 .card-suggestion { --pair-accent: var(--agent); }
 .card-comment { --pair-accent: var(--comment-edge); }

@@ -125,7 +125,9 @@ fighting over the same pixels.
   (§64/#87). Same meaning in both places: written, not committed.
 - **Awaiting** — leading edge in the user colour, muted. Quiet: this is
   the normal state of a submitted round and shouldn't compete.
-- **Read** — no leading edge.
+- **Read** — a quiet neutral spine (`--rule`), not nothing. Dropping the
+  edge entirely on click made the card look like it had broken rather
+  than settled; the spine stays, it just stops meaning anything.
 - **Settled** — collapsed to one line, below the fold (§5).
 
 Nothing blinks, and nothing uses colour alone: the dot is a shape
