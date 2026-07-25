@@ -1172,3 +1172,55 @@ finds the marker, and keeps the project instead of narrowing to its own
 subfolder. It does not fix the case where no marker exists yet — both
 siblings still fall to rule (3) — which is what the sticky-root half of
 #123 is for.
+
+## 64. Anchors must earn their position; sidecars survive a rename (#125, #126)
+
+Two durability fixes to the review layer, both about the same instinct:
+prefer an honest "I lost it" to a confident wrong answer.
+
+**Anchor recovery no longer takes cheap early-outs.** Anchors are
+offsets + quote + 32 chars of context either side. Inside the editor
+they are remapped through CodeMirror's `ChangeDesc`, which is exact.
+On load, offsets are stale and `reanchor()` re-resolves. Two shortcuts
+there were wrong:
+
+- The fast path accepted the stored offsets whenever they still held
+  the quote. Insert the same words immediately before an anchor and
+  those offsets sit on the *new* copy — identical text, so the comment
+  silently adopted whatever the author had just typed. It now requires
+  the context to match exactly as well; anything less falls through to
+  scoring, which picks the real occurrence on context.
+- A lone occurrence was accepted for being the only candidate. Delete
+  the anchored text while the same words survive elsewhere and the
+  comment migrated to a sentence it was never about. Occurrences are
+  now scored whether there is one or many, and anything reproducing
+  less than `MIN_CONTEXT_RATIO` (20%) of its stored context orphans
+  instead.
+
+The ratio is deliberately low. An anchor disturbed by ordinary editing
+still scores well, because only one side of it moves — verified against
+a word changed earlier in the sentence, the next sentence rewritten, a
+paragraph inserted above, and list markers added. What scores near zero
+is a *different* occurrence of the same words: it matches the space
+before and the punctuation after, and nothing else.
+
+**A rename outside Margin no longer drops the review.** The sidecar is
+keyed by path, so `draft.md` -> `final.md` stranded
+`draft.md.review.json` with nothing to load it — and the explorer
+filters `.review.json` out, so the work looked deleted rather than
+misplaced. On a miss, a sidecar whose own document is gone is a
+candidate, and it is adopted only when there is exactly one and its
+anchors still resolve against this file. That check is the whole
+safeguard: a rename preserves the text, so the quotes land; an
+unrelated new document sitting beside someone else's leftovers resolves
+nothing and adopts nothing.
+
+Adoption renames the sidecar rather than copying it — nothing is
+duplicated, nothing is deleted, and the leftover cannot be adopted
+twice.
+
+Deliberately *not* an id in frontmatter. It is the only thing that
+survives an arbitrary rename-and-move while the app is closed, but it
+writes into the author's document, which is the same objection that
+ruled out smart quotes and attribute lists (§60), and it duplicates on
+copy so two files would claim one review.
