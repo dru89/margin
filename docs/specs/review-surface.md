@@ -131,6 +131,17 @@ fighting over the same pixels.
 Nothing blinks, and nothing uses colour alone: the dot is a shape
 difference, the dash is a texture difference.
 
+**The spine stays inside the card.** It sits within the border rather
+than straddling it — an edge hanging past the rounded corners draws the
+eye to the overhang instead of to the state it is reporting.
+
+**The operation is named in words and coloured in the diff, not in the
+label.** "Deletion" set in `--danger` shouted over every other card's
+quiet uppercase; the word alone carries it, and the struck red text
+says the rest. A deletion in a card reads the way one reads in the
+document: ordinary text, struck through, on a red wash — not the
+insertion colour sitting on a red background.
+
 **Within a card, messages run oldest first** — the order the
 conversation happened in. A thread read backwards is incoherent, since
 every reply refers to what came before it, and putting the newest at

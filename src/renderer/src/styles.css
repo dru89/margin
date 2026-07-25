@@ -338,24 +338,20 @@ kbd {
    card's leading edge is state, the author chip is authorship, the diff is
    what happens to the text. Nothing relies on colour alone — the unread dot
    is a shape difference and the draft edge is a texture one. */
-.card-comment, .card-suggestion { position: relative; }
-.card-comment::before, .card-suggestion::before {
-  content: "";
-  position: absolute;
-  left: 0; top: 8px; bottom: 8px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-}
-.state-unread::before { background: var(--agent); }
-.state-awaiting::before { background: color-mix(in srgb, var(--user) 45%, transparent); }
-.state-pending::before { background: color-mix(in srgb, var(--agent) 45%, transparent); }
+/* State travels to the spine as a custom property rather than as another
+   ::before. An element has one ::before, and `.card::before` is defined
+   later at equal specificity — a second rule here silently lost, which is
+   how the whole vocabulary shipped invisible the first time. */
+.state-unread { --state-edge: var(--agent); }
+.state-awaiting { --state-edge: color-mix(in srgb, var(--user) 45%, transparent); }
+.state-pending { --state-edge: color-mix(in srgb, var(--agent) 45%, transparent); }
 /* Dashed: the same language the document uses for an uncommitted anchor. */
-.state-draft::before {
-  background: repeating-linear-gradient(
+.state-draft {
+  --state-edge: repeating-linear-gradient(
     to bottom, var(--comment-edge) 0 4px, transparent 4px 8px
   );
 }
-.state-read::before, .state-decided::before, .state-settled::before { background: none; }
+.state-read, .state-decided, .state-settled { --state-edge: transparent; }
 .state-unread { border-color: color-mix(in srgb, var(--agent) 45%, var(--rule)); }
 .state-draft {
   border-style: dashed;
@@ -370,8 +366,9 @@ kbd {
   font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase;
   color: var(--ink-faint);
 }
-.state-label .op-del { color: var(--danger); font-weight: 700; }
-.state-label .op-edit { color: var(--agent); font-weight: 700; }
+/* The word names the operation; the diff colours it. A saturated red label
+   shouted over every other card's quiet uppercase. */
+.state-label .op-del, .state-label .op-edit { font-weight: 700; color: var(--ink-soft); }
 .badge {
   font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; font-weight: 700;
   padding: 1px 6px; border-radius: 4px;
@@ -395,8 +392,11 @@ kbd {
    the operation's colour at a strength that reads at 13px — the document's
    9% wash is tuned for 17px prose and disappears here (#102). */
 .card-context-del {
-  color: var(--ink-soft);
+  color: var(--ink);
   background: color-mix(in srgb, var(--danger) 16%, transparent);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 70%, transparent);
+  text-decoration-thickness: 1.5px;
   border-radius: 3px;
   padding: 1px 4px;
 }
@@ -632,14 +632,16 @@ kbd {
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 .card { position: relative; }
-.card::before { /* the spine — sidebar echo of the anchor underline */
+.card::before { /* the spine — the card's state, on its leading edge */
   content: '';
   position: absolute;
-  inset: -1px auto -1px -1px;
+  /* Inside the card, not straddling its border. Hanging 1px past the
+     rounded corners drew the eye to the overhang rather than the state. */
+  inset: 8px auto 8px 0;
   width: 3px;
-  border-radius: 8px 0 0 8px;
-  background: var(--pair-accent, transparent);
-  opacity: 0.45;
+  border-radius: 0 3px 3px 0;
+  background: var(--state-edge, var(--pair-accent, transparent));
+  opacity: 1;
   transition: opacity 0.12s ease;
 }
 .card-suggestion { --pair-accent: var(--agent); }
