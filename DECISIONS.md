@@ -971,6 +971,64 @@ than once). The skill documents the pending-suggestions push refusal
 as an expected, recoverable state with explicit next steps, so agents
 treat the guardrail as workflow rather than a tool failure.
 
+## 59. Model catalog comes from the user's CLI, not from us (#93/#86)
+
+`query(...).supportedModels()` returns the live `ModelInfo[]` the spawned
+Claude Code CLI reports: `value` (pass back verbatim), `resolvedModel`
+(the versioned id an alias resolves to), `displayName`, `description`,
+`supportsEffort` + `supportedEffortLevels`, `supportsAdaptiveThinking`,
+`supportsFastMode`, `supportsAutoMode`.
+
+**Nothing in Margin's release cycle gates new models.** The SDK does not
+vendor a CLI — it spawns the user's `claude` on PATH
+(`pathToClaudeCodeExecutable` overrides). So the catalog tracks the
+user's own Claude Code install, which auto-updates. Bumping
+`@anthropic-ai/claude-agent-sdk` is *not* required for new models
+either. Probed 2026-07-25 on CLI 2.1.219: Default→claude-sonnet-5,
+sonnet→claude-sonnet-5, claude-fable-5[1m]→claude-fable-5,
+opus→claude-opus-4-8, haiku→claude-haiku-4-5-20251001. Opus 5 shipped
+that day and did **not** appear — because this box's CLI predates it,
+not because anything in Margin pins it.
+
+Consequences for the picker: it must be **per-model data-driven**
+(Haiku reports no effort levels and no adaptive thinking, so a global
+five-level control is wrong); `value` is not always a clean alias
+(`claude-fable-5[1m]`), so pass it through and display
+`displayName`/`resolvedModel` rather than parsing it; and #86 (thinking
+levels) is the same feature as #93, not a follow-on.
+
+The catalog's `default` row is the **recommended** default (Sonnet),
+not the user's configured default — those are different concepts.
+Margin's existing empty-string option already passes no model and thus
+defers to `~/.claude/settings.json`; keep that behavior and label it
+for what it is.
+
+## 60. Reference typography, not Google Docs cosplay (#83); reference.docx is not the style source (#57)
+
+Drew's framing, adopted: Margin should match the **reference details** —
+fonts, sizes, line spacing — in the editor and preview, and explicitly
+should *not* try to look like Google Docs. Docs is one output target,
+not the source of truth. Evidence it isn't: Margin's first real
+document (Drew's 2026 self-review) was written in Margin and pasted
+into a Workday rich-text form, never becoming a Doc.
+
+Two consequences. **#83** builds a `resolveDocStyle() → CSS custom
+properties` seam that editor and preview both consume; the Docs look is
+one theme over that seam, never hardwired. **#57 is re-scoped**: a
+runtime `.docx` importer is *not* the mechanism Drew wants. He wants a
+customization surface — likely settings-screen-driven — with the design
+still open. Do not build the docx importer; treat `styles.ts` as the
+current resolved config and put the seam in front of it.
+
+Non-goals reconfirmed with a shared reason (round-trip integrity):
+smart quotes / `--`→en-dash substitution, and kramdown attribute lists
+(`{: .post}`). Both would make fetch return text the author never
+wrote, producing a permanent diff on every later push.
+
+Copy-as-rich-text is **not** needed for the Workday case — copying out
+of Preview already pastes as rich text. Building an explicit affordance
+is wanted eventually but low priority.
+
 ## Verification status (honest accounting)
 
 Updated 2026-07-10, all verified by driving the built app over CDP:
