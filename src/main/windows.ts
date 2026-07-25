@@ -4,11 +4,11 @@ import { IPC } from '@shared/ipc';
 import {
   DocumentSession,
   dropSession,
-  findSessionByPath,
   getSession,
   hasActiveSetup,
   setSession,
 } from './session';
+import { findWorkspaceRoot } from './workspace';
 // (Menu import above is used by the context-menu handler.)
 import { addRecentFile } from './recents';
 
@@ -132,22 +132,36 @@ export async function attachDocument(win: BrowserWindow, filePath: string): Prom
   }
 }
 
+function reveal(win: BrowserWindow): void {
+  if (win.isMinimized()) win.restore();
+  win.focus();
+}
+
 /**
  * Open a file, following the Netscope window rules:
  * - already open somewhere -> focus that window
+ * - its project is open somewhere -> switch that window to it
  * - `preferWindow` (e.g. a welcome window the user acted in) -> load it there
  * - otherwise -> new cascaded window
  */
 export async function openFile(filePath: string, preferWindow?: BrowserWindow): Promise<void> {
   const resolved = path.resolve(filePath);
-  const existing = findSessionByPath(resolved);
-  if (existing) {
-    for (const win of BrowserWindow.getAllWindows()) {
-      if (getSession(win.webContents.id)?.filePath === resolved) {
-        if (win.isMinimized()) win.restore();
-        win.focus();
-        return;
-      }
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (getSession(win.webContents.id)?.filePath === resolved) {
+      reveal(win);
+      return;
+    }
+  }
+  // A window is scoped to a project, not a file: opening a second document
+  // from a project that's already open switches that window rather than
+  // starting a rival window over the same `.margin/` (issue #119 follow-up).
+  // This is what the file explorer already does from inside the window.
+  const root = await findWorkspaceRoot(resolved);
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (getSession(win.webContents.id)?.workspaceRoot === root) {
+      await attachDocument(win, resolved);
+      reveal(win);
+      return;
     }
   }
   // Reuse the acting window only when it holds nothing the user would
@@ -159,7 +173,7 @@ export async function openFile(filePath: string, preferWindow?: BrowserWindow): 
     !hasActiveSetup(preferWindow.webContents.id)
   ) {
     await attachDocument(preferWindow, resolved);
-    preferWindow.focus();
+    reveal(preferWindow);
     return;
   }
   createWindow(resolved);
