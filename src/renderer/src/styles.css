@@ -268,7 +268,10 @@ kbd {
 .cm-content::selection { background: color-mix(in srgb, var(--user) 25%, transparent); }
 .cm-activeLine { background: transparent; }
 .cm-placeholder { color: var(--ink-faint); font-style: italic; }
-.cm-selectionMatch { background: var(--comment-wash); }
+/* .cm-selectionMatch alone loses to CodeMirror's injected theme (it lands
+   later at equal specificity), so this had no effect and matches painted
+   CM's default green — off-palette in an all-Catppuccin app. */
+.cm-editor .cm-selectionMatch { background: var(--comment-wash); }
 
 /* markdown syntax */
 .md-h1, .md-h2, .md-h3, .md-h4 { font-weight: 650; }
@@ -323,7 +326,19 @@ kbd {
 .pair-active.anchor-comment { background: color-mix(in srgb, var(--comment-edge) 30%, transparent); }
 .pair-active.anchor-suggestion-ins { background: color-mix(in srgb, var(--agent) 28%, transparent); }
 .pair-active.anchor-suggestion-del { background: color-mix(in srgb, var(--danger) 18%, transparent); }
+/* Pending: the composer's subject, or a selection kept alive across a
+   focus change. Same hue as a comment so the relationship reads, but
+   washed out and dashed — it hasn't been committed to the review yet
+   and shouldn't carry a real anchor's weight (#87/#91). */
+.anchor-pending {
+  background: color-mix(in srgb, var(--comment-wash) 80%, transparent);
+  border-bottom: 2px dashed color-mix(in srgb, var(--comment-edge) 70%, transparent);
+}
 .anchor, .card { transition: background 0.12s ease, border-color 0.12s ease; }
+
+/* Matches keep painting after the editor loses focus, lingering with no
+   visible selection to explain them (#91). */
+.cm-editor:not(.cm-focused) .cm-selectionMatch { background: transparent; }
 
 /* ——— preview ——— */
 

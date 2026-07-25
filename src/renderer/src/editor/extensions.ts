@@ -182,6 +182,69 @@ const annotationsField = StateField.define<{ anns: EditorAnnotation[]; deco: Dec
   provide: (f) => EditorView.decorations.from(f, (v) => v.deco),
 });
 
+export const setPendingAnchor = StateEffect.define<{ from: number; to: number } | null>();
+
+/** The composer's range, remapped through edits while it stays open. */
+const pendingAnchorField = StateField.define<{ from: number; to: number } | null>({
+  create: () => null,
+  update(value, tr) {
+    for (const effect of tr.effects) {
+      if (effect.is(setPendingAnchor)) value = effect.value;
+    }
+    if (!value) return null;
+    if (!tr.docChanged) return value;
+    return { from: tr.changes.mapPos(value.from), to: tr.changes.mapPos(value.to, 1) };
+  },
+});
+
+const pendingAnchorMark = Decoration.mark({ class: 'anchor-pending' });
+
+function pendingRange(view: EditorView): { from: number; to: number } | null {
+  const pending = view.state.field(pendingAnchorField);
+  if (pending) return pending;
+  // A selection the editor no longer paints because focus moved to the
+  // sidebar. "+ Comment" still targets it, so it has to stay visible —
+  // without this the button acts on text with nothing marking it (#91).
+  if (view.hasFocus) return null;
+  const { main } = view.state.selection;
+  return main.empty ? null : { from: main.from, to: main.to };
+}
+
+/**
+ * Text that is spoken for but not yet committed: either the composer's
+ * subject, or a selection kept alive across a focus change. Deliberately
+ * quieter than a real comment anchor (dashed, paler) — it marks intent,
+ * and intent shouldn't look like something already in the review (#87/#91).
+ */
+const pendingAnchorHighlight = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = this.build(view);
+    }
+
+    update(update: ViewUpdate) {
+      const retargeted = update.transactions.some((tr) =>
+        tr.effects.some((e) => e.is(setPendingAnchor)),
+      );
+      if (update.docChanged || update.selectionSet || update.focusChanged || retargeted) {
+        this.decorations = this.build(update.view);
+      }
+    }
+
+    build(view: EditorView): DecorationSet {
+      const range = pendingRange(view);
+      if (!range) return Decoration.none;
+      const from = Math.max(0, range.from);
+      const to = Math.min(range.to, view.state.doc.length);
+      if (from >= to) return Decoration.none;
+      return Decoration.set([pendingAnchorMark.range(from, to)]);
+    }
+  },
+  { decorations: (v) => v.decorations },
+);
+
 const markdownHighlight = HighlightStyle.define([
   { tag: t.heading1, class: 'md-h1' },
   { tag: t.heading2, class: 'md-h2' },
@@ -405,6 +468,8 @@ export function createExtensions(callbacks: EditorCallbacks) {
     lineStyles,
     tablePill,
     annotationsField,
+    pendingAnchorField,
+    pendingAnchorHighlight,
     readOnlyCompartment.of(EditorState.readOnly.of(false)),
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
