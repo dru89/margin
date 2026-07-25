@@ -86,6 +86,7 @@ export async function loadReview(docPath: string, content: string): Promise<Revi
     const data = JSON.parse(raw) as ReviewData;
     if (data.version !== 1) return emptyReview(name);
     data.discussion ??= []; // sidecars written before the discussion feature
+    backfillRounds(data);
     // The file may have been edited outside the app since the sidecar was
     // written — re-anchor everything against the current content.
     for (const c of data.comments) c.anchor = reanchor(content, c.anchor);
@@ -96,6 +97,21 @@ export async function loadReview(docPath: string, content: string): Promise<Revi
   } catch {
     return emptyReview(name);
   }
+}
+
+/**
+ * Sidecars written before round stamps existed carry none. Backfill them
+ * as round 0 — history — and mark every thread seen, so opening an old
+ * review reads as settled work rather than a wall of unread. Nothing is
+ * rewritten until the document is next saved.
+ */
+function backfillRounds(data: ReviewData): void {
+  for (const c of data.comments) {
+    c.round ??= 0;
+    for (const r of c.replies) r.round ??= 0;
+    c.seenRound ??= data.round;
+  }
+  for (const s of data.suggestions) s.round ??= 0;
 }
 
 export async function saveReview(docPath: string, review: ReviewData): Promise<void> {

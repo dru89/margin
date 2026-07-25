@@ -58,11 +58,33 @@ and the review's current round `r`:
 
 | state | rule | means |
 | --- | --- | --- |
-| **Draft** | `t.round === r` and the round hasn't been submitted | You wrote this; it hasn't been sent |
-| **Awaiting** | last activity is yours, `round < r` | Sent, Claude hasn't answered |
-| **Unread** | last activity is the agent's, `round > (t.seenRound ?? -1)` | Claude answered and you haven't looked |
-| **Read** | last activity is the agent's, already seen | Answered, you've seen it |
+| **Draft** | latest activity is *yours*, `round >= r` | You wrote this; it hasn't been sent |
+| **Awaiting** | latest activity is yours, `round < r` | Sent, no answer yet |
+| **Unread** | latest *external* round `> (t.seenRound ?? -1)` | Someone else spoke and you haven't looked |
+| **Read** | latest activity is external, already seen | Answered, you've seen it |
 | **Settled** | `t.status === 'resolved'` | Done |
+
+Two things implementation settled that the rules above had glossed:
+
+**Draft needs authorship, not just the round number.** `ReviewData.round`
+increments at the *top* of `submitReview`, so submitting moves the
+counter past everything the author has written — which is what makes
+"unsent" computable at all. But the agent's output for round N also
+carries N and stays there until the next submit, so the number alone
+cannot separate the two. It is *your* writing at the current round that
+is a draft.
+
+**"The agent" is really "not you".** A thread imported from a linked
+Google Doc is attributed to `user` (it isn't the agent's) but was
+written by a collaborator, so it must not read as your draft. The test
+is external authorship: `author === 'agent'`, or an imported thread, or
+a reply carrying `collaborator`. Note that a reply *you* send to the Doc
+carries `driveReplyId` but no `collaborator`, which is what keeps it
+yours.
+
+Unread therefore tracks the latest **external** round rather than the
+latest activity, so a thread where someone else spoke and you then
+replied still counts as seen.
 
 **Orphaned is a flag, not a state.** An anchor can be lost in any of
 the above, and the thread still needs its state shown. It renders as a

@@ -129,12 +129,16 @@ const busyDocs = new Set<string>();
 
 const gdocsToken = async (): Promise<string> => (await getAccessToken())!;
 
-function importedReply(r: CommentRecord['replies'][number]): Reply {
+function importedReply(r: CommentRecord['replies'][number], round: number): Reply {
   return {
     id: nanoid(8),
     author: 'user',
     text: r.content,
     createdAt: r.createdTime,
+    // The round it arrived in, not one it was written in — a collaborator
+    // on the Doc has no idea our rounds exist. It is still the round the
+    // author first *could* have seen it.
+    round,
     collaborator: r.author.displayName,
     driveReplyId: r.id,
   };
@@ -158,7 +162,7 @@ async function mergeDocComments(session: DocumentSession, docId: string, markdow
         const known = new Set(existing.replies.map((r) => r.driveReplyId).filter(Boolean));
         for (const reply of record.replies) {
           if (reply.content === '') continue; // bare action replies
-          if (!known.has(reply.id)) existing.replies.push(importedReply(reply));
+          if (!known.has(reply.id)) existing.replies.push(importedReply(reply, review.round));
         }
         if (record.resolved && existing.status === 'open') existing.status = 'resolved';
         continue;
@@ -175,8 +179,9 @@ async function mergeDocComments(session: DocumentSession, docId: string, markdow
         author: 'user',
         createdAt: record.createdTime,
         text: record.content,
+        round: review.round,
         anchor,
-        replies: record.replies.filter((r) => r.content !== '').map(importedReply),
+        replies: record.replies.filter((r) => r.content !== '').map((r) => importedReply(r, review.round)),
         status: record.resolved ? 'resolved' : 'open',
         provenance: 'imported',
         driveCommentId: record.id,
