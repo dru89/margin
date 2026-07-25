@@ -333,6 +333,74 @@ kbd {
   background: color-mix(in srgb, var(--comment-wash) 80%, transparent);
   border-bottom: 2px dashed color-mix(in srgb, var(--comment-edge) 70%, transparent);
 }
+/* ——— review state vocabulary (spec §3) ———
+   Three independent axes that used to compete for the same pixels: the
+   card's leading edge is state, the author chip is authorship, the diff is
+   what happens to the text. Nothing relies on colour alone — the unread dot
+   is a shape difference and the draft edge is a texture one. */
+.card-comment, .card-suggestion { position: relative; }
+.card-comment::before, .card-suggestion::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 8px; bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+}
+.state-unread::before { background: var(--agent); }
+.state-awaiting::before { background: color-mix(in srgb, var(--user) 45%, transparent); }
+.state-pending::before { background: color-mix(in srgb, var(--agent) 45%, transparent); }
+/* Dashed: the same language the document uses for an uncommitted anchor. */
+.state-draft::before {
+  background: repeating-linear-gradient(
+    to bottom, var(--comment-edge) 0 4px, transparent 4px 8px
+  );
+}
+.state-read::before, .state-decided::before, .state-settled::before { background: none; }
+.state-unread { border-color: color-mix(in srgb, var(--agent) 45%, var(--rule)); }
+.state-draft {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--comment-edge) 50%, var(--rule));
+}
+
+.unread-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--agent); flex: 0 0 auto;
+}
+.state-label {
+  font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.state-label .op-del { color: var(--danger); font-weight: 700; }
+.state-label .op-edit { color: var(--agent); font-weight: 700; }
+.badge {
+  font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; font-weight: 700;
+  padding: 1px 6px; border-radius: 4px;
+  background: color-mix(in srgb, var(--ink-faint) 20%, transparent);
+  color: var(--ink-soft);
+}
+/* Only ever rendered for rounds older than the one being drafted. */
+.rnd {
+  font-size: 10.5px; color: var(--ink-faint); white-space: nowrap;
+  border-bottom: 1px dotted var(--ink-faint); cursor: help;
+}
+
+/* Messages run oldest first; each is introduced by whoever wrote it. */
+/* Named apart from the discussion dock's .msg, which is a card with its own
+   background — reusing it made every thread message look like a card. */
+.thread-msg + .thread-msg,
+.card-quote + .thread-msg { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--rule); }
+.thread-msg-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+
+/* A deletion has no inserted half to contrast against, so the card carries
+   the operation's colour at a strength that reads at 13px — the document's
+   9% wash is tuned for 17px prose and disappears here (#102). */
+.card-context-del {
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
 .undo-decision { margin-left: auto; font-size: 11px; padding: 2px 8px; }
 .anchor, .card { transition: background 0.12s ease, border-color 0.12s ease; }
 
@@ -586,12 +654,21 @@ kbd {
 .card-composer { border-color: var(--user); cursor: default; }
 .card-archived { opacity: 0.7; cursor: default; }
 
+/* The head now carries state, badges and a round stamp rather than just an
+   author and one control, so it flows left with a gap. `space-between` here
+   would scatter five children across the card. */
 .card-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 8px;
 }
+/* Whatever sits on the right — the locator, or Resolve — pushes there. */
+.card-head > .card-locator,
+.card-head > .resolve-wrap,
+.card-head > .btn-ghost { margin-left: auto; }
+.card-head > .card-locator ~ .rnd { margin-left: 0; }
 
 
 
