@@ -328,6 +328,8 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
 export function Sidebar() {
   const review = useStore((s) => s.review);
   const setThreadStatus = useStore((s) => s.setThreadStatus);
+  const undoDecision = useStore((s) => s.undoDecision);
+  const locked = useLocked();
   const [showArchive, setShowArchive] = useState(false);
   const activeAnchorId = useStore((s) => s.activeAnchorId);
 
@@ -402,6 +404,17 @@ export function Sidebar() {
                     <div className="card-head">
                       <AuthorChip author={s.author} />
                       <span className="card-locator">{s.status}</span>
+                      {/* A decision is undone as a decision — Cmd-Z would only
+                          revert the text half and leave the review claiming it
+                          landed (#128). */}
+                      <button
+                        className="btn btn-ghost undo-decision"
+                        disabled={locked}
+                        title="Put this back to pending"
+                        onClick={() => undoDecision(s.id)}
+                      >
+                        Undo
+                      </button>
                     </div>
                     <Quote text={s.anchor.quote} />
                     {s.decisionComment && <Md text={`“${s.decisionComment}”`} />}

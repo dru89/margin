@@ -71,6 +71,11 @@ export interface Suggestion {
   status: SuggestionStatus;
   /** Optional comment left by the user when accepting/rejecting. */
   decisionComment?: string;
+  /**
+   * Where the replacement landed, once accepted. Remapped through later
+   * edits like an anchor, so the decision stays undoable (#128).
+   */
+  applied?: { from: number; to: number };
 }
 
 /**
