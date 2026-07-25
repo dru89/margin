@@ -11,14 +11,22 @@ import type { ModelChoice, ModelPreference } from '@shared/types';
  * three cannot drift. Deliberately shows the wire id rather than the
  * catalog's prose description: the audience wants to know exactly
  * which weights they selected, and the description wrapped to three
- * lines and shifted the layout under it.
+ * lines and shifted the layout under it. The id sits below *both*
+ * selects rather than under the model — it reads as a footnote to the
+ * pair instead of breaking them apart.
  */
 export function ModelPicker({
   value,
   onChange,
   /**
    * Whether "inherit from the level above" is offered. Settings sets
-   * the root default, so it has nothing to inherit from.
+   * the root default, so it has nothing to inherit from — and it is
+   * the one screen that offers the catalog's own "Default
+   * (recommended)" row. Everywhere else that row is hidden: offering
+   * both it and "Use my default" asks the user to distinguish two
+   * things that only differ if Settings is unset, and anyone with an
+   * opinion about the recommended model can just set it in Settings
+   * (Drew's call).
    */
   allowInherit = true,
   inheritLabel = 'Use my default',
@@ -48,6 +56,7 @@ export function ModelPicker({
   const current = value.model ?? (allowInherit ? '' : 'default');
   const selected = models.find((m) => m.value === current);
   const levels = selected?.effortLevels ?? [];
+  const choices = allowInherit ? models.filter((m) => m.value !== 'default') : models;
 
   return (
     <div className="model-picker">
@@ -66,20 +75,13 @@ export function ModelPicker({
           }}
         >
           {allowInherit && <option value="">{inheritLabel}</option>}
-          {models.map((m) => (
+          {choices.map((m) => (
             <option key={m.value} value={m.value}>
               {m.label}
             </option>
           ))}
         </select>
       </label>
-
-      {selected?.resolvedModel && (
-        <div className="model-row">
-          <span className="model-label" />
-          <code className="model-id">{selected.resolvedModel}</code>
-        </div>
-      )}
 
       {levels.length > 0 && (
         <label className="model-row">
@@ -97,6 +99,13 @@ export function ModelPicker({
             ))}
           </select>
         </label>
+      )}
+
+      {selected?.resolvedModel && (
+        <div className="model-row">
+          <span className="model-label" />
+          <code className="model-id">{selected.resolvedModel}</code>
+        </div>
       )}
     </div>
   );
