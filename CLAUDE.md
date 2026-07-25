@@ -83,6 +83,24 @@ while replying to an unread thread still left it reading as unread — the
 bug lived on an edge between two states that were each individually
 correct.
 
+## A project to look at
+
+```bash
+npm run fixture      # builds .fixtures/review-surface (gitignored), then prints the open command
+```
+
+A self-evaluation document with a review already in it: threads in every
+state from the spec (draft, awaiting, unread, read, settled, orphaned, a
+six-message thread, one imported from a Doc), pending/accepted/rejected
+suggestions including a deletion, a queued discussion message, a second
+document so the explorer has something to show, and a git repo. Anchors
+are computed against the real text, so the generator fails loudly rather
+than producing a document full of accidental orphans. Re-running resets
+it.
+
+Use it when working on the review surface — an empty document hides
+every problem worth seeing.
+
 ## Verifying changes (CDP smoke pattern)
 
 ```bash
