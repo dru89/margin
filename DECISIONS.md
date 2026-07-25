@@ -979,16 +979,31 @@ Claude Code CLI reports: `value` (pass back verbatim), `resolvedModel`
 `supportsEffort` + `supportedEffortLevels`, `supportsAdaptiveThinking`,
 `supportsFastMode`, `supportsAutoMode`.
 
-**Nothing in Margin's release cycle gates new models.** The SDK does not
-vendor a CLI — it spawns the user's `claude` on PATH
-(`pathToClaudeCodeExecutable` overrides). So the catalog tracks the
-user's own Claude Code install, which auto-updates. Bumping
-`@anthropic-ai/claude-agent-sdk` is *not* required for new models
-either. Probed 2026-07-25 on CLI 2.1.219: Default→claude-sonnet-5,
-sonnet→claude-sonnet-5, claude-fable-5[1m]→claude-fable-5,
-opus→claude-opus-4-8, haiku→claude-haiku-4-5-20251001. Opus 5 shipped
-that day and did **not** appear — because this box's CLI predates it,
-not because anything in Margin pins it.
+**The SDK vendors its own Claude Code binary, and that pins the model
+catalog.** `@anthropic-ai/claude-agent-sdk` ships a per-platform CLI
+inside a compressed Bun filesystem blob (`manifest.json` names the
+version, `extractFromBunfs.js` unpacks it); there is no `cli.js`, which
+is what made this hard to see. The SDK's patch number tracks the CLI
+it carries: 0.3.206 → CLI 2.1.206. **The system `claude` on PATH is
+never consulted** unless `pathToClaudeCodeExecutable` is set.
+
+So the catalog moves when — and only when — the SDK dependency is
+bumped. Drew's call (2026-07-25): **always use the vendored binary**,
+never `pathToClaudeCodeExecutable`. Reproducibility beats freshness;
+a per-machine CLI version we never tested is the worse failure mode,
+and a dependency bump per model generation is an acceptable cadence.
+**Add the SDK bump to the release checklist.**
+
+Demonstrated end to end that day: SDK 0.3.206 (vendored CLI 2.1.206,
+built 2026-07-09) reported `opus → claude-opus-4-8` while Drew's own
+CLI 2.1.219 showed Opus 5 in `/model`. Bumping to 0.3.220 (vendored
+CLI 2.1.220) flipped it to `opus → claude-opus-5` with no other
+change. Ruled out along the way, each by direct test: nested-session
+env vars, `ANTHROPIC_BASE_URL`, an on-disk catalog cache, and account
+entitlement (the last disproved when Drew ran the probe himself and
+still saw 4.8 — his Fable row carried the account-specific `Requires
+usage credits` suffix, so identity matched and only the binary
+differed).
 
 Consequences for the picker: it must be **per-model data-driven**
 (Haiku reports no effort levels and no adaptive thinking, so a global
