@@ -62,10 +62,13 @@ const api = {
   rejectProposal: (id: string, comment?: string): Promise<void> =>
     ipcRenderer.invoke(IPC.rejectProposal, id, comment),
   getProjectsDir: (): Promise<string> => ipcRenderer.invoke(IPC.getProjectsDir),
-  setupMessage: (transcript: SetupMessage[]): Promise<SetupReply> =>
-    ipcRenderer.invoke(IPC.setupMessage, transcript),
-  createProject: (proposal: ProjectProposal, transcript: SetupMessage[]): Promise<string> =>
-    ipcRenderer.invoke(IPC.createProject, proposal, transcript),
+  setupMessage: (transcript: SetupMessage[], pref?: ModelPreference): Promise<SetupReply> =>
+    ipcRenderer.invoke(IPC.setupMessage, transcript, pref),
+  createProject: (
+    proposal: ProjectProposal,
+    transcript: SetupMessage[],
+    pref?: ModelPreference,
+  ): Promise<string> => ipcRenderer.invoke(IPC.createProject, proposal, transcript, pref),
   getAppSettings: (): Promise<AppSettingsState> => ipcRenderer.invoke(IPC.getAppSettings),
   updateAppSettings: (patch: Partial<AppSettingsState>): Promise<AppSettingsState> =>
     ipcRenderer.invoke(IPC.updateAppSettings, patch),

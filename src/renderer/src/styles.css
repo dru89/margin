@@ -1530,3 +1530,7 @@ button.status-chip:active { transform: translateY(1px); }
 }
 
 .settings-row-stack { flex-direction: column; align-items: stretch; gap: 8px; }
+
+/* #73: model choice sits with the setup composer, before anything exists. */
+.setup-model { flex: 1; min-width: 0; max-width: 340px; }
+.setup-model .model-detail { margin-top: 2px; }

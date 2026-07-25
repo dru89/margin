@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { nanoid } from 'nanoid';
 import os from 'os';
 import type {
+  ModelPreference,
   CommentThread,
   ProjectProposal,
   SetupMessage,
@@ -442,7 +443,10 @@ How to work:
  * prompt. The propose_project tool only captures the card — the app
  * materializes it after the author confirms.
  */
-export async function runSetupTurn(transcript: SetupMessage[]): Promise<SetupReply> {
+export async function runSetupTurn(
+  transcript: SetupMessage[],
+  pref: ModelPreference = {},
+): Promise<SetupReply> {
   if (process.env.MARGIN_FAKE_AGENT) {
     return runFakeSetupTurn(transcript);
   }
@@ -494,6 +498,8 @@ export async function runSetupTurn(transcript: SetupMessage[]): Promise<SetupRep
       maxTurns: 6,
       executable: 'node',
       env: cleanEnv(),
+      ...(pref.model ? { model: pref.model } : {}),
+      ...(pref.effort ? { effort: pref.effort as never } : {}),
     },
   });
 
