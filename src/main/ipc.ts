@@ -226,15 +226,20 @@ export function registerIpcHandlers(): void {
     return updateSettings({ projectsDir: result.filePaths[0] });
   });
 
-  ipcMain.handle(IPC.setupMessage, (_event, transcript: SetupMessage[]) =>
-    runSetupTurn(transcript),
+  ipcMain.handle(IPC.setupMessage, (_event, transcript: SetupMessage[], pref?: ModelPreference) =>
+    runSetupTurn(transcript, pref),
   );
 
   // One confirm materializes the whole project: folder, seed files, git
   // repo, and the setup transcript seeded as the project discussion.
   ipcMain.handle(
     IPC.createProject,
-    async (event, proposal: ProjectProposal, transcript: SetupMessage[]) => {
+    async (
+      event,
+      proposal: ProjectProposal,
+      transcript: SetupMessage[],
+      pref?: ModelPreference,
+    ) => {
       const { projectsDir } = await getSettings();
       const folder = path.basename(path.normalize(proposal.folderName));
       if (!folder || folder === '.' || folder === '..' || folder.startsWith('.')) {
@@ -271,6 +276,9 @@ export function registerIpcHandlers(): void {
         createdAt: new Date().toISOString(),
       }));
       await saveDiscussion(target, { version: 1, messages });
+      // The model chosen during setup becomes the project's default
+      // for every later round (DECISIONS §61).
+      if (pref?.model || pref?.effort) await saveProjectSettings(target, pref);
       await initProjectRepo(target, `New project: ${proposal.title}`);
 
       if (!firstMd) throw new Error('The proposal contained no markdown file to open.');

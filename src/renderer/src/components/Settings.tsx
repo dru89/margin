@@ -101,7 +101,7 @@ export function Settings() {
                   defaultEffort: next.effort,
                 });
               }}
-              inheritLabel="Claude Code default"
+              allowInherit={false}
             />
           </div>
         </section>

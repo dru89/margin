@@ -111,11 +111,7 @@ export function Toolbar() {
           </button>
           {submitOpen && (
             <div className="popover" ref={popoverRef}>
-              <ModelPicker
-                value={modelPref}
-                onChange={setModelPref}
-                inheritLabel="Use my default"
-              />
+              <ModelPicker value={modelPref} onChange={setModelPref} />
               <h4 className="sidebar-heading popover-manifest-head">Goes with this round</h4>
               {modifiedDocs.length > 0 && (
                 <p className="manifest-files">
@@ -139,7 +135,7 @@ export function Toolbar() {
               )}
               <div className="card-actions">
                 <button className="btn btn-primary" onClick={doSubmit}>
-                  Send round {nextRound} →
+                  Send round {nextRound}
                 </button>
                 <button className="btn" onClick={() => setSubmitOpen(false)}>
                   Cancel

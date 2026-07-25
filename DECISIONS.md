@@ -1065,6 +1065,17 @@ Three points his sketch didn't cover, decided here:
   default" vs "this session only"; Margin's is always sticky, per
   Drew's wording. Add the transient option only if the absence is felt.
 
+**Only one "default" is ever visible in a given list.** The catalog's
+own `Default (recommended)` row appears in Settings and nowhere else;
+every other surface offers only `Use my default`, which resolves
+through Settings. Showing both — as the first build did — asks the
+user to distinguish two options that differ only when Settings is
+unset, and the difference is invisible from the list. Drew's reasoning:
+anyone with an opinion about the recommended model can select it in
+Settings, and anyone overriding at both levels is a power user who
+doesn't need the recommendation surfaced again. Don't "restore" the
+Default row to the project-level pickers.
+
 One `ModelPicker` component serves all three surfaces so they cannot
 drift, and it is driven entirely by `supportedModels()` — the option
 list, the version strings, and which models even show an effort

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { ModelPicker } from '@/components/ModelPicker';
+import type { ModelPreference } from '@shared/types';
 import type { ProjectProposal, SetupMessage } from '@shared/types';
 import { Md } from '@/components/Md';
 
@@ -13,13 +15,19 @@ export function ProjectSetup({ onBack }: { onBack: () => void }) {
   const [transcript, setTranscript] = useState<SetupMessage[]>([]);
   const [proposal, setProposal] = useState<ProjectProposal | null>(null);
   const [projectsDir, setProjectsDir] = useState('');
+  const [pref, setPref] = useState<ModelPreference>({});
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    void window.margin.getProjectsDir().then(setProjectsDir);
+    void window.margin.getAppSettings().then((cfg) => {
+      setProjectsDir(cfg.projectsDir);
+      // Inherit the app default; the user can change it before the
+      // project exists, and the choice becomes the project's own.
+      setPref({ model: cfg.defaultModel, effort: cfg.defaultEffort });
+    });
   }, []);
 
   useEffect(() => {
@@ -43,7 +51,7 @@ export function ProjectSetup({ onBack }: { onBack: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      const result = await window.margin.setupMessage(next);
+      const result = await window.margin.setupMessage(next, pref);
       setTranscript([...next, { author: 'agent', text: result.reply }]);
       if (result.proposal) setProposal(result.proposal);
     } catch (err) {
@@ -60,7 +68,7 @@ export function ProjectSetup({ onBack }: { onBack: () => void }) {
     setError(null);
     try {
       // The window switches to the new document via docLoaded.
-      await window.margin.createProject(proposal, transcript);
+      await window.margin.createProject(proposal, transcript, pref);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setBusy(false);
@@ -122,6 +130,9 @@ export function ProjectSetup({ onBack }: { onBack: () => void }) {
             }
           }}
         />
+        <div className="setup-model">
+          <ModelPicker value={pref} onChange={setPref} />
+        </div>
         <div className="setup-compose-row">
           <button className="btn btn-ghost" onClick={onBack}>
             Back
