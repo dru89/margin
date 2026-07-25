@@ -1,5 +1,6 @@
 import { execFile } from 'child_process';
 import { promises as fs } from 'fs';
+import os from 'os';
 import path from 'path';
 import type { WorkspaceFile, WorkspaceState } from '@shared/types';
 import { loadProposals } from './proposalsStore';
@@ -16,13 +17,58 @@ function git(cwd: string, args: string[]): Promise<string> {
 }
 
 /** Workspace root = git repo root when present, else the file's directory. */
+/**
+ * The project a document belongs to, in precedence order:
+ *
+ *   1. the nearest ancestor holding a `.margin/` — the marker we own, and
+ *      the only one the user can place deliberately. Nested markers mean
+ *      deliberately nested projects; the nearest wins.
+ *   2. the git toplevel — a decent guess when no marker exists yet, and
+ *      what every project created before `.margin/` keying resolved to.
+ *   3. the file's own directory.
+ *
+ *  Where both (1) and (2) apply, the *deeper* one wins. `.margin/` is
+ *  created automatically at whatever root was in use, so a stray marker
+ *  high up — open a loose `~/Writing/notes.md` once and `~/Writing/`
+ *  has one — must not swallow every git repo beneath it.
+ *
+ *  `.margin/` is written *at* whatever root (2) or (3) produced, so
+ *  existing projects already carry the marker at their current root and
+ *  keep it under this rule.
+ *
+ *  The walk stops before the home directory: opening a loose `~/notes.md`
+ *  creates `~/.margin/`, and without this every file anywhere under home
+ *  would then inherit home as its project. `~/notes.md` itself still
+ *  resolves to home through (3).
+ */
 export async function findWorkspaceRoot(filePath: string): Promise<string> {
   const dir = path.dirname(filePath);
-  try {
-    return (await git(dir, ['rev-parse', '--show-toplevel'])).trim();
-  } catch {
-    return dir;
+  const home = os.homedir();
+  let marker: string | null = null;
+  let cur = dir;
+  for (;;) {
+    if (cur !== home) {
+      try {
+        if ((await fs.stat(path.join(cur, '.margin'))).isDirectory()) {
+          marker = cur;
+          break;
+        }
+      } catch {
+        /* no marker here — keep walking up */
+      }
+    }
+    const parent = path.dirname(cur);
+    if (parent === cur) break;
+    cur = parent;
   }
+  let toplevel: string | null = null;
+  try {
+    toplevel = (await git(dir, ['rev-parse', '--show-toplevel'])).trim();
+  } catch {
+    /* not a repo */
+  }
+  if (marker && toplevel) return toplevel.length > marker.length ? toplevel : marker;
+  return marker ?? toplevel ?? dir;
 }
 
 export function isMarkdown(name: string): boolean {

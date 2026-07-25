@@ -68,8 +68,13 @@ export function registerIpcHandlers(): void {
     await showOpenDialog(win);
   });
 
-  ipcMain.handle(IPC.openPath, async (_event, filePath: string) => {
-    await openFile(filePath);
+  // Recents on the Welcome screen and drag-drop both land here. Pass the
+  // acting window so a Welcome window is replaced rather than left behind
+  // as an empty second window (#119); openFile() still refuses to reuse a
+  // window holding a document or a setup conversation.
+  ipcMain.handle(IPC.openPath, async (event, filePath: string) => {
+    const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+    await openFile(filePath, win);
   });
 
   ipcMain.handle(IPC.newWindow, () => {
@@ -282,6 +287,11 @@ export function registerIpcHandlers(): void {
       await initProjectRepo(target, `New project: ${proposal.title}`);
 
       if (!firstMd) throw new Error('The proposal contained no markdown file to open.');
+      // The conversation has been materialized into the project, so this
+      // window no longer holds anything unsaved. Without clearing the flag
+      // openFile() treats it as a live setup and opens the new document in
+      // a second window, stranding the setup screen in this one.
+      setSetupActive(event.sender.id, false);
       const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;
       await openFile(firstMd, win);
       return target;

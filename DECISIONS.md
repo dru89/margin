@@ -1103,3 +1103,72 @@ Updated 2026-07-10, all verified by driving the built app over CDP:
   model round hasn't been exercised — it's a one-string pass-through).
 - Fake agent mode exists but hasn't been exercised end-to-end in the UI
   (same code path as the real round minus the SDK; low risk).
+
+## 62. Window reuse is decided by what the window holds (#119, #82)
+
+Opening a document reuses the acting window only when that window holds
+nothing the user would lose, and otherwise opens a new one. Three
+states, per Drew:
+
+| the window holds | opening a file/folder |
+| --- | --- |
+| the Welcome screen | replaces it |
+| a new-project conversation | new window |
+| an open document | new window |
+
+Welcome is where you land, so replacing it is what the user expects and
+spawning a second window strands an empty one. The other two are
+places you navigated to, and both hold state.
+
+Two things this depends on, both easy to break:
+
+- **The rule is enforced in `openFile()`, but only reaches the cases
+  whose callers pass `preferWindow`.** The reuse condition was already
+  correct when #119 was filed; the bug was that the Welcome recents
+  list, drag-drop (both via `IPC.openPath`) and File ▸ Open Recent
+  called `openFile()` without a window, so every one of them took the
+  new-window branch. A new call site that forgets the argument silently
+  reintroduces the bug.
+- **The setup screen refuses reuse whenever it is open**, not only once
+  something has been typed. It's a destination, not a landing screen.
+  That makes `createProject` a special case: it consumes the
+  conversation into a real project, so it clears the flag before
+  calling `openFile()`. Without that clear, creating a project opened
+  the new document in a *second* window and left the setup screen
+  behind in the first — which is what it did before this change.
+
+## 63. The project root is keyed off `.margin/`, not `.git/` (#123, #124)
+
+`findWorkspaceRoot()` resolves in this order, and where both apply the
+**deeper** wins:
+
+1. nearest ancestor holding a `.margin/`
+2. the git toplevel
+3. the file's own directory
+
+Drew's reasoning: `.margin/` is a directory we control and git is not.
+It also gives the user the only deliberate way to declare a project
+boundary — nested markers mean nested projects, nearest wins — which is
+the answer to "is `parent/` or `parent/child/` the project?" It is a
+declaration, not an ambiguity.
+
+The migration is a no-op: `.margin/` is written *at* whatever root (2)
+or (3) produced, so every existing project already carries the marker
+exactly where rule (1) looks.
+
+Two guards, both there because `.margin/` is created automatically
+rather than by the user, so stray markers are expected:
+
+- **Deeper wins over the marker.** Open a loose `~/Writing/notes.md`
+  once and `~/Writing/.margin/` exists; without this every git repo
+  underneath would resolve to the whole of `~/Writing`.
+- **The walk skips the home directory itself.** Same failure one level
+  up: `~/.margin/` would make every file anywhere under home one
+  project. A file sitting directly in home still resolves to home via
+  rule (3).
+
+This also fixes #123 for established projects: a nested file walks up,
+finds the marker, and keeps the project instead of narrowing to its own
+subfolder. It does not fix the case where no marker exists yet — both
+siblings still fall to rule (3) — which is what the sticky-root half of
+#123 is for.

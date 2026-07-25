@@ -58,7 +58,7 @@ export async function rebuildMenu(): Promise<void> {
   const recentItems: MenuItemConstructorOptions[] = recents.map((r) => ({
     label: r.name,
     sublabel: r.path,
-    click: () => void openFile(r.path),
+    click: (_item, win) => void openFile(r.path, win instanceof BrowserWindow ? win : undefined),
   }));
   if (recentItems.length > 0) recentItems.push({ type: 'separator' });
   recentItems.push({
