@@ -89,6 +89,7 @@ function buildReviewServer(sdk: AgentSdk, session: DocumentSession) {
               author: 'agent',
               text: args.text,
               createdAt: new Date().toISOString(),
+              round: session.review.round,
             });
           });
           return ok('Reply added.');
@@ -117,6 +118,7 @@ function buildReviewServer(sdk: AgentSdk, session: DocumentSession) {
             anchor: makeAnchor(session.content, found.from, found.to),
             replies: [],
             status: 'open',
+            round: session.review.round,
           };
           await session.mutateReview((r) => r.comments.push(thread));
           return ok(`Comment added with id ${thread.id}.`);
@@ -173,6 +175,7 @@ function buildReviewServer(sdk: AgentSdk, session: DocumentSession) {
             id: nanoid(8),
             author: 'agent',
             createdAt: new Date().toISOString(),
+            round: session.review.round,
             anchor: makeAnchor(session.content, found.from, found.to),
             replacement: args.replacement,
             note: args.note,
@@ -265,6 +268,7 @@ function runFakeReviewTurn(session: DocumentSession, callbacks: TurnCallbacks): 
           author: 'agent',
           text: `(fake agent) Acknowledged: “${thread.text.slice(0, 60)}”. A real round would respond substantively here.`,
           createdAt: new Date().toISOString(),
+          round: session.review.round,
         });
       });
       await sleep(400);
@@ -280,6 +284,7 @@ function runFakeReviewTurn(session: DocumentSession, callbacks: TurnCallbacks): 
             id: nanoid(8),
             author: 'agent',
             createdAt: new Date().toISOString(),
+            round: session.review.round,
             anchor: makeAnchor(session.content, found.from, found.to),
             replacement: `${line} (revised by fake agent)`,
             note: 'Demonstration suggestion from MARGIN_FAKE_AGENT — accept or reject to exercise the flow.',

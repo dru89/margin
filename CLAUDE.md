@@ -20,7 +20,11 @@ MARGIN_FAKE_AGENT=1 npx electron . …   # scripted review round, no credentials
 There is no test framework. Verification is done by driving the built app
 over CDP (see below) plus targeted node scripts for pure logic (compile a
 single module with `npx esbuild src/shared/anchors.ts --format=esm --outfile=…`
-and assert against it).
+and assert against it). `npm run test:state` is one such suite —
+`scripts/test-review-state.mjs`, covering review-state derivation *and*
+its transitions. **Transitions are where the bugs are**: the state cases
+all passed while replying to an unread thread still left it reading as
+unread. When adding a rule, add the edge into it, not just the point.
 
 ## Verifying changes (CDP smoke pattern)
 

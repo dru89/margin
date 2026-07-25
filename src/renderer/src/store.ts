@@ -12,6 +12,7 @@ import type {
   WorkspaceState,
 } from '@shared/types';
 import { makeAnchor, resolveQuote } from '@shared/anchors';
+import { markSeen } from '@shared/reviewState';
 import { applyReplacement, formatTableAtCaret } from './editorBridge';
 
 export type ViewMode = 'write' | 'preview';
@@ -312,6 +313,7 @@ export const useStore = create<MarginState>((set, get) => {
             id: newId,
             author: 'user' as const,
             createdAt: new Date().toISOString(),
+            round: r.round,
             text: text.trim(),
             anchor: makeAnchor(content, composerAnchor.from, composerAnchor.to),
             replies: [],
@@ -333,6 +335,7 @@ export const useStore = create<MarginState>((set, get) => {
             id: nanoid(8),
             author: 'user' as const,
             createdAt: new Date().toISOString(),
+            round: r.round,
             anchor: makeAnchor(content, composerAnchor.from, composerAnchor.to),
             replacement,
             note: note?.trim() || undefined,
@@ -357,6 +360,7 @@ export const useStore = create<MarginState>((set, get) => {
                     author: 'user' as const,
                     text,
                     createdAt: new Date().toISOString(),
+                    round: r.round,
                     driveReplyId,
                   },
                 ],
@@ -372,7 +376,9 @@ export const useStore = create<MarginState>((set, get) => {
         ...r,
         comments: r.comments.map((c) =>
           c.id === threadId
-            ? {
+            ? // Replying is proof of having read what came before it, so the
+              // seen marker advances without waiting for a click.
+              markSeen({
                 ...c,
                 replies: [
                   ...c.replies,
@@ -381,9 +387,10 @@ export const useStore = create<MarginState>((set, get) => {
                     author: 'user' as const,
                     text: text.trim(),
                     createdAt: new Date().toISOString(),
+                    round: r.round,
                   },
                 ],
-              }
+              })
             : c,
         ),
       }));

@@ -21,6 +21,8 @@ export interface Reply {
   author: Author;
   text: string;
   createdAt: string;
+  /** Review round this was written in. Stamped at creation; never changes. */
+  round: number;
   /** Display name when this reply came from (or was sent to) the linked Google Doc. */
   collaborator?: string;
   /** Drive reply id — presence means it exists on the Doc (merge key). */
@@ -37,6 +39,13 @@ export interface CommentThread {
   anchor: Anchor;
   replies: Reply[];
   status: ThreadStatus;
+  /** Review round this was opened in. Stamped at creation; never changes. */
+  round: number;
+  /**
+   * Highest round of agent activity on this thread the author has looked at.
+   * Written by the UI only — the agent never sets it.
+   */
+  seenRound?: number;
   /** 'imported' = from the linked Google Doc (read-down; replies stay local
    * unless explicitly sent via Reply on Doc). Absent = local. */
   provenance?: 'local' | 'imported';
@@ -52,6 +61,8 @@ export interface Suggestion {
   id: string;
   author: Author;
   createdAt: string;
+  /** Review round this was proposed in. Stamped at creation; never changes. */
+  round: number;
   anchor: Anchor;
   /** Replacement text for the anchored range. Empty string = deletion. */
   replacement: string;
