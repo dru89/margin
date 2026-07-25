@@ -1274,12 +1274,11 @@ button.status-chip:active { transform: translateY(1px); }
   margin-top: 10px;
 }
 /* The picker gets its own row above the buttons — sandwiched between
-   them it forced Back and Send to centre against three rows (#73 review). */
-.setup-model { margin-top: 10px; }
-/* Back is a ghost button, so only its padding separates its label from
-   the column the picker's labels start at. Pull it back by that padding
-   so the two read as one left edge (#73 review). */
-.setup-compose-row > .btn-ghost { margin-left: -8px; }
+   them it forced Back and Send to centre against three rows (#73 review).
+   Centred rather than left-aligned: on this screen it belongs to the
+   composer as a whole, and hard left put it in a column with Back,
+   which invited an alignment it was never going to keep. */
+.setup-model { margin-top: 10px; display: flex; justify-content: center; }
 
 /* preview: list breathing room (issue #7) */
 .preview-body li { margin: 0.35em 0; }
