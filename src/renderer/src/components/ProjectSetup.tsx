@@ -34,13 +34,14 @@ export function ProjectSetup({ onBack }: { onBack: () => void }) {
     endRef.current?.scrollIntoView({ block: 'end' });
   }, [transcript, proposal, busy]);
 
-  // Tell main this window holds an unsaved conversation so Open Folder
-  // routes to a new window instead of overwriting it (issue #82).
+  // This window is a place the user navigated to, not a landing screen, so
+  // opening a file goes elsewhere for as long as it's up — whether or not
+  // anything has been typed yet (#82, #119). Creating the project clears
+  // this from the main side, since that consumes the conversation.
   useEffect(() => {
-    const active = transcript.length > 0 || input.trim() !== '';
-    window.margin.setSetupActive(active);
+    window.margin.setSetupActive(true);
     return () => window.margin.setSetupActive(false);
-  }, [transcript, input]);
+  }, []);
 
   const send = async () => {
     const text = input.trim();

@@ -1103,3 +1103,36 @@ Updated 2026-07-10, all verified by driving the built app over CDP:
   model round hasn't been exercised — it's a one-string pass-through).
 - Fake agent mode exists but hasn't been exercised end-to-end in the UI
   (same code path as the real round minus the SDK; low risk).
+
+## 62. Window reuse is decided by what the window holds (#119, #82)
+
+Opening a document reuses the acting window only when that window holds
+nothing the user would lose, and otherwise opens a new one. Three
+states, per Drew:
+
+| the window holds | opening a file/folder |
+| --- | --- |
+| the Welcome screen | replaces it |
+| a new-project conversation | new window |
+| an open document | new window |
+
+Welcome is where you land, so replacing it is what the user expects and
+spawning a second window strands an empty one. The other two are
+places you navigated to, and both hold state.
+
+Two things this depends on, both easy to break:
+
+- **The rule is enforced in `openFile()`, but only reaches the cases
+  whose callers pass `preferWindow`.** The reuse condition was already
+  correct when #119 was filed; the bug was that the Welcome recents
+  list, drag-drop (both via `IPC.openPath`) and File ▸ Open Recent
+  called `openFile()` without a window, so every one of them took the
+  new-window branch. A new call site that forgets the argument silently
+  reintroduces the bug.
+- **The setup screen refuses reuse whenever it is open**, not only once
+  something has been typed. It's a destination, not a landing screen.
+  That makes `createProject` a special case: it consumes the
+  conversation into a real project, so it clears the flag before
+  calling `openFile()`. Without that clear, creating a project opened
+  the new document in a *second* window and left the setup screen
+  behind in the first — which is what it did before this change.
