@@ -199,22 +199,15 @@ const pendingAnchorField = StateField.define<{ from: number; to: number } | null
 
 const pendingAnchorMark = Decoration.mark({ class: 'anchor-pending' });
 
-function pendingRange(view: EditorView): { from: number; to: number } | null {
-  const pending = view.state.field(pendingAnchorField);
-  if (pending) return pending;
-  // A selection the editor no longer paints because focus moved to the
-  // sidebar. "+ Comment" still targets it, so it has to stay visible —
-  // without this the button acts on text with nothing marking it (#91).
-  if (view.hasFocus) return null;
-  const { main } = view.state.selection;
-  return main.empty ? null : { from: main.from, to: main.to };
-}
-
 /**
- * Text that is spoken for but not yet committed: either the composer's
- * subject, or a selection kept alive across a focus change. Deliberately
- * quieter than a real comment anchor (dashed, paler) — it marks intent,
- * and intent shouldn't look like something already in the review (#87/#91).
+ * The subject of an open composer: a comment you have started but not
+ * submitted. Deliberately quieter than a real comment anchor (dashed,
+ * paler) — it marks an unfinished thought, and shouldn't look like
+ * something already in the review (#87).
+ *
+ * Only the composer earns this. A merely-selected range never does: a
+ * selection the editor has stopped painting is treated as no selection
+ * at all (#91), so there is nothing to mark.
  */
 const pendingAnchorHighlight = ViewPlugin.fromClass(
   class {
@@ -228,13 +221,13 @@ const pendingAnchorHighlight = ViewPlugin.fromClass(
       const retargeted = update.transactions.some((tr) =>
         tr.effects.some((e) => e.is(setPendingAnchor)),
       );
-      if (update.docChanged || update.selectionSet || update.focusChanged || retargeted) {
+      if (update.docChanged || retargeted) {
         this.decorations = this.build(update.view);
       }
     }
 
     build(view: EditorView): DecorationSet {
-      const range = pendingRange(view);
+      const range = view.state.field(pendingAnchorField);
       if (!range) return Decoration.none;
       const from = Math.max(0, range.from);
       const to = Math.min(range.to, view.state.doc.length);
@@ -475,9 +468,14 @@ export function createExtensions(callbacks: EditorCallbacks) {
       if (update.docChanged) {
         callbacks.onChange(update.state.doc.toString(), update.changes);
       }
-      if (update.selectionSet) {
+      if (update.selectionSet || update.focusChanged) {
+        // A selection the editor no longer paints is treated as no
+        // selection: "+ Comment" disables rather than acting on text the
+        // user can't see is still selected (#91). The button suppresses
+        // its own focus steal so this doesn't fire out from under it.
         const range = update.state.selection.main;
-        callbacks.onSelectionChange(range.empty ? null : { from: range.from, to: range.to });
+        const gone = range.empty || !update.view.hasFocus;
+        callbacks.onSelectionChange(gone ? null : { from: range.from, to: range.to });
       }
       if (update.selectionSet || update.docChanged) {
         const head = update.state.selection.main.head;

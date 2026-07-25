@@ -326,18 +326,17 @@ kbd {
 .pair-active.anchor-comment { background: color-mix(in srgb, var(--comment-edge) 30%, transparent); }
 .pair-active.anchor-suggestion-ins { background: color-mix(in srgb, var(--agent) 28%, transparent); }
 .pair-active.anchor-suggestion-del { background: color-mix(in srgb, var(--danger) 18%, transparent); }
-/* Pending: the composer's subject, or a selection kept alive across a
-   focus change. Same hue as a comment so the relationship reads, but
-   washed out and dashed — it hasn't been committed to the review yet
-   and shouldn't carry a real anchor's weight (#87/#91). */
+/* Pending: the subject of an open composer — a comment started but not
+   submitted. Same hue as a comment so the relationship reads, but washed
+   out and dashed, because it isn't in the review yet (#87). */
 .anchor-pending {
   background: color-mix(in srgb, var(--comment-wash) 80%, transparent);
   border-bottom: 2px dashed color-mix(in srgb, var(--comment-edge) 70%, transparent);
 }
 .anchor, .card { transition: background 0.12s ease, border-color 0.12s ease; }
 
-/* Matches keep painting after the editor loses focus, lingering with no
-   visible selection to explain them (#91). */
+/* Once focus leaves, the selection no longer counts, so its same-word
+   matches shouldn't keep painting either (#91). */
 .cm-editor:not(.cm-focused) .cm-selectionMatch { background: transparent; }
 
 /* ——— preview ——— */
