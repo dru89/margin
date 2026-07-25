@@ -9,7 +9,7 @@ import type {
   SetupMessage,
 } from '@shared/types';
 import { IPC } from '@shared/ipc';
-import { findSessionByPath, getSession } from './session';
+import { findSessionByPath, getSession, setSetupActive } from './session';
 import { attachDocument, createWindow, openFile } from './windows';
 import { showOpenDialog, showOpenFolderDialog } from './menu';
 import { commitCheckpoint, fileLog, initProjectRepo, initRepo, isInRepo, restoreFromCommit } from './git';
@@ -143,6 +143,10 @@ export function registerIpcHandlers(): void {
       return;
     }
     await attachDocument(win, resolved);
+  });
+
+  ipcMain.on(IPC.setupActive, (event, active: boolean) => {
+    setSetupActive(event.sender.id, !!active);
   });
 
   ipcMain.on(IPC.caretContext, (event, ctx: { inTable: boolean }) => {

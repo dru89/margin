@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore } from '@/store';
 
 /** 32px status strip: one chip states the round's state, detail line beside it. */
@@ -9,6 +9,16 @@ export function AgentBar() {
   const cancelReview = useStore((s) => s.cancelReview);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [showLog, setShowLog] = useState(false);
+  const logRef = useRef<HTMLDivElement>(null);
+
+  // Follow the tail only when the user is already at the bottom, so
+  // scrolling back to read isn't yanked away (issue #105).
+  useEffect(() => {
+    const el = logRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+    if (atBottom) el.scrollTop = el.scrollHeight;
+  }, [activity, showLog]);
 
   if (agent.phase === 'idle') return null;
   if ((agent.phase === 'done' || agent.phase === 'error') && dismissed === agent.detail) return null;
@@ -25,7 +35,17 @@ export function AgentBar() {
           <span className="status-chip status-agent">✓ Round {round} returned</span>
         )}
         {agent.phase === 'error' && <span className="status-chip status-danger">✕ Round failed</span>}
-        <span className="agent-detail">{agent.detail}</span>
+        {activity.length > 0 ? (
+          <button
+            className="agent-detail agent-detail-button"
+            title={showLog ? 'Hide the full log' : 'Show the full log'}
+            onClick={() => setShowLog(!showLog)}
+          >
+            {agent.detail}
+          </button>
+        ) : (
+          <span className="agent-detail">{agent.detail}</span>
+        )}
         <span className="agent-actions">
           {activity.length > 0 && (
             <button className="btn btn-ghost" onClick={() => setShowLog(!showLog)}>
@@ -44,7 +64,7 @@ export function AgentBar() {
         </span>
       </div>
       {showLog && (
-        <div className="agent-log">
+        <div className="agent-log" ref={logRef}>
           {activity.map((line, i) => (
             <div key={i}>{line}</div>
           ))}

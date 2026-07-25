@@ -1476,3 +1476,35 @@ button.status-chip:active { transform: translateY(1px); }
   font-size: 11px;
   color: var(--danger);
 }
+
+/* ——— papercuts (v0.4.2) ——— */
+
+/* #92: the author chip and the reply text were touching. */
+.reply .chip { margin-right: 6px; vertical-align: baseline; }
+.reply p:first-of-type { margin-top: 4px; }
+
+/* #97: the inline Accept/Reject pill must read disabled while a round
+   runs — the click was already ignored, only the styling lied. */
+.editor-locked .suggest-pill button {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* #105: the status detail doubles as the log toggle. */
+.agent-detail-button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-detail-button:hover { text-decoration: underline; }
+
+.agent-log { overflow-y: auto; max-height: 30vh; scroll-behavior: smooth; }

@@ -1,7 +1,14 @@
 import { BrowserWindow, Menu, nativeTheme, screen, shell } from 'electron';
 import path from 'path';
 import { IPC } from '@shared/ipc';
-import { DocumentSession, dropSession, findSessionByPath, getSession, setSession } from './session';
+import {
+  DocumentSession,
+  dropSession,
+  findSessionByPath,
+  getSession,
+  hasActiveSetup,
+  setSession,
+} from './session';
 // (Menu import above is used by the context-menu handler.)
 import { addRecentFile } from './recents';
 
@@ -49,6 +56,16 @@ export function createWindow(filePath?: string): BrowserWindow {
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  // setWindowOpenHandler only covers window.open / target=_blank. A plain
+  // <a href> click navigates this window away from the app with no way
+  // back (issue #99) — send those to the browser instead. The renderer's
+  // own file:// / dev-server load is the one navigation we allow.
+  win.webContents.on('will-navigate', (event, url) => {
+    if (url === win.webContents.getURL()) return;
+    event.preventDefault();
+    if (/^https?:\/\//.test(url)) void shell.openExternal(url);
   });
 
   // Right-click: native edit actions plus "Add Comment" on a selection.
@@ -133,7 +150,14 @@ export async function openFile(filePath: string, preferWindow?: BrowserWindow): 
       }
     }
   }
-  if (preferWindow && !getSession(preferWindow.webContents.id)) {
+  // Reuse the acting window only when it holds nothing the user would
+  // lose: no document, and no in-progress project-setup conversation
+  // (issue #82 — ⇧⌘O used to overwrite a live setup chat).
+  if (
+    preferWindow &&
+    !getSession(preferWindow.webContents.id) &&
+    !hasActiveSetup(preferWindow.webContents.id)
+  ) {
     await attachDocument(preferWindow, resolved);
     preferWindow.focus();
     return;

@@ -43,6 +43,7 @@ export const IPC = {
 
   // renderer -> main (send)
   caretContext: 'doc:caret-context',
+  setupActive: 'setup:active',
 
   // main -> renderer (send)
   docLoaded: 'doc:loaded',
