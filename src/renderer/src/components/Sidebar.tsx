@@ -465,15 +465,31 @@ function focusCard(id: string): void {
   const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   el.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
   if (still) return;
-  const accent = getComputedStyle(document.documentElement).getPropertyValue('--user').trim();
-  el.animate(
-    [
-      { boxShadow: `0 0 0 0 ${accent}00` },
-      { boxShadow: `0 0 0 3px ${accent}`, offset: 0.18 },
-      { boxShadow: `0 0 0 0 ${accent}00` },
-    ],
-    { duration: 1100, easing: 'ease-out' },
-  );
+  const pulse = () => {
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--user').trim();
+    el.animate(
+      [
+        { boxShadow: `0 0 0 0 ${accent}00` },
+        { boxShadow: `0 0 0 3px ${accent}`, offset: 0.2 },
+        { boxShadow: `0 0 0 0 ${accent}00` },
+      ],
+      { duration: 900, easing: 'ease-out' },
+    );
+  };
+  // Wait for the smooth scroll to land. Firing both at once means the pulse
+  // peaks while the card is still travelling — usually off-screen — and is
+  // over before it arrives.
+  const scroller = el.closest('.review-scroll');
+  if (!scroller) return pulse();
+  let done = false;
+  const run = () => {
+    if (done) return;
+    done = true;
+    scroller.removeEventListener('scrollend', run);
+    pulse();
+  };
+  scroller.addEventListener('scrollend', run, { once: true });
+  window.setTimeout(run, 700); // in case the card was already in place
 }
 
 /**
@@ -489,7 +505,9 @@ function focusCard(id: string): void {
  * It clears itself once every item in it has been dealt with, so it never
  * has to be dismissed to get out of the way.
  */
-function RoundHeader() {
+const MAX_JUMPS = 3;
+
+function RoundHeader({ onReviewAll }: { onReviewAll: () => void }) {
   const review = useStore((s) => s.review);
   const setActiveAnchor = useStore((s) => s.setActiveAnchor);
   const markThreadSeen = useStore((s) => s.markThreadSeen);
@@ -506,6 +524,12 @@ function RoundHeader() {
     answered.some((c) => isUnread(c)) || proposed.some((s) => s.status === 'pending');
 
   if (round === 0 || dismissed === round || !outstanding) return null;
+
+  // One list, document order — the same rule the sidebar itself follows.
+  const items: Array<CommentThread | Suggestion> = [...answered, ...proposed.filter((s) => s.status === 'pending')]
+    .sort((a, b) => a.anchor.from - b.anchor.from);
+  const shown = items.slice(0, MAX_JUMPS);
+  const rest = items.length - shown.length;
 
   const go = (id: string, anchor: Anchor, seen?: string) => {
     setActiveAnchor(id);
@@ -536,14 +560,21 @@ function RoundHeader() {
       </div>
       <p>Claude {parts.join(' and ')}.</p>
       <div className="round-jumps">
-        {answered.map((c) => (
-          <button key={c.id} className="round-jump" onClick={() => go(c.id, c.anchor, c.id)}>
-            ↳ “{c.anchor.quote.length > 26 ? `${c.anchor.quote.slice(0, 25)}…` : c.anchor.quote}”
+        {shown.map((it) => (
+          <button
+            key={it.id}
+            className="round-jump"
+            onClick={() => go(it.id, it.anchor, 'replies' in it ? it.id : undefined)}
+          >
+            ↳ “{it.anchor.quote.length > 26 ? `${it.anchor.quote.slice(0, 25)}…` : it.anchor.quote}”
           </button>
         ))}
-        {proposed.length > 0 && (
-          <button className="round-jump" onClick={() => go(proposed[0].id, proposed[0].anchor)}>
-            {proposed.length} {proposed.length === 1 ? 'suggestion' : 'suggestions'}
+        {/* No attempt to rank: a turn can answer a dozen threads and nothing
+            in the data says which matters most. Document order, capped, and
+            the rest handed to the filter that already exists for this. */}
+        {rest > 0 && (
+          <button className="round-jump round-jump-more" onClick={onReviewAll}>
+            +{rest} more — review all
           </button>
         )}
       </div>
@@ -610,12 +641,17 @@ export function Sidebar() {
   // The card being read stays put even once it stops qualifying, so the list
   // never moves out from under a click.
   const keep = (id: string, qualifies: boolean) => qualifies || id === activeAnchorId;
-  const shownThreads = onlyNeedsYou
-    ? openThreads.filter((t) => keep(t.id, threadNeedsYou(t, currentRound)))
-    : openThreads;
-  const shownSuggestions = onlyNeedsYou
-    ? pendingSuggestions.filter((s) => keep(s.id, suggestionNeedsYou(s, currentRound)))
-    : pendingSuggestions;
+  // Threads and suggestions are one list in document order. Two sections
+  // meant a comment on the first paragraph sat below a suggestion on the
+  // ninth, which is not what a margin does (spec §4).
+  const shown: Array<CommentThread | Suggestion> = [
+    ...(onlyNeedsYou
+      ? openThreads.filter((t) => keep(t.id, threadNeedsYou(t, currentRound)))
+      : openThreads),
+    ...(onlyNeedsYou
+      ? pendingSuggestions.filter((s) => keep(s.id, suggestionNeedsYou(s, currentRound)))
+      : pendingSuggestions),
+  ].sort((a, b) => a.anchor.from - b.anchor.from);
 
   return (
     <aside className="sidebar">
@@ -647,7 +683,7 @@ export function Sidebar() {
         </div>
       )}
       <div className="review-scroll">
-        <RoundHeader />
+        <RoundHeader onReviewAll={() => setOnlyNeedsYou(true)} />
         <Composer />
         {pendingSuggestions.length === 0 && openThreads.length === 0 && (
           <div className="sidebar-empty">
@@ -658,23 +694,18 @@ export function Sidebar() {
             </p>
           </div>
         )}
-        {shownSuggestions.length > 0 && (
+        {shown.length > 0 && (
           <section>
-            <h3 className="sidebar-heading">Suggestions · {shownSuggestions.length}</h3>
-            {shownSuggestions.map((s) => (
-              <SuggestionCard key={s.id} suggestion={s} />
-            ))}
+            {shown.map((it) =>
+              'replies' in it ? (
+                <ThreadCard key={it.id} thread={it} />
+              ) : (
+                <SuggestionCard key={it.id} suggestion={it} />
+              ),
+            )}
           </section>
         )}
-        {shownThreads.length > 0 && (
-          <section>
-            <h3 className="sidebar-heading">Comments · {shownThreads.length}</h3>
-            {shownThreads.map((c) => (
-              <ThreadCard key={c.id} thread={c} />
-            ))}
-          </section>
-        )}
-        {onlyNeedsYou && shownThreads.length === 0 && shownSuggestions.length === 0 && (
+        {onlyNeedsYou && shown.length === 0 && (
           <p className="hint sidebar-filtered-empty">
             Nothing waiting on you.{' '}
             <button className="linkish" onClick={() => setOnlyNeedsYou(false)}>Show everything</button>

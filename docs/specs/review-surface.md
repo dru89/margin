@@ -199,8 +199,10 @@ lives in the tooltip (`Round 3 · 24 Jul`) rather than on screen.
 
 ## 4. Ordering, grouping, and what clears "unread"
 
-**Order by document position. Always.** The sidebar is a margin; its
-job is to correspond to the text beside it. Sorting by recency or
+**Order by document position. Always — and in one list.** Threads and
+suggestions interleave; separate sections for each put a comment on the
+first paragraph below a suggestion on the ninth, which is not what a
+margin does. The sidebar's job is to correspond to the text beside it. Sorting by recency or
 grouping by state breaks the spatial memory that makes a margin
 readable, and means a card moves when its state changes — the exact
 complaint in #88 about a comment sliding away after submission.
@@ -298,6 +300,12 @@ Round 4 · Claude replied to 2 threads, proposed 3 edits
   ↳ [ thread: "moved from C+I…" ]  [ thread: "TIM program" ]  [ 3 suggestions ]
 ```
 
+**At most three entries, in document order, then a hand-off.** A turn
+can answer a dozen threads, and nothing in the data says which of them
+matters most — so no ranking is attempted. The first three by document
+position get an entry; the rest become "+N more — review all", which
+turns on the Needs-you filter rather than growing a wall of chips.
+
 Each entry **centres** the card, **marks the passage in the document**
 and gives the card a brief pulse. Landing a card barely inside the
 viewport asks the reader to find it again, and moving only the sidebar
@@ -308,7 +316,10 @@ active id — otherwise clicking the same entry twice does nothing,
 because the state never changed. The pulse is a Web Animations call
 rather than a class, because focusing a card changes its state and
 rewrites its `className`, which would strip one. Both respect
-`prefers-reduced-motion`.
+`prefers-reduced-motion`. The pulse waits for the scroll to land
+(`scrollend`, with a timeout fallback): fired together, it peaks while
+the card is still travelling — usually off-screen — and is over before
+it arrives.
 
 The header is dismissible and disappears once every item in it has been
 seen or decided.
