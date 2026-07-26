@@ -298,8 +298,20 @@ Round 4 · Claude replied to 2 threads, proposed 3 edits
   ↳ [ thread: "moved from C+I…" ]  [ thread: "TIM program" ]  [ 3 suggestions ]
 ```
 
-Each entry jumps to the card and expands it. The header is dismissible
-and disappears once every item in it has been seen.
+Each entry **centres** the card, **marks the passage in the document**
+and gives the card a brief pulse. Landing a card barely inside the
+viewport asks the reader to find it again, and moving only the sidebar
+leaves them to locate the text themselves.
+
+The jump is driven imperatively rather than by an effect watching the
+active id — otherwise clicking the same entry twice does nothing,
+because the state never changed. The pulse is a Web Animations call
+rather than a class, because focusing a card changes its state and
+rewrites its `className`, which would strip one. Both respect
+`prefers-reduced-motion`.
+
+The header is dismissible and disappears once every item in it has been
+seen or decided.
 
 The prose stays in the discussion dock — it is about the document as a
 whole and does not belong to any one thread. What changes is that it is

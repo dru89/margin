@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { CommentThread, Suggestion } from '@shared/types';
+import type { Anchor, CommentThread, Suggestion } from '@shared/types';
 import { useLocked, useStore } from '@/store';
 import {
   countThreads,
@@ -450,6 +450,33 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
 }
 
 /**
+ * Take the reader to a card: centre it, mark the passage in the document,
+ * and pulse the card so it is obvious which one arrived.
+ *
+ * Imperative on purpose. Driving this from an effect keyed on the active
+ * id means clicking the same jump twice does nothing, because the state
+ * never changes — and the pulse cannot be a class either, since the state
+ * change that comes with focusing rewrites the card's className and would
+ * strip it. A Web Animations call survives both.
+ */
+function focusCard(id: string): void {
+  const el = document.getElementById(`card-${id}`);
+  if (!el) return;
+  const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  el.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
+  if (still) return;
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--user').trim();
+  el.animate(
+    [
+      { boxShadow: `0 0 0 0 ${accent}00` },
+      { boxShadow: `0 0 0 3px ${accent}`, offset: 0.18 },
+      { boxShadow: `0 0 0 0 ${accent}00` },
+    ],
+    { duration: 1100, easing: 'ease-out' },
+  );
+}
+
+/**
  * What the last completed round produced, with a way into each piece
  * (spec §5, #103).
  *
@@ -480,9 +507,14 @@ function RoundHeader() {
 
   if (round === 0 || dismissed === round || !outstanding) return null;
 
-  const go = (id: string, seen?: string) => {
+  const go = (id: string, anchor: Anchor, seen?: string) => {
     setActiveAnchor(id);
     if (seen) markThreadSeen(seen);
+    // Mark the passage in the document too — a jump that only moves the
+    // sidebar leaves the reader to find the text themselves.
+    if (!anchor.orphaned) revealRange(anchor.from, anchor.to);
+    // After the state change has rendered, so the card is there to scroll to.
+    requestAnimationFrame(() => focusCard(id));
   };
   const parts = [
     answered.length > 0 && `replied to ${answered.length} ${answered.length === 1 ? 'thread' : 'threads'}`,
@@ -505,12 +537,12 @@ function RoundHeader() {
       <p>Claude {parts.join(' and ')}.</p>
       <div className="round-jumps">
         {answered.map((c) => (
-          <button key={c.id} className="round-jump" onClick={() => go(c.id, c.id)}>
+          <button key={c.id} className="round-jump" onClick={() => go(c.id, c.anchor, c.id)}>
             ↳ “{c.anchor.quote.length > 26 ? `${c.anchor.quote.slice(0, 25)}…` : c.anchor.quote}”
           </button>
         ))}
         {proposed.length > 0 && (
-          <button className="round-jump" onClick={() => go(proposed[0].id)}>
+          <button className="round-jump" onClick={() => go(proposed[0].id, proposed[0].anchor)}>
             {proposed.length} {proposed.length === 1 ? 'suggestion' : 'suggestions'}
           </button>
         )}
