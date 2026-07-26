@@ -220,16 +220,28 @@ should be built on.
 Acting on a card should not make it disappear from under the cursor; it
 leaves the list when the author moves on.
 
-**Answer "what's new" with a summary bar, not with order.** A single
-row above the list:
+**Answer "what's new" with a summary bar, not with order.**
 
 ```
-3 unread · 2 queued · 5 settled            [ Unread ]  [ All ]
+( 7 need you )                     <- the only control
+2 not sent · 2 awaiting reply · 3 resolved
 ```
 
-Counts are always visible; the filter narrows the list without
-reordering it. This gives #104 its answer — what's new, what's queued,
-what's done — while a card stays where the document put it.
+**One interactive thing, three plain facts.** Counts rendered beside a
+row of buttons read as filters even when they aren't, so the count worth
+filtering by *is* the filter — a chip that presses in — and the rest are
+stated in plain muted text with no border, background or pointer.
+
+**The words say who holds the ball**, and the bar and the cards use the
+same ones. "Queued" and "awaiting" were indistinguishable, and
+"awaiting" read as though it might be waiting on the author:
+
+| | means | card label |
+| --- | --- | --- |
+| **need you** | someone else spoke last, or an edit is undecided | *Unread*, or nothing once seen |
+| **not sent** | your writing, still to go | *Not sent* |
+| **awaiting reply** | sent, no answer yet | *Awaiting reply* |
+| **resolved** | done — matching "Resolved & decided" below | *Resolved* |
 
 **Settled threads stay in the list**, collapsed below a fold at the
 end, one line each, expandable. Keeping them is a decision to revisit

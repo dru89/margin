@@ -54,12 +54,13 @@ function RoundStamp({ round, at }: { round: number; at?: string }) {
   );
 }
 
+/** The same words the summary bar uses, so the two never disagree. */
 const STATE_LABEL: Record<ThreadState, string> = {
-  draft: 'Draft — not sent',
+  draft: 'Not sent',
   awaiting: 'Awaiting reply',
   unread: 'Unread',
   read: '',
-  settled: 'Settled',
+  settled: 'Resolved',
 };
 
 /** One message in a thread: the author chip introduces what it wrote. */
@@ -506,33 +507,29 @@ export function Sidebar() {
 
   return (
     <aside className="sidebar">
-      {/* Counts are always visible; the filter narrows without reordering,
-          which is how "what's new" gets answered without a card moving
-          when its state changes (spec §4). */}
+      {/* One interactive thing, three plain facts. Counts sitting beside a
+          pair of buttons read as filters when they are not — so the count
+          that is worth filtering by *is* the filter, and the rest are
+          stated, not offered (spec §4). */}
       {(openThreads.length > 0 || pendingSuggestions.length > 0 || archivedCount > 0) && (
         <div className="review-summary">
-          <div className="review-counts">
-            {counts.needsYou > 0 && <span><b>{counts.needsYou}</b> need you</span>}
-            {counts.draft > 0 && <span><b>{counts.draft}</b> queued</span>}
-            {counts.awaiting > 0 && <span><b>{counts.awaiting}</b> awaiting</span>}
-            {archivedCount > 0 && <span><b>{archivedCount}</b> settled</span>}
-          </div>
-          {counts.needsYou > 0 && (
-            <div className="review-filters">
-              <button
-                className={`btn btn-toggle${onlyNeedsYou ? '' : ' on'}`}
-                onClick={() => setOnlyNeedsYou(false)}
-              >
-                All
-              </button>
-              <button
-                className={`btn btn-toggle${onlyNeedsYou ? ' on' : ''}`}
-                onClick={() => setOnlyNeedsYou(true)}
-              >
-                Needs you
-              </button>
-            </div>
+          {counts.needsYou > 0 ? (
+            <button
+              className={`needs-you-chip${onlyNeedsYou ? ' on' : ''}`}
+              aria-pressed={onlyNeedsYou}
+              title={onlyNeedsYou ? 'Show everything' : 'Show only what is waiting on you'}
+              onClick={() => setOnlyNeedsYou(!onlyNeedsYou)}
+            >
+              <b>{counts.needsYou}</b> need you
+            </button>
+          ) : (
+            <span className="review-clear">Nothing waiting on you</span>
           )}
+          <div className="review-counts">
+            {counts.draft > 0 && <span><b>{counts.draft}</b> not sent</span>}
+            {counts.awaiting > 0 && <span><b>{counts.awaiting}</b> awaiting reply</span>}
+            {archivedCount > 0 && <span><b>{archivedCount}</b> resolved</span>}
+          </div>
         </div>
       )}
       <div className="review-scroll">
@@ -565,7 +562,7 @@ export function Sidebar() {
         {onlyNeedsYou && shownThreads.length === 0 && shownSuggestions.length === 0 && (
           <p className="hint sidebar-filtered-empty">
             Nothing waiting on you.{' '}
-            <button className="linkish" onClick={() => setOnlyNeedsYou(false)}>Show all</button>
+            <button className="linkish" onClick={() => setOnlyNeedsYou(false)}>Show everything</button>
           </p>
         )}
         {archivedCount > 0 && (
