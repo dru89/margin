@@ -650,13 +650,26 @@ kbd {
 }
 .card-suggestion { --pair-accent: var(--agent); }
 .card-comment { --pair-accent: var(--comment-edge); }
-.pair-hot.card { border-color: color-mix(in srgb, var(--pair-accent) 40%, var(--rule)); }
-.pair-hot.card::before { opacity: 1; }
+/* Hover and selected sit on independent properties, so all three of
+   hover / selected / both are distinguishable. They used to differ only by
+   a 40% vs 55% border tint, which is invisible.
+   Hover is transient, so it gets the light touch: the surface lifts.
+   Selected is persistent, so it gets the structural one: the spine
+   thickens and the card firms up. Both is naturally both. */
+.pair-hot.card {
+  background: color-mix(in srgb, var(--ink) 9%, var(--paper-raised));
+  border-color: color-mix(in srgb, var(--ink-faint) 45%, var(--rule));
+}
 .pair-active.card {
-  border-color: color-mix(in srgb, var(--pair-accent) 55%, var(--rule));
+  border-color: var(--ink-faint);
   box-shadow: var(--shadow);
 }
-.pair-active.card::before { opacity: 1; }
+/* A hairline ring reads as "this is the one you are on" without borrowing
+   a colour — colour on a card means state. */
+.pair-active.card { outline: 1px solid color-mix(in srgb, var(--ink-faint) 55%, transparent); }
+/* Widening the spine emphasises the card without recolouring it — the
+   colour is state, and selecting a card must not appear to change it. */
+.pair-active.card::before { width: 6px; }
 .card-composer { border-color: var(--user); cursor: default; }
 .card-archived { opacity: 0.7; cursor: default; }
 

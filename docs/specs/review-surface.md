@@ -133,6 +133,14 @@ fighting over the same pixels.
 Nothing blinks, and nothing uses colour alone: the dot is a shape
 difference, the dash is a texture difference.
 
+**Hover and selected sit on different properties**, so hover, selected,
+and selected-while-hovered are three visibly different things. Hover is
+transient and gets the light touch — the surface lifts. Selected is
+persistent and gets the structural one — the spine widens and a hairline
+ring appears. Neither recolours the card: colour is state, and selecting
+a card must not appear to change what it is. They previously differed
+only by a 40% versus 55% border tint, which is invisible.
+
 **The spine stays inside the card.** It sits within the border rather
 than straddling it — an edge hanging past the rounded corners draws the
 eye to the overhang instead of to the state it is reporting.
