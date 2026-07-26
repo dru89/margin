@@ -10,7 +10,7 @@
  *   node scripts/test-workspace.mjs
  */
 import { execFileSync } from 'child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs';
+import { realpathSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { tmpdir, homedir } from 'os';
 import path from 'path';
 import { load, reporter } from './lib/compile.mjs';
@@ -19,7 +19,7 @@ const { mod, dir: build } = await load('src/main/workspace.ts');
 const { findWorkspaceRoot } = mod;
 const { t, head, done } = reporter();
 
-const base = mkdtempSync(path.join(tmpdir(), 'margin-roots-'));
+const base = realpathSync(mkdtempSync(path.join(tmpdir(), 'margin-roots-')));
 const make = (rel, { git = false, marker = false } = {}) => {
   const abs = path.join(base, rel);
   mkdirSync(abs, { recursive: true });
