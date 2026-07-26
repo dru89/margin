@@ -1162,11 +1162,16 @@ button.status-chip:active { transform: translateY(1px); }
 /* ——— inline accept pill ——— */
 
 .suggest-ins-wrap { position: relative; }
+/* Below the words it acts on, not above them. Floating above put it over
+   the previous line — fine when the widget sat at the end of a whole
+   anchor, misleading now that it sits mid-sentence beside the words that
+   change: it read as annotating the line above. */
 .suggest-pill {
   position: absolute;
-  bottom: calc(100% + 6px);
+  top: calc(100% + 2px);
   left: 0;
   z-index: 5;
+  box-shadow: var(--shadow);
   display: flex;
   align-items: center;
   gap: 2px;
