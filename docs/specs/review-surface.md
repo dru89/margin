@@ -137,7 +137,7 @@ difference, the dash is a texture difference.
 and selected-while-hovered are three visibly different things. Hover is
 transient and gets the light touch — the surface lifts. Selected is
 persistent and gets the structural one — the spine widens and a hairline
-ring appears. Neither recolours the card: color is state, and selecting
+ring appears. Neither recolors the card: color is state, and selecting
 a card must not appear to change what it is. They previously differed
 only by a 40% versus 55% border tint, which is invisible.
 
@@ -145,7 +145,7 @@ only by a 40% versus 55% border tint, which is invisible.
 than straddling it — an edge hanging past the rounded corners draws the
 eye to the overhang instead of to the state it is reporting.
 
-**The operation is named in words and coloured in the diff, not in the
+**The operation is named in words and colored in the diff, not in the
 label.** "Deletion" set in `--danger` shouted over every other card's
 quiet uppercase; the word alone carries it, and the struck red text
 says the rest. A deletion in a card reads the way one reads in the
@@ -419,7 +419,7 @@ Two places carry it, and one deliberately does not:
   a 13px sidebar card reads as a gray smudge rather than as red. Cards
   run around 20%.
 - **Not the leading edge.** That is state, and only state. A deletion
-  sitting unread keeps a teal edge; colouring it red would mean an
+  sitting unread keeps a teal edge; coloring it red would mean an
   unread deletion and a read one look identical, which is the exact
   collapse §3 exists to prevent.
 
@@ -523,6 +523,16 @@ second comment.
 - Composer with text → keeps its anchor, does not re-target, takes
   focus. Nothing typed is ever discarded by a misclick.
 
+"With text" ignores whitespace, and in suggest mode an edited
+replacement counts on its own — the replacement *is* the work there.
+
+The composer's anchor is remapped through document changes like a review
+anchor. It could previously be skipped, because a new selection
+re-targeted the composer and it rarely outlived an edit; keeping it put
+is precisely what makes the remap necessary. Text deleted from under an
+open draft leaves it anchored to nothing, and it commits as orphaned
+rather than onto whatever moved into its place.
+
 **Anything in Draft state is editable and deletable** (#89). It hasn't
 left the building, so the asymmetry where a queued discussion message
 can be deleted but not edited, and an inline comment neither, has no
@@ -571,7 +581,7 @@ The state model is the dependency; everything else reads from it.
 4. Round header (§5) — closes #100, #103.
 5. Intra-suggestion word diff + removal rendering (§6) — closes #98,
    #102.
-6. Draft editing (§7) — closes #89, #121.
+6. Draft editing (§8) — closes #89, #121.
 7. Chips (§9) — closes #90. Independent of 1–6; can move earlier.
 8. `inReplyTo` + pointer rows (§7) — needs 1–2 for state, and #128
    settled before any bulk accept.

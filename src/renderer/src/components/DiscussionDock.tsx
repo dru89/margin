@@ -3,6 +3,38 @@ import { useStore } from '@/store';
 import { Md } from '@/components/Md';
 import { MentionTextarea } from '@/components/MentionTextarea';
 
+/** Rewrite a queued message in place; its own buffer, discarded on cancel. */
+function QueuedEditor({
+  text,
+  onSave,
+  onCancel,
+}: {
+  text: string;
+  onSave: (text: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(text);
+  return (
+    <div className="msg-edit">
+      <MentionTextarea
+        autoFocus
+        value={value}
+        onChange={setValue}
+        onSubmit={() => value.trim() && onSave(value)}
+        onEscape={onCancel}
+      />
+      <div className="card-actions">
+        <button className="btn btn-primary" disabled={!value.trim()} onClick={() => onSave(value)}>
+          Save
+        </button>
+        <button className="btn" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /**
  * The project discussion as a dock pinned to the sidebar's bottom edge
  * (spec §1): composer always visible, queued count always visible, expands
@@ -14,7 +46,9 @@ export function DiscussionDock() {
   const toggleDock = useStore((s) => s.toggleDock);
   const addDiscussionMessage = useStore((s) => s.addDiscussionMessage);
   const removeDiscussionMessage = useStore((s) => s.removeDiscussionMessage);
+  const editDiscussionMessage = useStore((s) => s.editDiscussionMessage);
   const [text, setText] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [pulse, setPulse] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -75,6 +109,16 @@ export function DiscussionDock() {
                 {m.pending ? (
                   <span className="msg-queued">
                     Queued{' '}
+                    {/* Queued means unsent, so it can still be rewritten —
+                        the asymmetry where it could only be deleted and
+                        retyped had no justification (#89). */}
+                    <button
+                      className="queued-edit"
+                      title="Edit queued message"
+                      onClick={() => setEditingId(editingId === m.id ? null : m.id)}
+                    >
+                      Edit
+                    </button>
                     <button
                       className="queued-remove"
                       title="Remove queued message"
@@ -92,7 +136,18 @@ export function DiscussionDock() {
                   </span>
                 )}
               </div>
-              <Md text={m.text} />
+              {editingId === m.id ? (
+                <QueuedEditor
+                  text={m.text}
+                  onSave={(next) => {
+                    editDiscussionMessage(m.id, next);
+                    setEditingId(null);
+                  }}
+                  onCancel={() => setEditingId(null)}
+                />
+              ) : (
+                <Md text={m.text} />
+              )}
             </div>
           ))}
           <div ref={endRef} />

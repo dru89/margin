@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocked, useStore } from '@/store';
+import { draftHasContent } from '@shared/composer';
 import { History } from '@/components/History';
 import { ModelPicker } from '@/components/ModelPicker';
 import { GdocsMenu } from '@/components/GdocsMenu';
+
+const ellipsize = (text: string, max: number): string =>
+  text.length > max ? `${text.slice(0, max - 1)}…` : text;
 
 export function Toolbar() {
   const doc = useStore((s) => s.doc);
@@ -22,8 +26,16 @@ export function Toolbar() {
   const discussion = useStore((s) => s.discussion);
   const workspace = useStore((s) => s.workspace);
   const removeDiscussionMessage = useStore((s) => s.removeDiscussionMessage);
+  const composerAnchor = useStore((s) => s.composerAnchor);
+  const composerDraft = useStore((s) => s.composerDraft);
   const queued = discussion.filter((m) => m.pending);
   const modifiedDocs = workspace?.files.filter((f) => f.modified && f.kind === 'markdown') ?? [];
+  // The quote it is attached to, when the composer holds work that will not
+  // travel with this round — nothing when it is empty or closed.
+  const unfinished =
+    composerAnchor && draftHasContent(composerDraft, composerAnchor.quote)
+      ? ellipsize(composerAnchor.quote, 32)
+      : null;
   const [submitOpen, setSubmitOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -136,6 +148,14 @@ export function Toolbar() {
               ))}
               {modifiedDocs.length === 0 && queued.length === 0 && (
                 <p className="manifest-files">Comments and review state for {doc.fileName}.</p>
+              )}
+              {/* Submission is never blocked by an open draft (spec §8): a
+                  disabled primary action would have to explain itself, and
+                  this list already exists to say what travels. */}
+              {unfinished && (
+                <p className="manifest-unfinished">
+                  Your unfinished comment on “{unfinished}” isn’t included.
+                </p>
               )}
               <div className="card-actions">
                 <button className="btn btn-primary" onClick={doSubmit}>

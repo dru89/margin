@@ -15,8 +15,10 @@ import { pathToFileURL } from 'url';
 const dir = mkdtempSync(path.join(tmpdir(), 'margin-state-'));
 const out = path.join(dir, 'reviewState.mjs');
 execFileSync('npx', ['esbuild', 'src/shared/reviewState.ts', '--format=esm', `--outfile=${out}`, '--log-level=error'], { stdio: 'inherit' });
-const { threadState, suggestionState, isUnread, markSeen, countThreads, threadNeedsYou, suggestionNeedsYou } =
-  await import(pathToFileURL(out).href);
+const {
+  threadState, suggestionState, isUnread, markSeen, countThreads, threadNeedsYou,
+  suggestionNeedsYou, threadEditable, replyEditable, suggestionEditable,
+} = await import(pathToFileURL(out).href);
 
 let fails = 0;
 const t = (label, got, want) => {
@@ -135,6 +137,28 @@ step(w3.submit(), 'and send it', 'awaiting');
 head('transition: resolve wins from any state');
 step(world().comment().resolve(), 'resolve a draft', 'settled');
 step(world().comment().submit().agentReplies().resolve(), 'resolve an unread', 'settled');
+
+head('editable while it is still yours and unsent (spec §8, #89)');
+t('your comment, this round', threadEditable(thread({ round: 4 }), 4), true);
+t('the same comment once sent', threadEditable(thread({ round: 3 }), 4), false);
+t('the agent’s', threadEditable(thread({ author: 'agent', round: 4 }), 4), false);
+// author is 'user' on an imported thread and its round is the one it
+// arrived in, so the naive test says "yours, this round" — it is neither.
+t('a collaborator’s Doc comment is not yours to rewrite',
+  threadEditable(thread({ round: 4, provenance: 'imported', collaborator: 'Sam', driveCommentId: 'd1' }), 4), false);
+t('a resolved thread is history', threadEditable(thread({ round: 4, status: 'resolved' }), 4), false);
+t('your reply, this round', replyEditable(reply({ author: 'user', round: 4 }), 4), true);
+t('your reply, already sent', replyEditable(reply({ author: 'user', round: 3 }), 4), false);
+// It exists on the Doc under your name; editing the local copy would
+// silently disagree with the copy other people are reading.
+t('your reply that went to the Doc',
+  replyEditable(reply({ author: 'user', round: 4, driveReplyId: 'd1' }), 4), false);
+t('the agent’s reply', replyEditable(reply({ round: 4 }), 4), false);
+t('your suggestion, this round', suggestionEditable(sug({ author: 'user', round: 4 }), 4), true);
+t('your suggestion, already sent', suggestionEditable(sug({ author: 'user', round: 3 }), 4), false);
+t('the agent’s suggestion', suggestionEditable(sug({ round: 4 }), 4), false);
+t('your suggestion, already decided',
+  suggestionEditable(sug({ author: 'user', round: 4, status: 'accepted' }), 4), false);
 
 rmSync(dir, { recursive: true, force: true });
 console.log(fails === 0 ? '\nAll review-state cases pass.' : `\n${fails} FAILING`);

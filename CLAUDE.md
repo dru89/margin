@@ -25,6 +25,8 @@ module with esbuild and assert against it. Existing suites:
 npm test                 # all suites
 npm run test:state       # review-state derivation + transitions
 npm run test:anchors     # anchor resolution, orphaning, position stability
+npm run test:worddiff    # trimming a suggestion to what actually changed (§6)
+npm run test:composer    # what counts as a draft the composer must protect (§66)
 npm run test:paths       # agent-supplied path validation (the untrusted boundary)
 npm run test:workspace   # project-root derivation + its two guards (§63)
 npm run test:sidecar     # load, backfill, rename recovery, refusing a stranger's

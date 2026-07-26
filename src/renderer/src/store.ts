@@ -12,7 +12,13 @@ import type {
   WorkspaceState,
 } from '@shared/types';
 import { makeAnchor, resolveQuote } from '@shared/anchors';
-import { markSeen } from '@shared/reviewState';
+import {
+  markSeen,
+  replyEditable,
+  suggestionEditable,
+  threadEditable,
+} from '@shared/reviewState';
+import { draftHasContent, emptyDraft, type ComposerDraft } from '@shared/composer';
 import { applyReplacement, formatTableAtCaret } from './editorBridge';
 
 export type ViewMode = 'write' | 'preview';
@@ -27,7 +33,21 @@ interface MarginState {
   activity: string[];
   selection: { from: number; to: number } | null;
   activeAnchorId: string | null;
-  composerAnchor: { from: number; to: number; quote: string } | null;
+  composerAnchor: { from: number; to: number; quote: string; orphaned?: boolean } | null;
+  /**
+   * What is typed in the composer. Lifted out of the component because two
+   * other places have to see it: the re-target rule, which refuses to move
+   * a composer holding work, and the submit popover, which says an
+   * unfinished comment isn't traveling with the round (spec §8).
+   */
+  composerDraft: ComposerDraft;
+  setComposerDraft: (patch: Partial<ComposerDraft>) => void;
+  /**
+   * Bumped when a re-target is refused, to pull focus to the composer.
+   * A counter rather than a flag: the second refused click has to move
+   * focus too, and setting the same value twice is not a state change.
+   */
+  composerFocus: number;
   dirty: boolean;
   workspace: WorkspaceState | null;
   explorerOpen: boolean;
@@ -48,6 +68,18 @@ interface MarginState {
   addComment: (text: string) => void;
   addSuggestion: (replacement: string, note?: string) => void;
   replyToThread: (threadId: string, text: string) => void;
+  /**
+   * Draft editing (spec §8, #89). Each of these is guarded by the matching
+   * predicate in `@shared/reviewState` — the store is the last place that
+   * can enforce it, since a card could go stale between render and click.
+   */
+  editComment: (threadId: string, text: string) => void;
+  deleteComment: (threadId: string) => void;
+  editReply: (threadId: string, replyId: string, text: string) => void;
+  deleteReply: (threadId: string, replyId: string) => void;
+  editSuggestion: (id: string, patch: { replacement?: string; note?: string }) => void;
+  deleteSuggestion: (id: string) => void;
+  editDiscussionMessage: (id: string, text: string) => void;
   /** Record a reply that was just sent to the linked Google Doc thread. */
   addDocReply: (threadId: string, text: string, driveReplyId: string) => void;
   setThreadStatus: (threadId: string, status: 'open' | 'resolved') => void;
@@ -114,6 +146,21 @@ function refreshAnchors(review: ReviewData, content: string): ReviewData {
       s.status === 'pending' ? { ...s, anchor: refresh(s.anchor) } : s,
     ),
   };
+}
+
+/**
+ * The anchor a committed draft carries. A composer whose text was deleted
+ * while it was open commits as orphaned — the card says "text gone", which
+ * is true, instead of silently claiming the words that moved into its
+ * place.
+ */
+function anchorForDraft(
+  content: string,
+  composerAnchor: { from: number; to: number; quote: string; orphaned?: boolean },
+): Anchor {
+  return composerAnchor.orphaned
+    ? { from: composerAnchor.from, to: composerAnchor.from, quote: composerAnchor.quote, orphaned: true }
+    : makeAnchor(content, composerAnchor.from, composerAnchor.to);
 }
 
 export const useStore = create<MarginState>((set, get) => {
@@ -283,6 +330,24 @@ export const useStore = create<MarginState>((set, get) => {
           },
         });
       }
+      // The open composer's anchor moves with the text too. It used to be
+      // safe to skip: any new selection re-targeted the composer, so it
+      // rarely outlived an edit. It now stays put by design (spec §8), so
+      // an unmapped offset would quietly re-point the draft at whatever
+      // slid into its place — the very failure #121 is about.
+      const composerAnchor = get().composerAnchor;
+      if (composerAnchor) {
+        const from = changes.mapPos(composerAnchor.from, 1);
+        const to = changes.mapPos(composerAnchor.to, -1);
+        set({
+          composerAnchor:
+            to <= from
+              ? // The words are gone. Keep the draft and what it was about;
+                // committing it says so rather than grabbing the neighbours.
+                { ...composerAnchor, from, to: from, orphaned: true }
+              : { from, to, quote: content.slice(from, to) },
+        });
+      }
       set({ content, dirty: true });
       scheduleSave();
     },
@@ -292,8 +357,21 @@ export const useStore = create<MarginState>((set, get) => {
     setPreviewQuote: (previewQuote) => set({ previewQuote }),
     setActiveAnchor: (activeAnchorId) => set({ activeAnchorId }),
 
+    composerDraft: emptyDraft,
+    setComposerDraft: (patch) => set({ composerDraft: { ...get().composerDraft, ...patch } }),
+    composerFocus: 0,
+
     openComposer: () => {
-      const { selection, content, mode, previewQuote } = get();
+      const { selection, content, mode, previewQuote, composerAnchor, composerDraft } = get();
+      // A composer holding work keeps its anchor and takes focus instead
+      // (spec §8). Re-targeting it would silently re-point a comment at
+      // text it wasn't written about; clearing it would throw away typed
+      // work on a misclick. Both are worse than a click that visibly
+      // lands somewhere else.
+      if (composerAnchor && draftHasContent(composerDraft, composerAnchor.quote)) {
+        set({ composerFocus: get().composerFocus + 1 });
+        return;
+      }
       if (mode === 'preview') {
         // Rendered text loses source offsets — re-locate the quote in the
         // source. Selections that cross markdown formatting won't resolve.
@@ -302,6 +380,9 @@ export const useStore = create<MarginState>((set, get) => {
         if (!found) return;
         set({
           composerAnchor: { from: found.from, to: found.to, quote: content.slice(found.from, found.to) },
+          // The mode survives a re-target; the replacement cannot — it was
+          // a copy of the old quote and is now about different words.
+          composerDraft: { ...composerDraft, replacement: null },
         });
         return;
       }
@@ -312,10 +393,11 @@ export const useStore = create<MarginState>((set, get) => {
           to: selection.to,
           quote: content.slice(selection.from, selection.to),
         },
+        composerDraft: { ...composerDraft, replacement: null },
       });
     },
 
-    closeComposer: () => set({ composerAnchor: null }),
+    closeComposer: () => set({ composerAnchor: null, composerDraft: emptyDraft }),
 
     addComment: (text) => {
       const { composerAnchor, content } = get();
@@ -333,13 +415,13 @@ export const useStore = create<MarginState>((set, get) => {
             createdAt: new Date().toISOString(),
             round: r.round,
             text: text.trim(),
-            anchor: makeAnchor(content, composerAnchor.from, composerAnchor.to),
+            anchor: anchorForDraft(content, composerAnchor),
             replies: [],
             status: 'open' as const,
           },
         ],
       }));
-      set({ composerAnchor: null, activeAnchorId: newId });
+      set({ composerAnchor: null, composerDraft: emptyDraft, activeAnchorId: newId });
     },
 
     addSuggestion: (replacement, note) => {
@@ -354,14 +436,14 @@ export const useStore = create<MarginState>((set, get) => {
             author: 'user' as const,
             createdAt: new Date().toISOString(),
             round: r.round,
-            anchor: makeAnchor(content, composerAnchor.from, composerAnchor.to),
+            anchor: anchorForDraft(content, composerAnchor),
             replacement,
             note: note?.trim() || undefined,
             status: 'pending' as const,
           },
         ],
       }));
-      set({ composerAnchor: null });
+      set({ composerAnchor: null, composerDraft: emptyDraft });
     },
 
     addDocReply: (threadId, text, driveReplyId) => {
@@ -412,6 +494,83 @@ export const useStore = create<MarginState>((set, get) => {
             : c,
         ),
       }));
+    },
+
+    editComment: (threadId, text) => {
+      const { review } = get();
+      const t = review?.comments.find((c) => c.id === threadId);
+      if (!t || !text.trim() || !threadEditable(t, review!.round)) return;
+      updateReview((r) => ({
+        ...r,
+        comments: r.comments.map((c) => (c.id === threadId ? { ...c, text: text.trim() } : c)),
+      }));
+    },
+
+    deleteComment: (threadId) => {
+      const { review } = get();
+      const t = review?.comments.find((c) => c.id === threadId);
+      if (!t || !threadEditable(t, review!.round)) return;
+      // Its own replies go with it. They can only be the author's, written
+      // this round — anything else would have made the thread uneditable.
+      updateReview((r) => ({ ...r, comments: r.comments.filter((c) => c.id !== threadId) }));
+      if (get().activeAnchorId === threadId) set({ activeAnchorId: null });
+    },
+
+    editReply: (threadId, replyId, text) => {
+      const { review } = get();
+      const t = review?.comments.find((c) => c.id === threadId);
+      const reply = t?.replies.find((r) => r.id === replyId);
+      if (!reply || !text.trim() || !replyEditable(reply, review!.round)) return;
+      updateReview((r) => ({
+        ...r,
+        comments: r.comments.map((c) =>
+          c.id === threadId
+            ? {
+                ...c,
+                replies: c.replies.map((x) => (x.id === replyId ? { ...x, text: text.trim() } : x)),
+              }
+            : c,
+        ),
+      }));
+    },
+
+    deleteReply: (threadId, replyId) => {
+      const { review } = get();
+      const t = review?.comments.find((c) => c.id === threadId);
+      const reply = t?.replies.find((r) => r.id === replyId);
+      if (!reply || !replyEditable(reply, review!.round)) return;
+      updateReview((r) => ({
+        ...r,
+        comments: r.comments.map((c) =>
+          c.id === threadId ? { ...c, replies: c.replies.filter((x) => x.id !== replyId) } : c,
+        ),
+      }));
+    },
+
+    editSuggestion: (id, patch) => {
+      const { review } = get();
+      const s = review?.suggestions.find((x) => x.id === id);
+      if (!s || !suggestionEditable(s, review!.round)) return;
+      updateReview((r) => ({
+        ...r,
+        suggestions: r.suggestions.map((x) =>
+          x.id === id
+            ? {
+                ...x,
+                replacement: patch.replacement ?? x.replacement,
+                note: patch.note !== undefined ? patch.note.trim() || undefined : x.note,
+              }
+            : x,
+        ),
+      }));
+    },
+
+    deleteSuggestion: (id) => {
+      const { review } = get();
+      const s = review?.suggestions.find((x) => x.id === id);
+      if (!s || !suggestionEditable(s, review!.round)) return;
+      updateReview((r) => ({ ...r, suggestions: r.suggestions.filter((x) => x.id !== id) }));
+      if (get().activeAnchorId === id) set({ activeAnchorId: null });
     },
 
     setThreadStatus: (threadId, status) => {
@@ -543,6 +702,17 @@ export const useStore = create<MarginState>((set, get) => {
 
     removeDiscussionMessage: (id) => {
       const discussion = get().discussion.filter((m) => !(m.id === id && m.pending));
+      set({ discussion });
+      void window.margin.updateDiscussion(discussion);
+    },
+
+    editDiscussionMessage: (id, text) => {
+      // Queued only. Once a message has gone with a round it is a record of
+      // what was said, the same rule the review sidecar follows (spec §8).
+      if (!text.trim()) return;
+      const discussion = get().discussion.map((m) =>
+        m.id === id && m.pending ? { ...m, text: text.trim() } : m,
+      );
       set({ discussion });
       void window.margin.updateDiscussion(discussion);
     },

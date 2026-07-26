@@ -1259,3 +1259,63 @@ Consequences, both deliberate:
   test would assert markup that is expected to churn.
 - No coverage target. A percentage would reward exactly the tests this
   entry exists to prevent.
+
+## 66. One composer; drafts are editable until they are sent (#121, #89)
+
+Two rules that turn out to be the same rule: **something the author has
+not sent yet belongs to the author, and nothing may change it but them.**
+
+**The composer keeps its anchor once it holds work.** Selecting other text
+and asking for a comment used to move the draft onto the new selection,
+producing a comment attached to words it was never written about, with
+nothing on screen saying so. Clearing the box instead would discard typed
+work on a misclick, which is worse — a click that appears not to land is
+recoverable, a paragraph that vanishes is not. So an empty composer
+re-targets freely (the ordinary case of grabbing the wrong words), and one
+holding work keeps its anchor, takes focus, and pulses.
+
+"Holding work" is whitespace-insensitive, and in suggest mode an edited
+replacement counts on its own — there, the replacement *is* the work, and
+requiring a rationale before protecting it would throw away the edit.
+
+Not a second composer. Committing already stages a comment without sending
+it, so several drafts before a round already work; a second buffer would
+add a state to manage without adding capability.
+
+**The composer's anchor is now remapped through every document change**,
+like a review anchor. It was previously safe not to: any new selection
+re-targeted the composer, so it rarely outlived an edit. It now stays put
+by design, so an unmapped offset would re-point the draft at whatever slid
+into its place — the failure this entry starts by removing, arriving by a
+second route. If the quoted text is deleted outright the draft survives
+and commits as orphaned: "text gone" is true, and claiming the neighbours
+is not.
+
+**Anything still in Draft state can be rewritten or taken back** — a
+comment, a reply, a suggestion, a queued discussion message. The
+asymmetry where a queued message could be deleted but not edited, and an
+inline comment neither, had no justification behind it.
+
+Three conditions, all necessary, and each one is a case in the suite:
+
+- *It is the author's writing.* An imported Doc thread carries
+  `author: 'user'` and the round it arrived in, so the naive test says
+  "yours, this round" about a comment a colleague wrote.
+- *It belongs to the round being composed.* Submitting is what makes
+  something sent, and the counter moves past it at that moment.
+- *It has not been published elsewhere.* A reply sent with "Reply on Doc"
+  exists on the Doc under the author's name; editing the local copy would
+  silently disagree with the copy other people are reading.
+
+Deletion is one click, with no confirmation, matching the queued-message
+✕ that has always worked this way. It only ever removes the author's own
+unsent text, and a confirmation on every draft costs more than the loss
+it prevents. If that proves wrong in use, the fix is a confirm on the one
+case that takes more than a single message with it — deleting a thread
+that has replies.
+
+**Submission is never blocked by an open draft.** The submit popover
+already enumerates what travels with the round, so it gets one more line
+saying an unfinished comment does not. A disabled primary action would
+have to explain itself, and this is the surface that already exists to
+answer the question.
