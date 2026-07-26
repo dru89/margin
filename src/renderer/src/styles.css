@@ -409,6 +409,45 @@ kbd {
   padding: 1px 4px;
 }
 
+/* ——— summary bar (spec §4) ——— */
+.review-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper-inset);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.review-counts { display: flex; flex-wrap: wrap; gap: 2px 6px; }
+.review-counts b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.review-counts > span + span::before {
+  content: '·';
+  color: var(--ink-faint);
+  margin-right: 6px;
+}
+.review-filters { display: flex; }
+.review-filters .btn-toggle { padding: 2px 10px; font-size: 11.5px; border-radius: 6px; }
+.review-filters .btn-toggle.on { background: var(--paper-raised); }
+.sidebar-filtered-empty { padding: 14px; }
+.linkish {
+  background: none; border: 0; padding: 0; font: inherit;
+  color: var(--user); cursor: pointer; text-decoration: underline;
+}
+
+/* A long thread folds in the middle. */
+.thread-fold {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  font: inherit; font-size: 11.5px; color: var(--ink-faint);
+  background: transparent; border: 0; cursor: pointer;
+  padding: 7px 2px; margin-top: 8px; border-top: 1px solid var(--rule);
+}
+.thread-fold:hover { color: var(--ink); }
+.thread-fold-line { flex: 1; height: 1px; background: var(--rule); }
+
 .undo-decision { margin-left: auto; font-size: 11px; padding: 2px 8px; }
 .anchor, .card { transition: background 0.12s ease, border-color 0.12s ease; }
 
