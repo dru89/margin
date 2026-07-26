@@ -60,19 +60,37 @@ export function wordDiff(before: string, after: string): DiffPart[] {
   let lead = a.slice(0, head).join('');
   let trail = a.slice(a.length - tail).join('');
 
-  // Whitespace that both sides share is unchanged, so it belongs outside
-  // the marked spans. Leaving it in strikes and re-underlines a space that
-  // was never touched, and the highlight stops matching the words that
+  // Characters both sides share at the edges are unchanged, so they belong
+  // outside the marked spans. Leaving them in strikes and re-underlines
+  // something nothing touched, and the mark stops matching the words that
   // actually differ.
   //
-  // Only when *both* sides have it: inserting a word into a sentence adds
-  // a space as well as a word, and that space really is new.
+  // Whitespace *and* punctuation, because both produce the same artefact:
+  //   ... [-C+I,-]{+Commerce & Identity (C&I),+} where     two commas
+  //   (something [-parenthetical)-]{+in parentheses)+}     two closing parens
+  // The second reads worse — a closing paren is half a matched pair, so
+  // seeing two looks like broken markup rather than repeated content — but
+  // it is the same thing, so one rule covers both.
+  //
+  // Never letters or digits: hoisting those would cut words in half
+  // ("runn[-ing-]{+er+}"), which trades one oddity for a worse one.
+  //
+  // And only when *both* sides have it: inserting a word into a sentence
+  // adds a space as well as a word, and that space really is new.
   if (before2 !== '' && after2 !== '') {
     const shared = (x: string, y: string, at: 'start' | 'end') => {
-      const re = at === 'end' ? /\s+$/ : /^\s+/;
+      const re = at === 'end' ? /[^\p{L}\p{N}]+$/u : /^[^\p{L}\p{N}]+/u;
       const mx = re.exec(x)?.[0] ?? '';
       const my = re.exec(y)?.[0] ?? '';
-      const n = Math.min(mx.length, my.length);
+      // Compare character by character from the shared edge; stop at the
+      // first difference, so "(C&I)," and "C+I," share only the comma.
+      let n = 0;
+      while (n < mx.length && n < my.length) {
+        const cx = at === 'end' ? mx[mx.length - 1 - n] : mx[n];
+        const cy = at === 'end' ? my[my.length - 1 - n] : my[n];
+        if (cx !== cy) break;
+        n++;
+      }
       if (n === 0) return '';
       return at === 'end' ? mx.slice(mx.length - n) : mx.slice(0, n);
     };

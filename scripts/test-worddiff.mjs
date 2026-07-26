@@ -24,7 +24,7 @@ const show = (a, b) =>
 head('only what changed is marked');
 t('the C+I case from #98',
   show('moved from C+I, where', 'moved from Commerce & Identity (C&I), where'),
-  'moved from [-C+I,-]{+Commerce & Identity (C&I),+} where');
+  'moved from [-C+I-]{+Commerce & Identity (C&I)+}, where');
 t('one word in the middle', show('the quick brown fox', 'the quick red fox'),
   'the quick [-brown-]{+red+} fox');
 t('a word appended', show('the quick fox', 'the quick brown fox'),
@@ -69,6 +69,17 @@ t('but an inserted word brings its own space',
   show('the quick fox', 'the quick brown fox'), 'the quick {+brown +}fox');
 t('and a removed word takes its space with it',
   show('the quick brown fox', 'the quick fox'), 'the quick [-brown -]fox');
+
+head('shared punctuation rides out too');
+// Same artefact as the shared space, and worse with a matched pair: two
+// closing parens read as broken markup rather than as repeated content.
+t('a shared closing paren', show('(something parenthetical)', '(something in parentheses)'),
+  '(something [-parenthetical-]{+in parentheses+})');
+t('brackets on both sides', show('(A),', '(B),'), '([-A-]{+B+}),');
+t('a shared trailing comma', show('C+I,', 'C&I,'), '[-C+I-]{+C&I+},');
+t('letters are never hoisted — no split words',
+  show('running', 'runner'), '[-running-]{+runner+}');
+t('digits are never hoisted', show('v1', 'v2'), '[-v1-]{+v2+}');
 
 head('one suggestion stays one replacement');
 // A real diff anchors on the shared word and splits this into two edits,

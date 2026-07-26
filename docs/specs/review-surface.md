@@ -353,15 +353,26 @@ edits you could take separately, when a suggestion is one replacement
 you accept or reject whole — and a suggestion that fragments into five
 small swaps is harder to judge than the sentence it came from.
 
-**Whitespace the two sides share stays outside the marks.** The space
-between the replaced words and what follows exists in both strings, so
-striking and re-underlining it misreports an untouched character, and
-the highlight stops matching the words that actually differ — hence
-`[-C+I,-]{+Commerce & Identity (C&I),+} where`, not `[-C+I, -]…`.
+**Characters the two sides share at the edges stay outside the marks** —
+whitespace *and* punctuation. They exist in both strings, so marking
+them misreports something untouched and the highlight stops matching
+the words that differ:
 
-Only when both sides have it, though: inserting a word into a sentence
-adds a space as well as a word, and that space really is new, so it
-stays inside the insertion.
+```
+[-C+I,-]{+Commerce & Identity (C&I),+} where     two commas
+(something [-parenthetical)-]{+in parentheses)+} two closing parens
+```
+
+The second reads worse, because a closing paren is half a matched pair
+and two of them look like broken markup rather than repeated content —
+but it is the same artifact, so one rule covers both.
+
+**Never letters or digits.** Hoisting those cuts words in half
+(`runn[-ing-]{+er+}`), trading one oddity for a worse one.
+
+**And only when both sides have it.** Inserting a word into a sentence
+adds a space as well as a word, so that space really is new and stays
+inside the insertion; deleting a word takes its space with it.
 
 Trimming also has no pathological case, so it needs no size cap.
 
