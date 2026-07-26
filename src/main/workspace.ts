@@ -75,6 +75,37 @@ export function isMarkdown(name: string): boolean {
   return /\.(md|markdown|mdx)$/i.test(name);
 }
 
+/**
+ * Resolve a path the renderer asked to open, refusing anything outside
+ * the project (#90).
+ *
+ * "Open in its default app" stopped being a request only the explorer can
+ * make the moment `@path` chips shipped: a chip's path comes from comment
+ * text, and the agent writes comment text. The renderer already refuses
+ * to make a chip clickable unless it names a file the workspace scan
+ * found, so this is the second lock on the same door — worth having,
+ * because the first one is a rendering decision and this one is the
+ * boundary that actually reaches the disk.
+ *
+ * Symlinks are resolved before the containment test, so a link inside
+ * the project pointing out of it does not smuggle a target past the
+ * check.
+ */
+export async function resolveInsideWorkspace(
+  workspaceRoot: string,
+  rawPath: string,
+): Promise<string | null> {
+  const root = await fs.realpath(workspaceRoot).catch(() => path.resolve(workspaceRoot));
+  const abs = path.resolve(root, rawPath);
+  const real = await fs.realpath(abs).catch(() => null);
+  if (!real) return null; // nothing there to open
+  if (real !== root && !real.startsWith(root + path.sep)) return null;
+  // A directory would hand the request to a file manager, which is not
+  // what naming a file in a comment asks for.
+  const stat = await fs.stat(real).catch(() => null);
+  return stat?.isFile() ? real : null;
+}
+
 async function walkFiles(root: string): Promise<string[]> {
   const results: string[] = [];
   const stack = [root];

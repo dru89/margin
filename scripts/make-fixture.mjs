@@ -50,6 +50,12 @@ Spent too long on the first draft of the proposal before showing it to anyone. T
 const doc = path.join(target, 'self-evaluation.md');
 writeFileSync(doc, DOC);
 writeFileSync(path.join(target, 'notes.md'), '# Scratch notes\n\nA second document, so the file explorer has something to show.\n');
+// Not markdown, so @-references to it have somewhere non-Margin to go.
+mkdirSync(path.join(target, 'data'), { recursive: true });
+writeFileSync(
+  path.join(target, 'data', 'rotations.csv'),
+  'week,primary,secondary\n2026-01-12,alex,sam\n2026-01-19,sam,jordan\n',
+);
 
 /** Anchor on real text; fails loudly rather than silently orphaning. */
 const at = (quote) => {
@@ -82,7 +88,10 @@ const comments = [
     anchor: at('PagerDuty rotation'),
     replies: [{
       id: 'rp-1', author: 'agent', round: ROUND, createdAt: iso(1),
-      text: 'Found the evidence — the rotation predates the Super Bowl by three weeks. Worth saying so explicitly; "before" undersells it.',
+      // Every case a chip has to render: a markdown file (opens in
+      // Margin), a file that isn't (opens in its default app), and one
+      // that names nothing here (lost).
+      text: 'Found the evidence in @data/rotations.csv — the rotation predates the Super Bowl by three weeks. I put the working through in @notes.md. The older export (@data/2025-rotations.csv) is gone.',
     }],
     status: 'open',
   },

@@ -27,6 +27,7 @@ npm run test:state       # review-state derivation + transitions
 npm run test:anchors     # anchor resolution, orphaning, position stability
 npm run test:worddiff    # trimming a suggestion to what actually changed (§6)
 npm run test:composer    # what counts as a draft the composer must protect (§66)
+npm run test:mentions    # finding @path references in comment text (§67)
 npm run test:paths       # agent-supplied path validation (the untrusted boundary)
 npm run test:workspace   # project-root derivation + its two guards (§63)
 npm run test:sidecar     # load, backfill, rename recovery, refusing a stranger's
@@ -210,6 +211,12 @@ npx electron . --remote-debugging-port=9224 "path/to/doc.md" &   # background
   explicit Accept). All other agent tools (`src/main/agent.ts`) mutate the
   review sidecar only; text changes land exclusively through user-accepted
   suggestions. Keep `Write`/`Edit`/`Bash` in `disallowedTools`.
+- **Anything reachable from agent-authored text is an untrusted request.**
+  Comment text renders `@path` chips, so `openExternal` checks containment
+  in the project (`resolveInsideWorkspace`) instead of trusting its caller
+  — the renderer declining to make a chip clickable is presentation, not a
+  boundary. Apply the same rule to anything new that turns agent output
+  into a file or URL the user can activate.
 - **Colors:** Catppuccin only (Latte light / Mocha dark), via the CSS
   variables in `styles.css`. Never hardcode hex values in components.
 - Fonts are bundled Fontsource packages (CSP has no network access):
