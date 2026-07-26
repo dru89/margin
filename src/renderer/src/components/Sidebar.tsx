@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CommentThread, Suggestion } from '@shared/types';
 import { useLocked, useStore } from '@/store';
 import {
@@ -453,6 +453,14 @@ export function Sidebar() {
   const undoDecision = useStore((s) => s.undoDecision);
   const locked = useLocked();
   const [showArchive, setShowArchive] = useState(false);
+  const archiveRef = useRef<HTMLElement>(null);
+  // Opening the fold at the floor of the pane would otherwise reveal the
+  // items below the fold — bring its heading up to the top instead, as far
+  // as the scroll allows. Instant, not animated: this is a disclosure, and
+  // a glide here reads as more ceremony than the action deserves.
+  useEffect(() => {
+    if (showArchive) archiveRef.current?.scrollIntoView({ block: 'start' });
+  }, [showArchive]);
   const activeAnchorId = useStore((s) => s.activeAnchorId);
 
   // Bring the focused card into view when an editor highlight is clicked.
@@ -568,7 +576,7 @@ export function Sidebar() {
           </p>
         )}
         {archivedCount > 0 && (
-          <section className="review-archive">
+          <section className="review-archive" ref={archiveRef}>
             <button
               className="btn btn-ghost sidebar-archive-toggle"
               onClick={() => setShowArchive(!showArchive)}

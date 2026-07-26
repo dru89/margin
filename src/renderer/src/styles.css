@@ -617,7 +617,9 @@ kbd {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
-  padding: 14px 14px 24px;
+  /* Even on all sides: the 24px bottom read as a gap once the archive was
+     pinned against it. */
+  padding: 14px;
   /* A column so the archive can be pushed to the bottom. */
   display: flex;
   flex-direction: column;
@@ -627,6 +629,10 @@ kbd {
    floating mid-pane — and does nothing once the list scrolls, where it is
    already last. */
 .review-archive { margin-top: auto; }
+/* The toggle is a bare ghost button, so only its own padding separates its
+   label from the column everything else starts at. Pull it back so the
+   fold lines up with the counts above it. */
+.review-archive .sidebar-archive-toggle { margin-left: -8px; }
 
 .sidebar-heading {
   font-size: 11px;

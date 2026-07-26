@@ -246,8 +246,17 @@ same ones. "Queued" and "awaiting" were indistinguishable, and
 | **awaiting reply** | sent, no answer yet | *Awaiting reply* |
 | **resolved** | done — matching "Resolved & decided" below | *Resolved* |
 
-**Settled threads stay in the list**, collapsed below a fold at the
-end, one line each, expandable. Keeping them is a decision to revisit
+**Settled threads stay in the list**, collapsed below a fold pinned to
+the floor of the pane — not merely last. With little to review it
+otherwise rendered straight after the empty state and floated mid-pane.
+`margin-top: auto` takes the slack when the list is short and does
+nothing once it scrolls, where the fold is already last.
+
+**Opening the fold scrolls its heading to the top**, as far as the
+scroll allows. Expanding something sitting on the floor would otherwise
+reveal the items below the fold, off-screen. Instant rather than
+animated: it is a disclosure, and a glide reads as more ceremony than
+the action deserves. Keeping them is a decision to revisit
 only if documents accumulate enough to make the fold useless.
 
 **The sidebar and the document scroll independently**, as today. The
