@@ -467,13 +467,17 @@ function focusCard(id: string): void {
   if (still) return;
   const pulse = () => {
     const accent = getComputedStyle(document.documentElement).getPropertyValue('--user').trim();
+    // Grows in, then dissolves at full width rather than shrinking back —
+    // a ring collapsing to nothing is what made this read as a cut. The
+    // colour is soft and the exit is long; the eye should catch it without
+    // being snapped at.
     el.animate(
       [
-        { boxShadow: `0 0 0 0 ${accent}00` },
-        { boxShadow: `0 0 0 3px ${accent}`, offset: 0.2 },
-        { boxShadow: `0 0 0 0 ${accent}00` },
+        { boxShadow: `0 0 0 0px ${accent}00`, easing: 'ease-out' },
+        { boxShadow: `0 0 0 5px ${accent}59`, offset: 0.3, easing: 'ease-in-out' },
+        { boxShadow: `0 0 0 5px ${accent}00` },
       ],
-      { duration: 900, easing: 'ease-out' },
+      { duration: 1500 },
     );
   };
   // Wait for the smooth scroll to land. Firing both at once means the pulse
@@ -507,7 +511,13 @@ function focusCard(id: string): void {
  */
 const MAX_JUMPS = 3;
 
-function RoundHeader({ onReviewAll }: { onReviewAll: () => void }) {
+function RoundHeader({
+  filtered,
+  onToggleFilter,
+}: {
+  filtered: boolean;
+  onToggleFilter: () => void;
+}) {
   const review = useStore((s) => s.review);
   const setActiveAnchor = useStore((s) => s.setActiveAnchor);
   const markThreadSeen = useStore((s) => s.markThreadSeen);
@@ -573,7 +583,14 @@ function RoundHeader({ onReviewAll }: { onReviewAll: () => void }) {
             in the data says which matters most. Document order, capped, and
             the rest handed to the filter that already exists for this. */}
         {rest > 0 && (
-          <button className="round-jump round-jump-more" onClick={onReviewAll}>
+          // Shares state with the All / Need you pair rather than silently
+          // setting it: a control that changes something elsewhere and then
+          // looks unchanged leaves no way back that the reader can see.
+          <button
+            className={`round-jump round-jump-more${filtered ? ' on' : ''}`}
+            aria-pressed={filtered}
+            onClick={onToggleFilter}
+          >
             +{rest} more — review all
           </button>
         )}
@@ -683,7 +700,7 @@ export function Sidebar() {
         </div>
       )}
       <div className="review-scroll">
-        <RoundHeader onReviewAll={() => setOnlyNeedsYou(true)} />
+        <RoundHeader filtered={onlyNeedsYou} onToggleFilter={() => setOnlyNeedsYou(!onlyNeedsYou)} />
         <Composer />
         {pendingSuggestions.length === 0 && openThreads.length === 0 && (
           <div className="sidebar-empty">

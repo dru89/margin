@@ -468,6 +468,12 @@ kbd {
   transition: background 0.14s ease;
 }
 .round-jump:hover { background: color-mix(in srgb, var(--agent) 16%, transparent); }
+.round-jump-more.on {
+  background: var(--agent);
+  border-color: var(--agent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
 
 /* Facts, then the control beneath them. */
 .review-counts { display: flex; flex-wrap: wrap; gap: 2px 6px; }

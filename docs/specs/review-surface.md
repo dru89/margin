@@ -304,7 +304,10 @@ Round 4 · Claude replied to 2 threads, proposed 3 edits
 can answer a dozen threads, and nothing in the data says which of them
 matters most — so no ranking is attempted. The first three by document
 position get an entry; the rest become "+N more — review all", which
-turns on the Needs-you filter rather than growing a wall of chips.
+**shares state with the All / Need you pair** — it presses in, and
+pressing it again returns to All. A control that silently changes
+something elsewhere and then looks unchanged leaves no visible way
+back.
 
 Each entry **centres** the card, **marks the passage in the document**
 and gives the card a brief pulse. Landing a card barely inside the
@@ -319,7 +322,9 @@ rewrites its `className`, which would strip one. Both respect
 `prefers-reduced-motion`. The pulse waits for the scroll to land
 (`scrollend`, with a timeout fallback): fired together, it peaks while
 the card is still travelling — usually off-screen — and is over before
-it arrives.
+it arrives. It also **dissolves at full width rather than shrinking
+back** — a ring collapsing to nothing reads as a cut — over about 1.5s
+with a soft, low-alpha colour.
 
 The header is dismissible and disappears once every item in it has been
 seen or decided.
