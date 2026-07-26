@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CommentThread, Suggestion } from '@shared/types';
 import { useLocked, useStore } from '@/store';
 import {
+  countThreads,
   latestActivity,
+  suggestionNeedsYou,
   suggestionState,
+  threadNeedsYou,
   threadState,
   type ThreadState,
 } from '@shared/reviewState';
@@ -51,12 +54,13 @@ function RoundStamp({ round, at }: { round: number; at?: string }) {
   );
 }
 
+/** The same words the summary bar uses, so the two never disagree. */
 const STATE_LABEL: Record<ThreadState, string> = {
-  draft: 'Draft — not sent',
+  draft: 'Not sent',
   awaiting: 'Awaiting reply',
   unread: 'Unread',
   read: '',
-  settled: 'Settled',
+  settled: 'Resolved',
 };
 
 /** One message in a thread: the author chip introduces what it wrote. */
@@ -276,6 +280,12 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
   const markThreadSeen = useStore((s) => s.markThreadSeen);
   const state = threadState(thread, currentRound);
   const last = latestActivity(thread);
+  const [expanded, setExpanded] = useState(false);
+  // Past four messages, keep the opening and the last two; fold the rest.
+  // Folding by age instead would hide the question in a two-message thread
+  // — the very thing the reply is answering.
+  const hidden = expanded || thread.replies.length + 1 <= 4 ? 0 : thread.replies.length - 2;
+  const shownReplies = hidden > 0 ? thread.replies.slice(hidden) : thread.replies;
 
   const sendReply = () => {
     replyTo(thread.id, reply);
@@ -310,7 +320,8 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
       }}
     >
       <div className="card-head">
-        {state === 'unread' && <span className="unread-dot" aria-hidden="true" />}
+        {/* Always mounted so clearing unread fades rather than snaps. */}
+        <span className={`unread-dot${state === 'unread' ? '' : ' is-gone'}`} aria-hidden="true" />
         {STATE_LABEL[state] && <span className="state-label">{STATE_LABEL[state]}</span>}
         {thread.anchor.orphaned && <span className="badge">Text gone</span>}
         {imported && <span className="chip chip-source" title="Imported from the linked Google Doc">Docs</span>}
@@ -377,7 +388,22 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
         at={thread.createdAt}
         text={thread.text}
       />
-      {thread.replies.map((r) => (
+      {/* The middle folds, never the ends: the first message is the
+          question and the last is where things stand (spec §3). */}
+      {hidden > 0 && !expanded && (
+        <button
+          className="thread-fold"
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded(true);
+          }}
+        >
+          <span className="thread-fold-line" />
+          {hidden} earlier {hidden === 1 ? 'reply' : 'replies'}
+          <span className="thread-fold-line" />
+        </button>
+      )}
+      {shownReplies.map((r) => (
         <Message
           key={r.id}
           author={r.author}
@@ -427,6 +453,14 @@ export function Sidebar() {
   const undoDecision = useStore((s) => s.undoDecision);
   const locked = useLocked();
   const [showArchive, setShowArchive] = useState(false);
+  const archiveRef = useRef<HTMLElement>(null);
+  // Opening the fold at the floor of the pane would otherwise reveal the
+  // items below the fold — bring its heading up to the top instead, as far
+  // as the scroll allows. Instant, not animated: this is a disclosure, and
+  // a glide here reads as more ceremony than the action deserves.
+  useEffect(() => {
+    if (showArchive) archiveRef.current?.scrollIntoView({ block: 'start' });
+  }, [showArchive]);
   const activeAnchorId = useStore((s) => s.activeAnchorId);
 
   // Bring the focused card into view when an editor highlight is clicked.
@@ -437,27 +471,77 @@ export function Sidebar() {
       ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [activeAnchorId]);
 
-  const { pendingSuggestions, openThreads, archived } = useMemo(() => {
+  const currentRound = review?.round ?? 0;
+  const [onlyNeedsYou, setOnlyNeedsYou] = useState(false);
+
+  const { pendingSuggestions, openThreads, archived, counts } = useMemo(() => {
     const comments = review?.comments ?? [];
     const suggestions = review?.suggestions ?? [];
+    const open = comments.filter((c) => c.status === 'open');
+    const pending = suggestions.filter((s) => s.status === 'pending');
+    const c = countThreads(comments, currentRound);
     return {
-      pendingSuggestions: suggestions
-        .filter((s) => s.status === 'pending')
-        .sort((a, b) => a.anchor.from - b.anchor.from),
-      openThreads: comments
-        .filter((c) => c.status === 'open')
-        .sort((a, b) => a.anchor.from - b.anchor.from),
+      // Document order, always. The filter narrows the list; it never
+      // reorders it, so a card stays where the document put it (spec §4).
+      pendingSuggestions: [...pending].sort((a, b) => a.anchor.from - b.anchor.from),
+      openThreads: [...open].sort((a, b) => a.anchor.from - b.anchor.from),
       archived: {
-        threads: comments.filter((c) => c.status === 'resolved'),
-        suggestions: suggestions.filter((s) => s.status !== 'pending'),
+        threads: comments.filter((x) => x.status === 'resolved'),
+        suggestions: suggestions.filter((x) => x.status !== 'pending'),
+      },
+      counts: {
+        ...c,
+        // Everything outstanding, threads and undecided suggestions alike —
+        // both are someone waiting on the author.
+        needsYou:
+          open.filter((t) => threadNeedsYou(t, currentRound)).length +
+          pending.filter((s) => suggestionNeedsYou(s, currentRound)).length,
+        draft:
+          c.draft + pending.filter((s) => suggestionState(s, currentRound) === 'draft').length,
       },
     };
-  }, [review]);
+  }, [review, currentRound]);
 
   const archivedCount = archived.threads.length + archived.suggestions.length;
+  // The card being read stays put even once it stops qualifying, so the list
+  // never moves out from under a click.
+  const keep = (id: string, qualifies: boolean) => qualifies || id === activeAnchorId;
+  const shownThreads = onlyNeedsYou
+    ? openThreads.filter((t) => keep(t.id, threadNeedsYou(t, currentRound)))
+    : openThreads;
+  const shownSuggestions = onlyNeedsYou
+    ? pendingSuggestions.filter((s) => keep(s.id, suggestionNeedsYou(s, currentRound)))
+    : pendingSuggestions;
 
   return (
     <aside className="sidebar">
+      {/* Facts on top, the filter beneath them (spec §4). */}
+      {(openThreads.length > 0 || pendingSuggestions.length > 0 || archivedCount > 0) && (
+        <div className="review-summary">
+          <div className="review-counts">
+            {counts.needsYou > 0 && <span><b>{counts.needsYou}</b> need you</span>}
+            {counts.draft > 0 && <span><b>{counts.draft}</b> not sent</span>}
+            {counts.awaiting > 0 && <span><b>{counts.awaiting}</b> awaiting reply</span>}
+            {archivedCount > 0 && <span><b>{archivedCount}</b> resolved</span>}
+          </div>
+          {counts.needsYou > 0 && (
+            <div className="review-filters">
+              <button
+                className={`btn btn-toggle${onlyNeedsYou ? '' : ' on'}`}
+                onClick={() => setOnlyNeedsYou(false)}
+              >
+                All
+              </button>
+              <button
+                className={`btn btn-toggle${onlyNeedsYou ? ' on' : ''}`}
+                onClick={() => setOnlyNeedsYou(true)}
+              >
+                Need you
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       <div className="review-scroll">
         <Composer />
         {pendingSuggestions.length === 0 && openThreads.length === 0 && (
@@ -469,24 +553,30 @@ export function Sidebar() {
             </p>
           </div>
         )}
-        {pendingSuggestions.length > 0 && (
+        {shownSuggestions.length > 0 && (
           <section>
-            <h3 className="sidebar-heading">Suggestions · {pendingSuggestions.length}</h3>
-            {pendingSuggestions.map((s) => (
+            <h3 className="sidebar-heading">Suggestions · {shownSuggestions.length}</h3>
+            {shownSuggestions.map((s) => (
               <SuggestionCard key={s.id} suggestion={s} />
             ))}
           </section>
         )}
-        {openThreads.length > 0 && (
+        {shownThreads.length > 0 && (
           <section>
-            <h3 className="sidebar-heading">Comments · {openThreads.length}</h3>
-            {openThreads.map((c) => (
+            <h3 className="sidebar-heading">Comments · {shownThreads.length}</h3>
+            {shownThreads.map((c) => (
               <ThreadCard key={c.id} thread={c} />
             ))}
           </section>
         )}
+        {onlyNeedsYou && shownThreads.length === 0 && shownSuggestions.length === 0 && (
+          <p className="hint sidebar-filtered-empty">
+            Nothing waiting on you.{' '}
+            <button className="linkish" onClick={() => setOnlyNeedsYou(false)}>Show everything</button>
+          </p>
+        )}
         {archivedCount > 0 && (
-          <section>
+          <section className="review-archive" ref={archiveRef}>
             <button
               className="btn btn-ghost sidebar-archive-toggle"
               onClick={() => setShowArchive(!showArchive)}

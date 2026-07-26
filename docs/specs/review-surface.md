@@ -205,19 +205,58 @@ grouping by state breaks the spatial memory that makes a margin
 readable, and means a card moves when its state changes — the exact
 complaint in #88 about a comment sliding away after submission.
 
-**Answer "what's new" with a summary bar, not with order.** A single
-row above the list:
+**The filter is "needs you", not "unread".** Unread changes the moment
+the author looks at something, so a list filtered on it rearranges
+itself as it is read — cards vanish mid-click. Outstanding work is the
+stable question: a thread needs the author whenever the last word came
+from someone else, and only replying, resolving or deciding removes it.
+Reading is not responding.
+
+Unread remains as a *state* on the card — it says what is new, which is
+a different and still useful thing. It is simply not what a filter
+should be built on.
+
+**Whatever is selected stays visible**, even once it stops qualifying.
+Acting on a card should not make it disappear from under the cursor; it
+leaves the list when the author moves on.
+
+**Answer "what's new" with a summary bar, not with order.**
 
 ```
-3 unread · 2 queued · 5 settled            [ Unread ]  [ All ]
+7 need you · 2 not sent · 2 awaiting reply · 3 resolved
+[ All ] [ Need you ]
 ```
 
-Counts are always visible; the filter narrows the list without
-reordering it. This gives #104 its answer — what's new, what's queued,
-what's done — while a card stays where the document put it.
+**Facts on one line, the filter beneath them.** Counts and buttons on the
+same row read as one control strip, so the counts looked clickable;
+stacking separates what is stated from what is offered without having to
+strip the buttons of their affordance. A single toggle chip carrying the
+count was tried and reads worse — the paired toggle is the app's existing
+vocabulary (it is what Write/Preview uses), and it makes the inactive
+option visible rather than implied.
 
-**Settled threads stay in the list**, collapsed below a fold at the
-end, one line each, expandable. Keeping them is a decision to revisit
+**The words say who holds the ball**, and the bar and the cards use the
+same ones. "Queued" and "awaiting" were indistinguishable, and
+"awaiting" read as though it might be waiting on the author:
+
+| | means | card label |
+| --- | --- | --- |
+| **need you** | someone else spoke last, or an edit is undecided | *Unread*, or nothing once seen |
+| **not sent** | your writing, still to go | *Not sent* |
+| **awaiting reply** | sent, no answer yet | *Awaiting reply* |
+| **resolved** | done — matching "Resolved & decided" below | *Resolved* |
+
+**Settled threads stay in the list**, collapsed below a fold pinned to
+the floor of the pane — not merely last. With little to review it
+otherwise rendered straight after the empty state and floated mid-pane.
+`margin-top: auto` takes the slack when the list is short and does
+nothing once it scrolls, where the fold is already last.
+
+**Opening the fold scrolls its heading to the top**, as far as the
+scroll allows. Expanding something sitting on the floor would otherwise
+reveal the items below the fold, off-screen. Instant rather than
+animated: it is a disclosure, and a glide reads as more ceremony than
+the action deserves. Keeping them is a decision to revisit
 only if documents accumulate enough to make the fold useless.
 
 **The sidebar and the document scroll independently**, as today. The

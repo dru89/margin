@@ -158,6 +158,12 @@ npx electron . --remote-debugging-port=9224 "path/to/doc.md" &   # background
   won, so deleted text stayed green). Win on **specificity** — two classes,
   or a custom property the base rule reads — not on where the rule sits.
   And verify the computed value, not that the class is present.
+- **Unregistered CSS custom properties do not interpolate.** `background:
+  var(--x)` with a `transition` declared will still snap when `--x` changes
+  — the declaration is there but has nothing to animate. Put the animated
+  value on the element directly (qualify the selector to win on
+  specificity), or register the property with `@property`. A conditionally
+  *rendered* element can't fade either: keep it mounted and collapse it.
 - **gdocs-sync is bundled into the main bundle from source** via the
   vite alias + tsconfig.node.json `paths` (no workspace/file: dep).
   Import it as `'gdocs-sync'`; the integration layer is

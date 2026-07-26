@@ -29,20 +29,13 @@ const DOC = `# 2026 Self-Evaluation
 
 ## Technical Incident Manager program
 
-Designed and launched the Technical Incident Manager program: proposal and
-training program, onboarding guide, a Teams channel, and a PagerDuty rotation
-with P1/P2 bot notifications wired in before the Super Bowl. Kickoff was Feb 5
-with engineering leads across alliances, and it was well received internally.
+Designed and launched the Technical Incident Manager program: proposal and training program, onboarding guide, a Teams channel, and a PagerDuty rotation with P1/P2 bot notifications wired in before the Super Bowl. Kickoff was Feb 5 with engineering leads across alliances, and it was well received internally.
 
-The program moved from C+I, where the original proposal had stalled for two
-quarters. Getting it unstuck meant rewriting the framing for an audience that
-had already said no once.
+The program moved from C+I, where the original proposal had stalled for two quarters. Getting it unstuck meant rewriting the framing for an audience that had already said no once.
 
 ## Platform work
 
-Partnered with the platform team on blue/green deployments, reducing rollback time
-across three properties. Led the mesh networking review and the C+I roadmap review
-that followed from it.
+Partnered with the platform team on blue/green deployments, reducing rollback time across three properties. Led the mesh networking review and the C+I roadmap review that followed from it.
 
 | Initiative | Status | Quarter |
 |---|---|---|
@@ -52,10 +45,7 @@ that followed from it.
 
 ## What I would do differently
 
-Spent too long on the first draft of the proposal before showing it to anyone.
-The version that landed was the fourth, and the first three taught me things I
-could have learned in a week of conversations.
-`;
+Spent too long on the first draft of the proposal before showing it to anyone. The version that landed was the fourth, and the first three taught me things I could have learned in a week of conversations.`;
 
 const doc = path.join(target, 'self-evaluation.md');
 writeFileSync(doc, DOC);
