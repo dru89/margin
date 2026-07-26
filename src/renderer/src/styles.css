@@ -268,7 +268,14 @@ kbd {
   padding: 48px 56px 40vh;
 }
 
-.cm-content { caret-color: var(--user); }
+/* Two classes: CodeMirror's injected theme sets caret-color on .cm-content
+   too and lands later, so the single-class rule lost and the caret stayed
+   black in dark mode. (Fourth time this file has been bitten by it — see
+   CLAUDE.md.) The .cm-cursor rules cover the drawn caret if drawSelection
+   is ever enabled. */
+.cm-editor .cm-content { caret-color: var(--user); }
+.cm-editor .cm-cursor,
+.cm-editor .cm-dropCursor { border-left-color: var(--user); border-left-width: 2px; }
 .cm-line { padding: 0; }
 .cm-content ::selection,
 .cm-content::selection { background: color-mix(in srgb, var(--user) 25%, transparent); }
@@ -1170,7 +1177,10 @@ button.status-chip:active { transform: translateY(1px); }
   position: absolute;
   top: calc(100% + 2px);
   left: 0;
-  transform: translateX(-50%);
+  /* --pill-dx is measured per suggestion (see centerPills): the offset from
+     the widget to the middle of the whole change, struck text included.
+     Falls back to the seam if measurement has not run yet. */
+  transform: translateX(calc(var(--pill-dx, 0px) - 50%));
   z-index: 5;
   box-shadow: var(--shadow);
   display: flex;
@@ -1189,12 +1199,17 @@ button.status-chip:active { transform: translateY(1px); }
   pointer-events: none;
   transition: opacity 0.12s ease;
 }
+/* Fading out slowly and in quickly means crossing the ragged gap between
+   two wrapped lines does not blink the pill: the pointer leaves one span
+   and reaches the next before the fade finishes. */
+.suggest-pill { transition: opacity 0.45s ease 0.12s; }
 .pair-hot .suggest-pill,
 .pair-active .suggest-pill,
 .suggest-ins-wrap.pair-hot .suggest-pill,
 .suggest-ins-wrap.pair-active .suggest-pill {
   opacity: 1;
   pointer-events: auto;
+  transition: opacity 0.1s ease;
 }
 .pill-accept {
   border: none;

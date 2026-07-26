@@ -528,8 +528,7 @@ function RoundHeader({
   onToggleFilter: () => void;
 }) {
   const review = useStore((s) => s.review);
-  const setActiveAnchor = useStore((s) => s.setActiveAnchor);
-  const markThreadSeen = useStore((s) => s.markThreadSeen);
+  const focusAnchor = useStore((s) => s.focusAnchor);
   const [dismissed, setDismissed] = useState<number | null>(null);
 
   const round = review?.round ?? 0;
@@ -550,14 +549,11 @@ function RoundHeader({
   const shown = items.slice(0, MAX_JUMPS);
   const rest = items.length - shown.length;
 
-  const go = (id: string, anchor: Anchor, seen?: string) => {
-    setActiveAnchor(id);
-    if (seen) markThreadSeen(seen);
+  const go = (id: string, anchor: Anchor) => {
+    focusAnchor(id);
     // Mark the passage in the document too — a jump that only moves the
     // sidebar leaves the reader to find the text themselves.
     if (!anchor.orphaned) revealRange(anchor.from, anchor.to);
-    // After the state change has rendered, so the card is there to scroll to.
-    requestAnimationFrame(() => focusCard(id));
   };
   const parts = [
     answered.length > 0 && `replied to ${answered.length} ${answered.length === 1 ? 'thread' : 'threads'}`,
@@ -583,7 +579,7 @@ function RoundHeader({
           <button
             key={it.id}
             className="round-jump"
-            onClick={() => go(it.id, it.anchor, 'replies' in it ? it.id : undefined)}
+            onClick={() => go(it.id, it.anchor)}
           >
             ↳ “{it.anchor.quote.length > 26 ? `${it.anchor.quote.slice(0, 25)}…` : it.anchor.quote}”
           </button>
@@ -623,14 +619,15 @@ export function Sidebar() {
     if (showArchive) archiveRef.current?.scrollIntoView({ block: 'start' });
   }, [showArchive]);
   const activeAnchorId = useStore((s) => s.activeAnchorId);
+  const focusRequest = useStore((s) => s.focusRequest);
 
-  // Bring the focused card into view when an editor highlight is clicked.
+  // Every "take me there" — a card, a round-header jump, or marked text in
+  // the document — lands here, so all three behave the same.
   useEffect(() => {
-    if (!activeAnchorId) return;
-    document
-      .getElementById(`card-${activeAnchorId}`)
-      ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [activeAnchorId]);
+    if (!focusRequest) return;
+    const id = focusRequest.id;
+    requestAnimationFrame(() => focusCard(id));
+  }, [focusRequest]);
 
   const currentRound = review?.round ?? 0;
   const [onlyNeedsYou, setOnlyNeedsYou] = useState(false);

@@ -41,7 +41,11 @@ export function EditorPane() {
         extensions: createExtensions({
           onChange: handleDocChange,
           onSelectionChange: setSelection,
-          onAnchorClick: setActiveAnchor,
+          // Clicking marked text in the document is the same request as
+          // clicking its card or a round-header jump: go there, mark it
+          // seen, center it, pulse it. It used to only set the selection.
+          onAnchorClick: (id) =>
+            id ? useStore.getState().focusAnchor(id) : useStore.getState().setActiveAnchor(null),
           onAnchorHover: setHoveredAnchor,
           onSuggestionAction: (id, action) => {
             if (useStore.getState().agent.phase === 'running') return;

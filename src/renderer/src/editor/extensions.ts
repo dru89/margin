@@ -261,6 +261,66 @@ const pendingAnchorHighlight = ViewPlugin.fromClass(
   { decorations: (v) => v.decorations },
 );
 
+/**
+ * Center each accept/reject pill on the whole change, not on the seam.
+ *
+ * CSS cannot do this: the struck text is a document mark and the inserted
+ * text lives in a widget, so nothing wraps both. This measures the union
+ * of the two after layout and offsets the pill onto its center. On a
+ * multi-line change that puts the pill under the middle of the block,
+ * which is where the eye expects a control for the whole thing.
+ */
+const centerPills = ViewPlugin.fromClass(
+  class {
+    private ro: ResizeObserver;
+    constructor(readonly view: EditorView) {
+      this.measure();
+      // Line wrapping decides where a change begins and ends, so anything
+      // that reflows the column invalidates the offsets. A first pass runs
+      // before webfonts settle and measures the wrong boxes — hence the
+      // observer rather than a one-shot.
+      this.ro = new ResizeObserver(() => this.measure());
+      this.ro.observe(view.contentDOM);
+    }
+    destroy() {
+      this.ro.disconnect();
+    }
+    update() {
+      this.measure();
+    }
+    measure() {
+      requestAnimationFrame(() => {
+        const root = this.view.dom;
+        for (const wrap of root.querySelectorAll<HTMLElement>('.suggest-ins-wrap')) {
+          const id = wrap.dataset.anchorId;
+          if (!id) continue;
+          const boxes = [
+            ...root.querySelectorAll<HTMLElement>(
+              `.anchor-suggestion-del[data-anchor-id="${CSS.escape(id)}"]`,
+            ),
+          ].map((e) => e.getBoundingClientRect());
+          // The pill is positioned against the wrap's *first* line box, so
+          // that is the origin the offset has to be measured from.
+          const origin = wrap.getClientRects()[0];
+          if (!origin) continue;
+          boxes.push(...wrap.getClientRects());
+          const left = Math.min(...boxes.map((b) => b.left));
+          const right = Math.max(...boxes.map((b) => b.right));
+          const top = Math.min(...boxes.map((b) => b.top));
+          const bottom = Math.max(...boxes.map((b) => b.bottom));
+          // Only center when the change sits on one line. Across several,
+          // the union spans most of the column and its middle is a point in
+          // the middle of a paragraph — no more "the control for this edit"
+          // than the seam, and further from where the reader is looking.
+          const oneLine = bottom - top < origin.height * 1.6;
+          const dx = oneLine ? (left + right) / 2 - origin.left : 0;
+          wrap.style.setProperty('--pill-dx', `${Math.round(dx)}px`);
+        }
+      });
+    }
+  },
+);
+
 const markdownHighlight = HighlightStyle.define([
   { tag: t.heading1, class: 'md-h1' },
   { tag: t.heading2, class: 'md-h2' },
@@ -484,6 +544,7 @@ export function createExtensions(callbacks: EditorCallbacks) {
     lineStyles,
     tablePill,
     annotationsField,
+    centerPills,
     pendingAnchorField,
     pendingAnchorHighlight,
     readOnlyCompartment.of(EditorState.readOnly.of(false)),
