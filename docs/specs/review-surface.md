@@ -546,11 +546,30 @@ can be deleted but not edited, and an inline comment neither, has no
 justification. Once a round is submitted, its contents are history and
 become read-only.
 
-**Submission is never blocked by an open draft.** The submit popover
-already enumerates what travels with the round; an unfinished comment
-gets a line there saying it isn't included. A disabled primary action
-would have to explain itself, and this surface already exists to
-answer the question.
+**An open edit box is not a second composer.** Both can be open at once,
+and that is fine, because they are different in what they risk. A
+composer holds text that exists nowhere else, so losing it loses work —
+which is why a new selection cannot take it. An edit box holds a
+*revision* to something already staged; abandoning it loses the revision
+and the original survives intact. Closing one edit to open another would
+destroy typing to prevent nothing, so any number may be open.
+
+**Submission is never blocked, by an open draft or an open edit.** A
+disabled primary action would have to explain itself, and the submit
+popover already exists to say what travels with the round. It gets one
+line per kind of uncommitted work:
+
+- The composer's draft *survives* the round — it stays open, its anchor
+  keeps being remapped — so its line is a fact: it isn't included.
+- An open edit box *cannot* survive: the item it is changing becomes
+  history the moment the round goes, so the box closes and the typing
+  goes with it. Its line is therefore a warning, said before the click
+  rather than discovered after it.
+
+Submitting deliberately does not save an open edit. The author typed it
+but never confirmed it, and committing half a rewrite into a round sends
+it to Claude and makes it part of the record — worse than losing it,
+because it cannot be taken back.
 
 ## 9. @-references as chips (#90)
 

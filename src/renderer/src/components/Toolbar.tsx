@@ -28,6 +28,7 @@ export function Toolbar() {
   const removeDiscussionMessage = useStore((s) => s.removeDiscussionMessage);
   const composerAnchor = useStore((s) => s.composerAnchor);
   const composerDraft = useStore((s) => s.composerDraft);
+  const openRevisions = useStore((s) => s.openRevisions);
   const queued = discussion.filter((m) => m.pending);
   const modifiedDocs = workspace?.files.filter((f) => f.modified && f.kind === 'markdown') ?? [];
   // The quote it is attached to, when the composer holds work that will not
@@ -155,6 +156,16 @@ export function Toolbar() {
               {unfinished && (
                 <p className="manifest-unfinished">
                   Your unfinished comment on “{unfinished}” isn’t included.
+                </p>
+              )}
+              {/* An open edit box cannot survive the round — what it is
+                  changing becomes history, so the box closes and the typing
+                  goes with it. Said here, before that happens. */}
+              {openRevisions.length > 0 && (
+                <p className="manifest-unfinished">
+                  {openRevisions.length === 1
+                    ? 'An edit you haven’t saved will be discarded; the original wording goes with this round.'
+                    : `${openRevisions.length} edits you haven’t saved will be discarded; the original wording goes with this round.`}
                 </p>
               )}
               <div className="card-actions">

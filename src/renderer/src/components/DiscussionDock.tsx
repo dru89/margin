@@ -49,6 +49,15 @@ export function DiscussionDock() {
   const editDiscussionMessage = useStore((s) => s.editDiscussionMessage);
   const [text, setText] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  // The submit popover names it too — a queued message is going with this
+  // round, so an unsaved rewrite of it is about to be lost (spec §8).
+  const setRevisionOpen = useStore((s) => s.setRevisionOpen);
+  useEffect(() => {
+    if (!editingId) return;
+    const key = `discussion:${editingId}`;
+    setRevisionOpen(key, true);
+    return () => setRevisionOpen(key, false);
+  }, [editingId, setRevisionOpen]);
   const [pulse, setPulse] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 

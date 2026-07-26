@@ -143,6 +143,26 @@ test.describe('editing what has not been sent', () => {
     await expect.poll(() => sidecarOf(file)?.comments?.length).toBe(0);
   });
 
+  test('a round carries the saved wording, not an edit still in the box', async () => {
+    // Submitting is never blocked, so an open edit box has to lose rather
+    // than commit text the author never confirmed. What it must not do is
+    // send half a rewrite — the popover says so before it happens.
+    m = await launch();
+    const file = doc(m.dir, 'p/doc.md', DOC);
+    await draftComment(file);
+
+    await m.first.locator('.card-comment').first()
+      .getByRole('button', { name: 'Edit', exact: true }).click();
+    await m.first.locator('.card-comment .msg-edit textarea').first().fill('half a rewr');
+
+    await m.first.getByRole('button', { name: /submit for review/i }).click();
+    await expect(m.first.getByText(/haven’t saved will be discarded/)).toBeVisible();
+    await m.first.getByRole('button', { name: /send round/i }).click();
+    await expect.poll(() => sidecarOf(file)?.round, { timeout: 60_000 }).toBe(1);
+
+    expect(sidecarOf(file).comments[0].text).toBe('first thoughts');
+  });
+
   test('once submitted, a comment is a record and stops being editable', async () => {
     m = await launch();
     const file = doc(m.dir, 'p/doc.md', DOC);

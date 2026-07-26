@@ -1328,8 +1328,29 @@ it prevents. If that proves wrong in use, the fix is a confirm on the one
 case that takes more than a single message with it — deleting a thread
 that has replies.
 
-**Submission is never blocked by an open draft.** The submit popover
-already enumerates what travels with the round, so it gets one more line
-saying an unfinished comment does not. A disabled primary action would
-have to explain itself, and this is the surface that already exists to
-answer the question.
+**An open edit box is not a second composer**, so both may be open at
+once and any number of edits may be. The rule against a second composer
+was about there being no capability gained; the rule protecting the
+composer's draft is about risk, and the risk here is different in kind. A
+composer holds text that exists nowhere else. An edit box holds a
+revision to something already staged — abandon it and the original is
+untouched. Closing one edit to open another would destroy typing to
+prevent nothing.
+
+**Submission is never blocked, by a draft or by an open edit.** A
+disabled primary action would have to explain itself, and the submit
+popover already exists to say what travels. It carries one line per kind
+of uncommitted work, and they are not the same kind of line:
+
+- The composer's draft survives the round — still open, still remapped —
+  so its line is a fact.
+- An open edit cannot survive. What it modifies becomes history the
+  moment the round goes, the box closes, and the typing goes with it. Its
+  line is a warning, and it exists because that loss was previously
+  silent: the round went out carrying the saved wording, the box vanished
+  with the round counter, and nothing had said either would happen.
+
+Submitting deliberately does not save an open edit. The author typed it
+and never confirmed it; committing half a rewrite sends it to Claude and
+writes it into the record, which is worse than losing it because it
+cannot be taken back.

@@ -176,6 +176,21 @@ function Message({
   );
 }
 
+/**
+ * Tell the submit popover an edit box is open here (spec §8).
+ *
+ * Pass a key while editing, a falsy value otherwise. Unmounting counts as
+ * closing — a card can be filtered out from under an open editor.
+ */
+function useRevisionOpen(key: string | null | false): void {
+  const setRevisionOpen = useStore((s) => s.setRevisionOpen);
+  useEffect(() => {
+    if (!key) return;
+    setRevisionOpen(key, true);
+    return () => setRevisionOpen(key, false);
+  }, [key, setRevisionOpen]);
+}
+
 function usePair(id: string, anchor: { from: number; to: number; orphaned?: boolean }) {
   const focusAnchor = useStore((s) => s.focusAnchor);
   const setHoveredAnchor = useStore((s) => s.setHoveredAnchor);
@@ -290,6 +305,7 @@ function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
   const [rejecting, setRejecting] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
   const [editing, setEditing] = useState<{ replacement: string; note: string } | null>(null);
+  useRevisionOpen(editing !== null && suggestion.id);
 
   const currentRound = useStore((s) => s.review?.round ?? 0);
   const state = suggestionState(suggestion, currentRound);
@@ -456,6 +472,7 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
   // while it is open — two composers in one card is a guess about which
   // one Save belongs to.
   const [editingId, setEditingId] = useState<string | null>(null);
+  useRevisionOpen(editingId && `${thread.id}:${editingId}`);
   const [resolveOpen, setResolveOpen] = useState(false);
   const [sendingToDoc, setSendingToDoc] = useState(false);
   const [docError, setDocError] = useState<string | null>(null);

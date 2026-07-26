@@ -48,6 +48,17 @@ interface MarginState {
    * focus too, and setting the same value twice is not a state change.
    */
   composerFocus: number;
+  /**
+   * Edit boxes currently open on already-staged items, by key.
+   *
+   * Only the submit popover reads this. A revision is uncommitted work
+   * like a composer draft, but unlike the composer it cannot survive the
+   * round — the item it modifies becomes history, the box closes, and the
+   * typing goes with it. So the popover has to name it *before* that
+   * happens, which means someone has to know it exists (spec §8).
+   */
+  openRevisions: string[];
+  setRevisionOpen: (key: string, open: boolean) => void;
   dirty: boolean;
   workspace: WorkspaceState | null;
   explorerOpen: boolean;
@@ -360,6 +371,14 @@ export const useStore = create<MarginState>((set, get) => {
     composerDraft: emptyDraft,
     setComposerDraft: (patch) => set({ composerDraft: { ...get().composerDraft, ...patch } }),
     composerFocus: 0,
+
+    openRevisions: [],
+    setRevisionOpen: (key, open) => {
+      const current = get().openRevisions;
+      const has = current.includes(key);
+      if (has === open) return; // no churn, and no new array to re-render on
+      set({ openRevisions: open ? [...current, key] : current.filter((k) => k !== key) });
+    },
 
     openComposer: () => {
       const { selection, content, mode, previewQuote, composerAnchor, composerDraft } = get();
