@@ -25,6 +25,8 @@ module with esbuild and assert against it. Existing suites:
 npm test                 # all suites
 npm run test:state       # review-state derivation + transitions
 npm run test:anchors     # anchor resolution, orphaning, position stability
+npm run test:worddiff    # trimming a suggestion to what actually changed (§6)
+npm run test:composer    # what counts as a draft the composer must protect (§66)
 npm run test:paths       # agent-supplied path validation (the untrusted boundary)
 npm run test:workspace   # project-root derivation + its two guards (§63)
 npm run test:sidecar     # load, backfill, rename recovery, refusing a stranger's
@@ -158,6 +160,13 @@ npx electron . --remote-debugging-port=9224 "path/to/doc.md" &   # background
   won, so deleted text stayed green). Win on **specificity** — two classes,
   or a custom property the base rule reads — not on where the rule sits.
   And verify the computed value, not that the class is present.
+- **`focus()` scrolls, and it wins against a smooth scroll.** Focusing an
+  off-screen element yanks its scroller into place in one frame, so a
+  `scrollIntoView({ behavior: 'smooth' })` running on the same container
+  ends as a snap — the animation is there, it just gets overwritten on
+  its first frame. Any `focus()` issued alongside a scroll needs
+  `focus({ preventScroll: true })`. React's `autoFocus` prop takes no
+  options, so a mount that also animates has to focus in an effect.
 - **Unregistered CSS custom properties do not interpolate.** `background:
   var(--x)` with a `transition` declared will still snap when `--x` changes
   — the declaration is there but has nothing to animate. Put the animated

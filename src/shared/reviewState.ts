@@ -132,6 +132,36 @@ export function suggestionNeedsYou(s: Suggestion, currentRound: number): boolean
   return suggestionState(s, currentRound) === 'pending' && s.author === 'agent';
 }
 
+/**
+ * Editability (spec §8, #89).
+ *
+ * A thing is editable while it is still the author's own unsent draft, and
+ * read-only the moment it is history. Three conditions, all necessary:
+ *
+ * - **It is the author's writing.** The agent's output and a collaborator's
+ *   Doc comment are records of what someone else said; editing them would
+ *   be rewriting the other half of the conversation.
+ * - **It belongs to the round being composed.** Submitting is what makes
+ *   something sent, and the round counter moves past it at that moment.
+ * - **It has not been published anywhere else.** A reply sent with "Reply
+ *   on Doc" already exists on the Doc under the author's name. Editing the
+ *   local copy would silently disagree with it, and the Doc is the copy
+ *   other people are reading.
+ */
+export function threadEditable(t: CommentThread, currentRound: number): boolean {
+  if (t.status === 'resolved') return false;
+  return !threadActivity(t).external && t.round >= currentRound && t.driveCommentId === undefined;
+}
+
+export function replyEditable(r: Reply, currentRound: number): boolean {
+  return !replyActivity(r).external && r.round >= currentRound && r.driveReplyId === undefined;
+}
+
+/** Draft is already exactly this rule for suggestions — pending, mine, unsent. */
+export function suggestionEditable(s: Suggestion, currentRound: number): boolean {
+  return suggestionState(s, currentRound) === 'draft';
+}
+
 export interface ReviewCounts {
   unread: number;
   draft: number;

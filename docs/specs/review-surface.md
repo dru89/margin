@@ -137,15 +137,22 @@ difference, the dash is a texture difference.
 and selected-while-hovered are three visibly different things. Hover is
 transient and gets the light touch — the surface lifts. Selected is
 persistent and gets the structural one — the spine widens and a hairline
-ring appears. Neither recolours the card: color is state, and selecting
+ring appears. Neither recolors the card: color is state, and selecting
 a card must not appear to change what it is. They previously differed
 only by a 40% versus 55% border tint, which is invisible.
+
+**A card head is facts on the left, one action in the corner.** The facts
+wrap among themselves and the action never moves: a thread carrying a
+state label, an orphan badge, and a round stamp used to push Resolve onto
+a line of its own, so the card reported its own width rather than its
+state. When the row runs out of room the round stamp drops to a second
+line, which is the right thing to lose.
 
 **The spine stays inside the card.** It sits within the border rather
 than straddling it — an edge hanging past the rounded corners draws the
 eye to the overhang instead of to the state it is reporting.
 
-**The operation is named in words and coloured in the diff, not in the
+**The operation is named in words and colored in the diff, not in the
 label.** "Deletion" set in `--danger` shouted over every other card's
 quiet uppercase; the word alone carries it, and the struck red text
 says the rest. A deletion in a card reads the way one reads in the
@@ -419,7 +426,7 @@ Two places carry it, and one deliberately does not:
   a 13px sidebar card reads as a gray smudge rather than as red. Cards
   run around 20%.
 - **Not the leading edge.** That is state, and only state. A deletion
-  sitting unread keeps a teal edge; colouring it red would mean an
+  sitting unread keeps a teal edge; coloring it red would mean an
   unread deletion and a read one look identical, which is the exact
   collapse §3 exists to prevent.
 
@@ -523,17 +530,46 @@ second comment.
 - Composer with text → keeps its anchor, does not re-target, takes
   focus. Nothing typed is ever discarded by a misclick.
 
+"With text" ignores whitespace, and in suggest mode an edited
+replacement counts on its own — the replacement *is* the work there.
+
+The composer's anchor is remapped through document changes like a review
+anchor. It could previously be skipped, because a new selection
+re-targeted the composer and it rarely outlived an edit; keeping it put
+is precisely what makes the remap necessary. Text deleted from under an
+open draft leaves it anchored to nothing, and it commits as orphaned
+rather than onto whatever moved into its place.
+
 **Anything in Draft state is editable and deletable** (#89). It hasn't
 left the building, so the asymmetry where a queued discussion message
 can be deleted but not edited, and an inline comment neither, has no
 justification. Once a round is submitted, its contents are history and
 become read-only.
 
-**Submission is never blocked by an open draft.** The submit popover
-already enumerates what travels with the round; an unfinished comment
-gets a line there saying it isn't included. A disabled primary action
-would have to explain itself, and this surface already exists to
-answer the question.
+**An open edit box is not a second composer.** Both can be open at once,
+and that is fine, because they are different in what they risk. A
+composer holds text that exists nowhere else, so losing it loses work —
+which is why a new selection cannot take it. An edit box holds a
+*revision* to something already staged; abandoning it loses the revision
+and the original survives intact. Closing one edit to open another would
+destroy typing to prevent nothing, so any number may be open.
+
+**Submission is never blocked, by an open draft or an open edit.** A
+disabled primary action would have to explain itself, and the submit
+popover already exists to say what travels with the round. It gets one
+line per kind of uncommitted work:
+
+- The composer's draft *survives* the round — it stays open, its anchor
+  keeps being remapped — so its line is a fact: it isn't included.
+- An open edit box *cannot* survive: the item it is changing becomes
+  history the moment the round goes, so the box closes and the typing
+  goes with it. Its line is therefore a warning, said before the click
+  rather than discovered after it.
+
+Submitting deliberately does not save an open edit. The author typed it
+but never confirmed it, and committing half a rewrite into a round sends
+it to Claude and makes it part of the record — worse than losing it,
+because it cannot be taken back.
 
 ## 9. @-references as chips (#90)
 
@@ -571,7 +607,7 @@ The state model is the dependency; everything else reads from it.
 4. Round header (§5) — closes #100, #103.
 5. Intra-suggestion word diff + removal rendering (§6) — closes #98,
    #102.
-6. Draft editing (§7) — closes #89, #121.
+6. Draft editing (§8) — closes #89, #121.
 7. Chips (§9) — closes #90. Independent of 1–6; can move earlier.
 8. `inReplyTo` + pointer rows (§7) — needs 1–2 for state, and #128
    settled before any bulk accept.

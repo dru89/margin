@@ -6,13 +6,16 @@ import {
   isUnread,
   latestExternalRound,
   latestActivity,
+  replyEditable,
+  suggestionEditable,
   suggestionNeedsYou,
   suggestionState,
+  threadEditable,
   threadNeedsYou,
   threadState,
   type ThreadState,
 } from '@shared/reviewState';
-import { revealRange } from '@/editorBridge';
+import { centerOnPos, revealRange } from '@/editorBridge';
 import { wordDiff } from '@shared/worddiff';
 import { DiscussionDock } from '@/components/DiscussionDock';
 import { MentionTextarea } from '@/components/MentionTextarea';
@@ -66,7 +69,13 @@ const STATE_LABEL: Record<ThreadState, string> = {
   settled: 'Resolved',
 };
 
-/** One message in a thread: the author chip introduces what it wrote. */
+/**
+ * One message in a thread: the author chip introduces what it wrote.
+ *
+ * A message the author has not sent yet can be rewritten or taken back in
+ * place (spec §8, #89) — `onSave` present is what says so. Everything else
+ * is a record of something that was said, and reads as one.
+ */
 function Message({
   author,
   collaborator,
@@ -74,6 +83,12 @@ function Message({
   at,
   text,
   docs,
+  editing,
+  onEdit,
+  onSave,
+  onCancel,
+  onDelete,
+  deleteTitle,
 }: {
   author: 'user' | 'agent';
   collaborator?: string;
@@ -81,17 +96,99 @@ function Message({
   at?: string;
   text: string;
   docs?: boolean;
+  /** Owned by the thread, so only one message in it is ever open. */
+  editing?: boolean;
+  onEdit?: () => void;
+  onSave?: (text: string) => void;
+  onCancel?: () => void;
+  onDelete?: () => void;
+  deleteTitle?: string;
 }) {
+  const [value, setValue] = useState(text);
+
+  const save = () => {
+    if (!value.trim()) return;
+    onSave?.(value);
+  };
+  const start = () => {
+    setValue(text); // whatever is stored now, not what was typed and abandoned
+    onEdit?.();
+  };
+
   return (
-    <div className="thread-msg">
+    <div className="thread-msg" onClick={editing ? (e) => e.stopPropagation() : undefined}>
       <div className="thread-msg-head">
         <AuthorChip author={author} collaborator={collaborator} />
         {docs && <span className="chip chip-source">Docs</span>}
         <RoundStamp round={round} at={at} />
+        {onSave && !editing && (
+          <span className="msg-tools">
+            <button
+              className="btn btn-ghost"
+              title="Edit this — it hasn’t been sent yet"
+              onClick={(e) => {
+                e.stopPropagation();
+                start();
+              }}
+            >
+              Edit
+            </button>
+            {onDelete && (
+              <button
+                className="btn btn-ghost"
+                title={deleteTitle ?? 'Delete this — it hasn’t been sent yet'}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+              >
+                Delete
+              </button>
+            )}
+          </span>
+        )}
       </div>
-      <Md text={text} />
+      {/* `onSave` can disappear underneath an open editor — a round starts,
+          or the round the message belongs to is submitted. It closes rather
+          than offering a Save that would be refused. */}
+      {editing && onSave ? (
+        <div className="msg-edit">
+          <MentionTextarea
+            autoFocus
+            value={value}
+            onChange={setValue}
+            onSubmit={save}
+            onEscape={onCancel}
+          />
+          <div className="card-actions">
+            <button className="btn btn-primary" disabled={!value.trim()} onClick={save}>
+              Save
+            </button>
+            <button className="btn" onClick={onCancel}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <Md text={text} />
+      )}
     </div>
   );
+}
+
+/**
+ * Tell the submit popover an edit box is open here (spec §8).
+ *
+ * Pass a key while editing, a falsy value otherwise. Unmounting counts as
+ * closing — a card can be filtered out from under an open editor.
+ */
+function useRevisionOpen(key: string | null | false): void {
+  const setRevisionOpen = useStore((s) => s.setRevisionOpen);
+  useEffect(() => {
+    if (!key) return;
+    setRevisionOpen(key, true);
+    return () => setRevisionOpen(key, false);
+  }, [key, setRevisionOpen]);
 }
 
 function usePair(id: string, anchor: { from: number; to: number; orphaned?: boolean }) {
@@ -117,54 +214,71 @@ function usePair(id: string, anchor: { from: number; to: number; orphaned?: bool
 
 function Composer() {
   const composerAnchor = useStore((s) => s.composerAnchor);
+  const draft = useStore((s) => s.composerDraft);
+  const setDraft = useStore((s) => s.setComposerDraft);
+  const focusKey = useStore((s) => s.composerFocus);
   const addComment = useStore((s) => s.addComment);
   const addSuggestion = useStore((s) => s.addSuggestion);
   const closeComposer = useStore((s) => s.closeComposer);
-  const [mode, setMode] = useState<'comment' | 'suggest'>('comment');
-  const [text, setText] = useState('');
-  const [replacement, setReplacement] = useState<string | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  // A refused re-target is a "take me back to what you were writing", so it
+  // behaves like every other jump: both ends of the pair centered, eased
+  // into place, and pulsed. Anything quieter leaves the reader looking for
+  // a draft that is off-screen at the other end of a long sidebar.
+  useEffect(() => {
+    if (!focusKey) return;
+    const anchor = useStore.getState().composerAnchor;
+    if (anchor && !anchor.orphaned) centerOnPos(anchor.from);
+    requestAnimationFrame(() => {
+      focusCard(cardRef.current);
+      pulsePendingAnchor();
+    });
+  }, [focusKey]);
   if (!composerAnchor) return null;
 
-  const effectiveReplacement = replacement ?? composerAnchor.quote;
+  const { mode, text } = draft;
+  const effectiveReplacement = draft.replacement ?? composerAnchor.quote;
   const submit = () => {
     if (mode === 'comment') addComment(text);
     else addSuggestion(effectiveReplacement, text);
-    setText('');
-    setReplacement(null);
   };
   const canSubmit =
     mode === 'comment' ? text.trim().length > 0 : effectiveReplacement !== composerAnchor.quote;
 
   return (
-    <div className="card card-composer">
+    <div className="card card-composer" ref={cardRef}>
       <div className="composer-modes">
         <button
           className={`btn btn-toggle${mode === 'comment' ? ' on' : ''}`}
-          onClick={() => setMode('comment')}
+          onClick={() => setDraft({ mode: 'comment' })}
         >
           Comment
         </button>
         <button
           className={`btn btn-toggle${mode === 'suggest' ? ' on' : ''}`}
-          onClick={() => setMode('suggest')}
+          onClick={() => setDraft({ mode: 'suggest' })}
         >
           Suggest
         </button>
       </div>
-      {mode === 'comment' ? (
-        <Quote text={composerAnchor.quote} />
-      ) : (
+      {/* The text can be edited out from under an open composer. Saying so
+          beats committing a comment about words that are no longer there. */}
+      {mode === 'comment' || composerAnchor.orphaned ? (
+        <Quote text={composerAnchor.quote} orphaned={composerAnchor.orphaned} />
+      ) : null}
+      {mode === 'suggest' && !composerAnchor.orphaned && (
         <textarea
           className="composer-replacement"
           value={effectiveReplacement}
-          onChange={(e) => setReplacement(e.target.value)}
+          onChange={(e) => setDraft({ replacement: e.target.value })}
         />
       )}
       <MentionTextarea
         autoFocus
+        focusKey={focusKey}
         value={text}
         placeholder={mode === 'comment' ? 'Comment for Claude…' : 'Why? (optional)'}
-        onChange={setText}
+        onChange={(text) => setDraft({ text })}
         onSubmit={() => canSubmit && submit()}
         onEscape={closeComposer}
       />
@@ -185,13 +299,24 @@ function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
   const content = useStore((s) => s.content);
   const accept = useStore((s) => s.acceptSuggestion);
   const reject = useStore((s) => s.rejectSuggestion);
+  const editSuggestion = useStore((s) => s.editSuggestion);
+  const deleteSuggestion = useStore((s) => s.deleteSuggestion);
   const pair = usePair(suggestion.id, suggestion.anchor);
   const [rejecting, setRejecting] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
+  const [editing, setEditing] = useState<{ replacement: string; note: string } | null>(null);
+  useRevisionOpen(editing !== null && suggestion.id);
 
   const currentRound = useStore((s) => s.review?.round ?? 0);
   const state = suggestionState(suggestion, currentRound);
+  const editable = !locked && suggestionEditable(suggestion, currentRound);
   const deletion = suggestion.replacement === '';
+
+  const saveEdit = () => {
+    if (!editing) return;
+    editSuggestion(suggestion.id, { replacement: editing.replacement, note: editing.note });
+    setEditing(null);
+  };
 
   // Only what changes, rather than the whole clause struck and re-inserted
   // (#98). Both strings are already stored — this is presentation.
@@ -215,24 +340,78 @@ function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
         <span className="card-locator">{locatorFor(content, suggestion.anchor.from)}</span>
         <RoundStamp round={suggestion.round} at={suggestion.createdAt} />
       </div>
+      {/* Beside the author chip, where a thread's draft controls are —
+          managing the item, as against deciding on it below (spec §8). */}
       <div className="thread-msg-head">
         <AuthorChip author={suggestion.author} />
-      </div>
-      <p className="card-diff">
-        {parts.map((p, i) => (
-          <span
-            key={i}
-            className={p.kind === 'del' ? 'diff-del' : p.kind === 'ins' ? 'diff-ins' : undefined}
-          >
-            {p.text}
+        {editable && !editing && (
+          <span className="msg-tools">
+            <button
+              className="btn btn-ghost"
+              title="Edit this edit — it hasn’t been sent yet"
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditing({ replacement: suggestion.replacement, note: suggestion.note ?? '' });
+              }}
+            >
+              Edit
+            </button>
+            <button
+              className="btn btn-ghost"
+              title="Delete this edit — it hasn’t been sent yet"
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteSuggestion(suggestion.id);
+              }}
+            >
+              Delete
+            </button>
           </span>
-        ))}
-      </p>
-      {suggestion.note && <Md text={suggestion.note} />}
+        )}
+      </div>
+      {editing ? (
+        <div className="msg-edit" onClick={(e) => e.stopPropagation()}>
+          <Quote text={suggestion.anchor.quote} orphaned={suggestion.anchor.orphaned} />
+          <textarea
+            className="composer-replacement"
+            autoFocus
+            value={editing.replacement}
+            placeholder="Replacement text (empty deletes the quoted text)"
+            onChange={(e) => setEditing({ ...editing, replacement: e.target.value })}
+          />
+          <MentionTextarea
+            value={editing.note}
+            placeholder="Why? (optional)"
+            onChange={(note) => setEditing({ ...editing, note })}
+            onSubmit={saveEdit}
+            onEscape={() => setEditing(null)}
+          />
+          <div className="card-actions">
+            <button className="btn btn-primary" onClick={saveEdit}>
+              Save
+            </button>
+            <button className="btn" onClick={() => setEditing(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="card-diff">
+          {parts.map((p, i) => (
+            <span
+              key={i}
+              className={p.kind === 'del' ? 'diff-del' : p.kind === 'ins' ? 'diff-ins' : undefined}
+            >
+              {p.text}
+            </span>
+          ))}
+        </p>
+      )}
+      {suggestion.note && !editing && <Md text={suggestion.note} />}
       {suggestion.anchor.orphaned && (
         <p className="orphan-note">anchor text no longer found — accept is disabled</p>
       )}
-      {!rejecting ? (
+      {editing ? null : !rejecting ? (
         <div className="card-actions">
           <button
             className="btn btn-primary"
@@ -282,9 +461,18 @@ function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
 function ThreadCard({ thread }: { thread: CommentThread }) {
   const locked = useLocked();
   const replyTo = useStore((s) => s.replyToThread);
+  const editComment = useStore((s) => s.editComment);
+  const deleteComment = useStore((s) => s.deleteComment);
+  const editReply = useStore((s) => s.editReply);
+  const deleteReply = useStore((s) => s.deleteReply);
   const setThreadStatus = useStore((s) => s.setThreadStatus);
   const pair = usePair(thread.id, thread.anchor);
   const [reply, setReply] = useState('');
+  // 'body', or a reply id. One at a time, and the reply box steps aside
+  // while it is open — two composers in one card is a guess about which
+  // one Save belongs to.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  useRevisionOpen(editingId && `${thread.id}:${editingId}`);
   const [resolveOpen, setResolveOpen] = useState(false);
   const [sendingToDoc, setSendingToDoc] = useState(false);
   const [docError, setDocError] = useState<string | null>(null);
@@ -292,6 +480,7 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
   const addDocReply = useStore((s) => s.addDocReply);
   const currentRound = useStore((s) => s.review?.round ?? 0);
   const state = threadState(thread, currentRound);
+  const bodyEditable = threadEditable(thread, currentRound);
   const last = latestActivity(thread);
   const [expanded, setExpanded] = useState(false);
   // Past four messages, keep the opening and the last two; fold the rest.
@@ -324,18 +513,23 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
       id={`card-${thread.id}`}
       className={`card card-comment state-${state}${pair.classes}`}
       aria-label="comment thread"
-      {...pair.props}
       // focusAnchor already clears unread — clicking a thread is a
       // deliberate "I'm looking at this" (spec §4).
       {...pair.props}
     >
-      <div className="card-head">
-        {/* Always mounted so clearing unread fades rather than snaps. */}
-        <span className={`unread-dot${state === 'unread' ? '' : ' is-gone'}`} aria-hidden="true" />
-        {STATE_LABEL[state] && <span className="state-label">{STATE_LABEL[state]}</span>}
-        {thread.anchor.orphaned && <span className="badge">Text gone</span>}
-        {imported && <span className="chip chip-source" title="Imported from the linked Google Doc">Docs</span>}
-        <RoundStamp round={last.round} at={thread.createdAt} />
+      <div className="card-head card-head-split">
+        {/* The facts wrap among themselves; Resolve keeps the corner. A
+            long state label next to a badge used to push it onto a line of
+            its own, so a card said more about its own width than its
+            state. */}
+        <span className="card-facts">
+          {/* Always mounted so clearing unread fades rather than snaps. */}
+          <span className={`unread-dot${state === 'unread' ? '' : ' is-gone'}`} aria-hidden="true" />
+          {STATE_LABEL[state] && <span className="state-label">{STATE_LABEL[state]}</span>}
+          {thread.anchor.orphaned && <span className="badge">Text gone</span>}
+          {imported && <span className="chip chip-source" title="Imported from the linked Google Doc">Docs</span>}
+          <RoundStamp round={last.round} at={thread.createdAt} />
+        </span>
         {imported ? (
           <span className="resolve-wrap">
             <button
@@ -397,6 +591,23 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
         round={thread.round}
         at={thread.createdAt}
         text={thread.text}
+        editing={editingId === 'body'}
+        onEdit={() => setEditingId('body')}
+        onCancel={() => setEditingId(null)}
+        onSave={
+          bodyEditable && !locked
+            ? (t) => {
+                editComment(thread.id, t);
+                setEditingId(null);
+              }
+            : undefined
+        }
+        onDelete={bodyEditable && !locked ? () => deleteComment(thread.id) : undefined}
+        deleteTitle={
+          thread.replies.length > 0
+            ? 'Delete this comment and its replies — none of it has been sent'
+            : 'Delete this comment — it hasn’t been sent yet'
+        }
       />
       {/* The middle folds, never the ends: the first message is the
           question and the last is where things stand (spec §3). */}
@@ -413,18 +624,38 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
           <span className="thread-fold-line" />
         </button>
       )}
-      {shownReplies.map((r) => (
-        <Message
-          key={r.id}
-          author={r.author}
-          collaborator={r.collaborator}
-          round={r.round}
-          at={r.createdAt}
-          text={r.text}
-          docs={!!r.driveReplyId && !r.collaborator}
-        />
-      ))}
-      <div className="card-replybox" onClick={(e) => e.stopPropagation()}>
+      {shownReplies.map((r) => {
+        const editable = !locked && replyEditable(r, currentRound);
+        return (
+          <Message
+            key={r.id}
+            author={r.author}
+            collaborator={r.collaborator}
+            round={r.round}
+            at={r.createdAt}
+            text={r.text}
+            docs={!!r.driveReplyId && !r.collaborator}
+            editing={editingId === r.id}
+            onEdit={() => setEditingId(r.id)}
+            onCancel={() => setEditingId(null)}
+            onSave={
+              editable
+                ? (t) => {
+                    editReply(thread.id, r.id, t);
+                    setEditingId(null);
+                  }
+                : undefined
+            }
+            onDelete={editable ? () => deleteReply(thread.id, r.id) : undefined}
+            deleteTitle="Delete this reply — it hasn’t been sent yet"
+          />
+        );
+      })}
+      <div
+        className="card-replybox"
+        hidden={editingId !== null}
+        onClick={(e) => e.stopPropagation()}
+      >
         <MentionTextarea
           value={reply}
           placeholder="Reply…"
@@ -490,8 +721,12 @@ function pulseAnchorText(id: string): void {
   }
 }
 
-function focusCard(id: string): void {
-  const el = document.getElementById(`card-${id}`);
+/** The open composer's subject, which carries no id of its own yet. */
+function pulsePendingAnchor(): void {
+  for (const el of document.querySelectorAll('.cm-editor .anchor-pending')) pulse(el);
+}
+
+function focusCard(el: HTMLElement | null): void {
   if (!el) return;
   const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   el.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
@@ -635,7 +870,7 @@ export function Sidebar() {
     if (!focusRequest) return;
     const id = focusRequest.id;
     requestAnimationFrame(() => {
-      focusCard(id);
+      focusCard(document.getElementById(`card-${id}`));
       // Both ends of the pair light up, whichever end was clicked.
       pulseAnchorText(id);
     });

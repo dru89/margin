@@ -1259,3 +1259,98 @@ Consequences, both deliberate:
   test would assert markup that is expected to churn.
 - No coverage target. A percentage would reward exactly the tests this
   entry exists to prevent.
+
+## 66. One composer; drafts are editable until they are sent (#121, #89)
+
+Two rules that turn out to be the same rule: **something the author has
+not sent yet belongs to the author, and nothing may change it but them.**
+
+**The composer keeps its anchor once it holds work.** Selecting other text
+and asking for a comment used to move the draft onto the new selection,
+producing a comment attached to words it was never written about, with
+nothing on screen saying so. Clearing the box instead would discard typed
+work on a misclick, which is worse — a click that appears not to land is
+recoverable, a paragraph that vanishes is not. So an empty composer
+re-targets freely (the ordinary case of grabbing the wrong words), and one
+holding work keeps its anchor, takes focus, and pulses.
+
+"Holding work" is whitespace-insensitive, and in suggest mode an edited
+replacement counts on its own — there, the replacement *is* the work, and
+requiring a rationale before protecting it would throw away the edit.
+
+A refusal is a jump like any other, so it behaves like one: the passage
+comes back to the center of the editor, the composer to the center of the
+sidebar, both eased rather than snapped, and both pulsed. The draft can
+be a long way off-screen at the moment it is protected, and a protection
+the author cannot find reads as nothing happening. The editor is scrolled
+without being focused (`centerOnPos`, not `revealRange`) — focus belongs
+to the draft, which is the whole point of the refusal.
+
+Moving focus to the draft is also what made the sidebar half of that snap
+while the editor half glided: `focus()` on an off-screen element scrolls
+its container instantly, overwriting the smooth scroll on its first
+frame. `preventScroll: true` fixes it. Worth remembering generally — the
+animation reads as correctly written and is simply outvoted.
+
+Not a second composer. Committing already stages a comment without sending
+it, so several drafts before a round already work; a second buffer would
+add a state to manage without adding capability.
+
+**The composer's anchor is now remapped through every document change**,
+like a review anchor. It was previously safe not to: any new selection
+re-targeted the composer, so it rarely outlived an edit. It now stays put
+by design, so an unmapped offset would re-point the draft at whatever slid
+into its place — the failure this entry starts by removing, arriving by a
+second route. If the quoted text is deleted outright the draft survives
+and commits as orphaned: "text gone" is true, and claiming the neighbours
+is not.
+
+**Anything still in Draft state can be rewritten or taken back** — a
+comment, a reply, a suggestion, a queued discussion message. The
+asymmetry where a queued message could be deleted but not edited, and an
+inline comment neither, had no justification behind it.
+
+Three conditions, all necessary, and each one is a case in the suite:
+
+- *It is the author's writing.* An imported Doc thread carries
+  `author: 'user'` and the round it arrived in, so the naive test says
+  "yours, this round" about a comment a colleague wrote.
+- *It belongs to the round being composed.* Submitting is what makes
+  something sent, and the counter moves past it at that moment.
+- *It has not been published elsewhere.* A reply sent with "Reply on Doc"
+  exists on the Doc under the author's name; editing the local copy would
+  silently disagree with the copy other people are reading.
+
+Deletion is one click, with no confirmation, matching the queued-message
+✕ that has always worked this way. It only ever removes the author's own
+unsent text, and a confirmation on every draft costs more than the loss
+it prevents. If that proves wrong in use, the fix is a confirm on the one
+case that takes more than a single message with it — deleting a thread
+that has replies.
+
+**An open edit box is not a second composer**, so both may be open at
+once and any number of edits may be. The rule against a second composer
+was about there being no capability gained; the rule protecting the
+composer's draft is about risk, and the risk here is different in kind. A
+composer holds text that exists nowhere else. An edit box holds a
+revision to something already staged — abandon it and the original is
+untouched. Closing one edit to open another would destroy typing to
+prevent nothing.
+
+**Submission is never blocked, by a draft or by an open edit.** A
+disabled primary action would have to explain itself, and the submit
+popover already exists to say what travels. It carries one line per kind
+of uncommitted work, and they are not the same kind of line:
+
+- The composer's draft survives the round — still open, still remapped —
+  so its line is a fact.
+- An open edit cannot survive. What it modifies becomes history the
+  moment the round goes, the box closes, and the typing goes with it. Its
+  line is a warning, and it exists because that loss was previously
+  silent: the round went out carrying the saved wording, the box vanished
+  with the round counter, and nothing had said either would happen.
+
+Submitting deliberately does not save an open edit. The author typed it
+and never confirmed it; committing half a rewrite sends it to Claude and
+writes it into the record, which is worse than losing it because it
+cannot be taken back.

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useStore } from '@/store';
 
 interface Props {
@@ -7,6 +7,11 @@ interface Props {
   placeholder?: string;
   className?: string;
   autoFocus?: boolean;
+  /**
+   * Bump to pull focus here. A counter, not a boolean: the caller needs
+   * every request to land, including a repeat of the last one.
+   */
+  focusKey?: number;
   /** Cmd/Ctrl+Enter. */
   onSubmit?: () => void;
   onEscape?: () => void;
@@ -28,11 +33,20 @@ export function MentionTextarea({
   placeholder,
   className,
   autoFocus,
+  focusKey,
   onSubmit,
   onEscape,
 }: Props) {
   const workspace = useStore((s) => s.workspace);
   const ref = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!focusKey) return; // 0 / undefined = nobody has asked yet
+    // `preventScroll` because the caller is mid-animation: focusing an
+    // off-screen textarea otherwise yanks its scroller into place in one
+    // frame, and the smooth scroll it was running loses the argument.
+    ref.current?.focus({ preventScroll: true });
+  }, [focusKey]);
   const [token, setToken] = useState<{ start: number; text: string } | null>(null);
   const [selected, setSelected] = useState(0);
 

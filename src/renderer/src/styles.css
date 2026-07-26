@@ -418,7 +418,7 @@ kbd {
 /* Two classes, so it does not depend on sitting after `.card-context` —
    which sets the insertion color and is defined further down the file. */
 /* The diff inside a suggestion card. Unchanged words stay ordinary so the
-   eye lands on what actually differs; the operation carries the colour. */
+   eye lands on what actually differs; the operation carries the color. */
 .card-diff {
   margin: 0 0 6px;
   font-family: var(--font-prose);
@@ -814,7 +814,7 @@ kbd {
 /* A hairline ring reads as "this is the one you are on" without borrowing
    a color — color on a card means state. */
 .pair-active.card { outline: 1px solid color-mix(in srgb, var(--ink-faint) 55%, transparent); }
-/* Widening the spine emphasises the card without recolouring it — the
+/* Widening the spine emphasizes the card without recoloring it — the
    color is state, and selecting a card must not appear to change it. */
 .pair-active.card::before { width: 6px; }
 .card-composer { border-color: var(--user); cursor: default; }
@@ -835,6 +835,40 @@ kbd {
 .card-head > .resolve-wrap,
 .card-head > .btn-ghost { margin-left: auto; }
 .card-head > .card-locator ~ .rnd { margin-left: 0; }
+
+/* Facts left, one action pinned to the corner. Two classes on both sides
+   so this beats the `.card-head > .btn-ghost` rule above outright rather
+   than by sitting below it. */
+.card-head-split { flex-wrap: nowrap; align-items: flex-start; }
+.card-head-split > .card-facts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.card-head.card-head-split > .btn-ghost,
+.card-head.card-head-split > .resolve-wrap { margin-left: 0; flex: 0 0 auto; }
+
+/* ——— draft editing (spec §8) ——— */
+
+/* Managing an unsent item sits with the other item-level controls, on the
+   right. Quiet by default: it applies to drafts only, and a draft already
+   says so on its leading edge. */
+.msg-tools { display: flex; gap: 2px; margin-left: auto; }
+.card-head > .msg-tools { margin-left: auto; }
+.msg-tools .btn-ghost {
+  padding: 1px 6px;
+  font-size: 11px;
+  color: var(--ink-faint);
+  opacity: 0.75;
+  transition: opacity 120ms ease, color 120ms ease;
+}
+.card:hover .msg-tools .btn-ghost { opacity: 1; }
+.msg-tools .btn-ghost:hover:not(:disabled) { color: var(--ink); opacity: 1; }
+.msg-edit { margin-top: 6px; }
+.msg-edit textarea { min-height: 54px; }
 
 
 
@@ -1276,6 +1310,15 @@ button.status-chip:active { transform: translateY(1px); }
   padding: 0 2px;
 }
 .queued-remove:hover { color: var(--danger); }
+.queued-edit {
+  border: none;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  padding: 0 2px;
+  font: inherit;
+}
+.queued-edit:hover { color: var(--ink); }
 .dock-composer { display: flex; align-items: flex-start; gap: 6px; padding: 8px 14px 12px; }
 .dock-composer .mention-wrap { flex: 1; }
 .dock-composer textarea { min-height: 34px; margin: 0; }
@@ -1285,6 +1328,14 @@ button.status-chip:active { transform: translateY(1px); }
 
 .popover-manifest-head { margin: 12px 0 8px; }
 .manifest-files { margin: 0 0 8px; font-size: 12px; color: var(--ink-soft); }
+/* A fact about what is *not* traveling, so it reads as a note rather than
+   a warning — nothing has gone wrong and nothing is blocked. */
+.manifest-unfinished {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--ink-faint);
+}
 .queued-item {
   display: flex;
   align-items: flex-start;
