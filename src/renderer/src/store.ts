@@ -55,6 +55,8 @@ interface MarginState {
   rejectSuggestion: (id: string, comment?: string) => void;
   /** Put an accepted or rejected suggestion back to pending (#128). */
   undoDecision: (id: string) => void;
+  /** Clear a thread's unread mark — the author has looked at it (spec §4). */
+  markThreadSeen: (id: string) => void;
   save: () => Promise<void>;
   /** Model + effort for this project's rounds (cascade: project → app default). */
   modelPref: ModelPreference;
@@ -429,6 +431,16 @@ export const useStore = create<MarginState>((set, get) => {
         suggestions: r.suggestions.map((x) =>
           x.id === id ? { ...x, status: 'accepted' as const, applied } : x,
         ),
+      }));
+    },
+
+    markThreadSeen: (id) => {
+      const { review } = get();
+      const t = review?.comments.find((c) => c.id === id);
+      if (!t || markSeen(t) === t) return; // nothing new to acknowledge
+      updateReview((r) => ({
+        ...r,
+        comments: r.comments.map((c) => (c.id === id ? markSeen(c) : c)),
       }));
     },
 

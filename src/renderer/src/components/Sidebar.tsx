@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CommentThread, Suggestion } from '@shared/types';
 import { useLocked, useStore } from '@/store';
+import {
+  latestActivity,
+  suggestionState,
+  threadState,
+  type ThreadState,
+} from '@shared/reviewState';
 import { revealRange } from '@/editorBridge';
 import { DiscussionDock } from '@/components/DiscussionDock';
 import { MentionTextarea } from '@/components/MentionTextarea';
@@ -29,6 +35,58 @@ function locatorFor(content: string, from: number): string {
 }
 
 /** Shared pair-state classes + hover/click wiring for anchored cards. */
+/**
+ * A round stamp, shown only when the item predates the round being drafted
+ * (spec §3). A stamp on everything is noise — in round 5, "Round 5" says
+ * nothing the state has not already said.
+ */
+function RoundStamp({ round, at }: { round: number; at?: string }) {
+  const current = useStore((s) => s.review?.round ?? 0);
+  if (round >= current) return null;
+  const when = at ? new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : null;
+  return (
+    <span className="rnd" title={`Round ${round}${when ? ` · ${when}` : ''}`}>
+      Round {round}
+    </span>
+  );
+}
+
+const STATE_LABEL: Record<ThreadState, string> = {
+  draft: 'Draft — not sent',
+  awaiting: 'Awaiting reply',
+  unread: 'Unread',
+  read: '',
+  settled: 'Settled',
+};
+
+/** One message in a thread: the author chip introduces what it wrote. */
+function Message({
+  author,
+  collaborator,
+  round,
+  at,
+  text,
+  docs,
+}: {
+  author: 'user' | 'agent';
+  collaborator?: string;
+  round: number;
+  at?: string;
+  text: string;
+  docs?: boolean;
+}) {
+  return (
+    <div className="thread-msg">
+      <div className="thread-msg-head">
+        <AuthorChip author={author} collaborator={collaborator} />
+        {docs && <span className="chip chip-source">Docs</span>}
+        <RoundStamp round={round} at={at} />
+      </div>
+      <Md text={text} />
+    </div>
+  );
+}
+
 function usePair(id: string, anchor: { from: number; to: number; orphaned?: boolean }) {
   const setActiveAnchor = useStore((s) => s.setActiveAnchor);
   const setHoveredAnchor = useStore((s) => s.setHoveredAnchor);
@@ -121,6 +179,10 @@ function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
   const [rejecting, setRejecting] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
 
+  const currentRound = useStore((s) => s.review?.round ?? 0);
+  const state = suggestionState(suggestion, currentRound);
+  const deletion = suggestion.replacement === '';
+
   // One ellipsized context line: the tail of what lands (or leaves).
   const context = suggestion.replacement
     ? `→ …${suggestion.replacement.slice(-70)}`
@@ -129,15 +191,25 @@ function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
   return (
     <div
       id={`card-${suggestion.id}`}
-      className={`card card-suggestion${pair.classes}`}
+      className={`card card-suggestion state-${state}${pair.classes}`}
       aria-label="suggestion"
       {...pair.props}
     >
       <div className="card-head">
-        <AuthorChip author={suggestion.author} />
+        {/* The operation is named here and shown in the diff; the leading
+            edge is state, and only state (spec §6). */}
+        <span className="state-label">
+          <span className={deletion ? 'op-del' : 'op-edit'}>{deletion ? 'Deletion' : 'Edit'}</span>
+          {state === 'draft' && ' · not sent'}
+        </span>
+        {suggestion.anchor.orphaned && <span className="badge">Text gone</span>}
         <span className="card-locator">{locatorFor(content, suggestion.anchor.from)}</span>
+        <RoundStamp round={suggestion.round} at={suggestion.createdAt} />
       </div>
-      <p className="card-context">{context}</p>
+      <div className="thread-msg-head">
+        <AuthorChip author={suggestion.author} />
+      </div>
+      <p className={`card-context${deletion ? ' card-context-del' : ''}`}>{context}</p>
       {suggestion.note && <Md text={suggestion.note} />}
       {suggestion.anchor.orphaned && (
         <p className="orphan-note">anchor text no longer found — accept is disabled</p>
@@ -200,6 +272,10 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
   const [docError, setDocError] = useState<string | null>(null);
   const imported = thread.provenance === 'imported';
   const addDocReply = useStore((s) => s.addDocReply);
+  const currentRound = useStore((s) => s.review?.round ?? 0);
+  const markThreadSeen = useStore((s) => s.markThreadSeen);
+  const state = threadState(thread, currentRound);
+  const last = latestActivity(thread);
 
   const sendReply = () => {
     replyTo(thread.id, reply);
@@ -223,13 +299,22 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
   return (
     <div
       id={`card-${thread.id}`}
-      className={`card card-comment${pair.classes}`}
+      className={`card card-comment state-${state}${pair.classes}`}
       aria-label="comment thread"
       {...pair.props}
+      onClick={() => {
+        // Clicking a thread is a deliberate "I'm looking at this", and it
+        // already focuses the anchor — so it is what clears unread (spec §4).
+        pair.props.onClick();
+        markThreadSeen(thread.id);
+      }}
     >
       <div className="card-head">
-        <AuthorChip author={thread.author} collaborator={thread.collaborator} />
+        {state === 'unread' && <span className="unread-dot" aria-hidden="true" />}
+        {STATE_LABEL[state] && <span className="state-label">{STATE_LABEL[state]}</span>}
+        {thread.anchor.orphaned && <span className="badge">Text gone</span>}
         {imported && <span className="chip chip-source" title="Imported from the linked Google Doc">Docs</span>}
+        <RoundStamp round={last.round} at={thread.createdAt} />
         {imported ? (
           <span className="resolve-wrap">
             <button
@@ -284,13 +369,24 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
         )}
       </div>
       <Quote text={thread.anchor.quote} orphaned={thread.anchor.orphaned} />
-      <Md text={thread.text} />
+      {/* Oldest first, the order the conversation happened in (spec §3). */}
+      <Message
+        author={thread.author}
+        collaborator={thread.collaborator}
+        round={thread.round}
+        at={thread.createdAt}
+        text={thread.text}
+      />
       {thread.replies.map((r) => (
-        <div key={r.id} className="reply">
-          <AuthorChip author={r.author} collaborator={r.collaborator} />
-          {r.driveReplyId && !r.collaborator && <span className="chip chip-source">Docs</span>}
-          <Md text={r.text} />
-        </div>
+        <Message
+          key={r.id}
+          author={r.author}
+          collaborator={r.collaborator}
+          round={r.round}
+          at={r.createdAt}
+          text={r.text}
+          docs={!!r.driveReplyId && !r.collaborator}
+        />
       ))}
       <div className="card-replybox" onClick={(e) => e.stopPropagation()}>
         <MentionTextarea

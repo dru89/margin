@@ -161,7 +161,13 @@ kbd {
   color: var(--on-accent);
   font-weight: 500;
 }
-.btn-primary:hover:not(:disabled) { filter: brightness(1.1); border-color: var(--user); }
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.12);
+  border-color: var(--user);
+  /* Independent of the surface behind it — brightness alone stopped
+     reading once a hovered card lifted underneath. */
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--user) 32%, transparent);
+}
 
 .btn-danger {
   background: var(--danger);
@@ -333,6 +339,76 @@ kbd {
   background: color-mix(in srgb, var(--comment-wash) 80%, transparent);
   border-bottom: 2px dashed color-mix(in srgb, var(--comment-edge) 70%, transparent);
 }
+/* ——— review state vocabulary (spec §3) ———
+   Three independent axes that used to compete for the same pixels: the
+   card's leading edge is state, the author chip is authorship, the diff is
+   what happens to the text. Nothing relies on colour alone — the unread dot
+   is a shape difference and the draft edge is a texture one. */
+/* State travels to the spine as a custom property rather than as another
+   ::before. An element has one ::before, and `.card::before` is defined
+   later at equal specificity — a second rule here silently lost, which is
+   how the whole vocabulary shipped invisible the first time. */
+.state-unread { --state-edge: var(--agent); }
+.state-awaiting { --state-edge: color-mix(in srgb, var(--user) 45%, transparent); }
+.state-pending { --state-edge: color-mix(in srgb, var(--agent) 45%, transparent); }
+/* Dashed: the same language the document uses for an uncommitted anchor. */
+.state-draft {
+  --state-edge: repeating-linear-gradient(
+    to bottom, var(--comment-edge) 0 4px, transparent 4px 8px
+  );
+}
+.state-read, .state-decided, .state-settled { --state-edge: var(--rule); }
+.state-unread { border-color: color-mix(in srgb, var(--agent) 45%, var(--rule)); }
+.state-draft {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--comment-edge) 50%, var(--rule));
+}
+
+.unread-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--agent); flex: 0 0 auto;
+}
+.state-label {
+  font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+/* The word names the operation; the diff colours it. A saturated red label
+   shouted over every other card's quiet uppercase. */
+.state-label .op-del, .state-label .op-edit { font-weight: 700; color: var(--ink-soft); }
+.badge {
+  font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; font-weight: 700;
+  padding: 1px 6px; border-radius: 4px;
+  background: color-mix(in srgb, var(--ink-faint) 20%, transparent);
+  color: var(--ink-soft);
+}
+/* Only ever rendered for rounds older than the one being drafted. */
+.rnd {
+  font-size: 10.5px; color: var(--ink-faint); white-space: nowrap;
+  border-bottom: 1px dotted var(--ink-faint); cursor: help;
+}
+
+/* Messages run oldest first; each is introduced by whoever wrote it. */
+/* Named apart from the discussion dock's .msg, which is a card with its own
+   background — reusing it made every thread message look like a card. */
+.thread-msg + .thread-msg,
+.card-quote + .thread-msg { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--rule); }
+.thread-msg-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+
+/* A deletion has no inserted half to contrast against, so the card carries
+   the operation's colour at a strength that reads at 13px — the document's
+   9% wash is tuned for 17px prose and disappears here (#102). */
+/* Two classes, so it does not depend on sitting after `.card-context` —
+   which sets the insertion colour and is defined further down the file. */
+.card-context.card-context-del {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 70%, transparent);
+  text-decoration-thickness: 1.5px;
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
 .undo-decision { margin-left: auto; font-size: 11px; padding: 2px 8px; }
 .anchor, .card { transition: background 0.12s ease, border-color 0.12s ease; }
 
@@ -561,37 +637,65 @@ kbd {
   margin-bottom: 10px;
   box-shadow: 0 1px 2px rgb(33 29 23 / 5%);
   cursor: pointer;
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  /* Includes background: the hover lift was landing instantly because the
+     earlier `.anchor, .card` transition rule loses to this one. */
+  transition: background 0.16s ease, border-color 0.14s ease, box-shadow 0.14s ease;
 }
 .card { position: relative; }
-.card::before { /* the spine — sidebar echo of the anchor underline */
+.card::before { /* the spine — the card's state, on its leading edge */
   content: '';
   position: absolute;
-  inset: -1px auto -1px -1px;
+  /* Inside the card, not straddling its border. Hanging 1px past the
+     rounded corners drew the eye to the overhang rather than the state. */
+  inset: 8px auto 8px 0;
   width: 3px;
-  border-radius: 8px 0 0 8px;
-  background: var(--pair-accent, transparent);
-  opacity: 0.45;
-  transition: opacity 0.12s ease;
+  border-radius: 0 3px 3px 0;
+  background: var(--state-edge, var(--pair-accent, transparent));
+  opacity: 1;
+  /* Clicking an unread thread changes its spine; a fade reads as the state
+     settling, where a snap to nothing read as the card breaking. */
+  transition: background 0.18s ease, opacity 0.12s ease;
 }
 .card-suggestion { --pair-accent: var(--agent); }
 .card-comment { --pair-accent: var(--comment-edge); }
-.pair-hot.card { border-color: color-mix(in srgb, var(--pair-accent) 40%, var(--rule)); }
-.pair-hot.card::before { opacity: 1; }
+/* Hover and selected sit on independent properties, so all three of
+   hover / selected / both are distinguishable. They used to differ only by
+   a 40% vs 55% border tint, which is invisible.
+   Hover is transient, so it gets the light touch: the surface lifts.
+   Selected is persistent, so it gets the structural one: the spine
+   thickens and the card firms up. Both is naturally both. */
+.pair-hot.card {
+  background: color-mix(in srgb, var(--ink) 6%, var(--paper-raised));
+  border-color: color-mix(in srgb, var(--ink-faint) 45%, var(--rule));
+}
 .pair-active.card {
-  border-color: color-mix(in srgb, var(--pair-accent) 55%, var(--rule));
+  border-color: var(--ink-faint);
   box-shadow: var(--shadow);
 }
-.pair-active.card::before { opacity: 1; }
+/* A hairline ring reads as "this is the one you are on" without borrowing
+   a colour — colour on a card means state. */
+.pair-active.card { outline: 1px solid color-mix(in srgb, var(--ink-faint) 55%, transparent); }
+/* Widening the spine emphasises the card without recolouring it — the
+   colour is state, and selecting a card must not appear to change it. */
+.pair-active.card::before { width: 6px; }
 .card-composer { border-color: var(--user); cursor: default; }
 .card-archived { opacity: 0.7; cursor: default; }
 
+/* The head now carries state, badges and a round stamp rather than just an
+   author and one control, so it flows left with a gap. `space-between` here
+   would scatter five children across the card. */
 .card-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 8px;
 }
+/* Whatever sits on the right — the locator, or Resolve — pushes there. */
+.card-head > .card-locator,
+.card-head > .resolve-wrap,
+.card-head > .btn-ghost { margin-left: auto; }
+.card-head > .card-locator ~ .rnd { margin-left: 0; }
 
 
 

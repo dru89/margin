@@ -83,6 +83,24 @@ while replying to an unread thread still left it reading as unread — the
 bug lived on an edge between two states that were each individually
 correct.
 
+## A project to look at
+
+```bash
+npm run fixture      # builds .fixtures/review-surface (gitignored), then prints the open command
+```
+
+A self-evaluation document with a review already in it: threads in every
+state from the spec (draft, awaiting, unread, read, settled, orphaned, a
+six-message thread, one imported from a Doc), pending/accepted/rejected
+suggestions including a deletion, a queued discussion message, a second
+document so the explorer has something to show, and a git repo. Anchors
+are computed against the real text, so the generator fails loudly rather
+than producing a document full of accidental orphans. Re-running resets
+it.
+
+Use it when working on the review surface — an empty document hides
+every problem worth seeing.
+
 ## Verifying changes (CDP smoke pattern)
 
 ```bash
@@ -131,6 +149,15 @@ npx electron . --remote-debugging-port=9224 "path/to/doc.md" &   # background
 - **CodeMirror theme injection wins over the stylesheet** for same-specificity
   rules (CM injects later). If a CM default style won't die, remove the
   extension (as done for `highlightActiveLine`) or raise specificity.
+- **`styles.css` is long enough that source order is not a defence.** A new
+  single-class rule loses to an existing single-class rule defined further
+  down, silently. This has bitten three times: `.cm-selectionMatch` (dead
+  for months, matches painted CodeMirror's green), the review-state spine
+  (`.card::before` is defined late, so the whole state vocabulary rendered
+  as the old pair-accent), and `.card-context-del` (the insertion colour
+  won, so deleted text stayed green). Win on **specificity** — two classes,
+  or a custom property the base rule reads — not on where the rule sits.
+  And verify the computed value, not that the class is present.
 - **gdocs-sync is bundled into the main bundle from source** via the
   vite alias + tsconfig.node.json `paths` (no workspace/file: dep).
   Import it as `'gdocs-sync'`; the integration layer is

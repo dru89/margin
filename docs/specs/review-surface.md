@@ -125,11 +125,32 @@ fighting over the same pixels.
   (§64/#87). Same meaning in both places: written, not committed.
 - **Awaiting** — leading edge in the user colour, muted. Quiet: this is
   the normal state of a submitted round and shouldn't compete.
-- **Read** — no leading edge.
+- **Read** — a quiet neutral spine (`--rule`), not nothing. Dropping the
+  edge entirely on click made the card look like it had broken rather
+  than settled; the spine stays, it just stops meaning anything.
 - **Settled** — collapsed to one line, below the fold (§5).
 
 Nothing blinks, and nothing uses colour alone: the dot is a shape
 difference, the dash is a texture difference.
+
+**Hover and selected sit on different properties**, so hover, selected,
+and selected-while-hovered are three visibly different things. Hover is
+transient and gets the light touch — the surface lifts. Selected is
+persistent and gets the structural one — the spine widens and a hairline
+ring appears. Neither recolours the card: colour is state, and selecting
+a card must not appear to change what it is. They previously differed
+only by a 40% versus 55% border tint, which is invisible.
+
+**The spine stays inside the card.** It sits within the border rather
+than straddling it — an edge hanging past the rounded corners draws the
+eye to the overhang instead of to the state it is reporting.
+
+**The operation is named in words and coloured in the diff, not in the
+label.** "Deletion" set in `--danger` shouted over every other card's
+quiet uppercase; the word alone carries it, and the struck red text
+says the rest. A deletion in a card reads the way one reads in the
+document: ordinary text, struck through, on a red wash — not the
+insertion colour sitting on a red background.
 
 **Within a card, messages run oldest first** — the order the
 conversation happened in. A thread read backwards is incoherent, since

@@ -100,16 +100,23 @@ export async function loadReview(docPath: string, content: string): Promise<Revi
 }
 
 /**
- * Sidecars written before round stamps existed carry none. Backfill them
- * as round 0 — history — and mark every thread seen, so opening an old
- * review reads as settled work rather than a wall of unread. Nothing is
- * rewritten until the document is next saved.
+ * Sidecars written before round stamps existed carry none. Backfill those
+ * as round 0 — history — and mark them seen, so opening an old review
+ * reads as settled work rather than a wall of unread. Nothing is rewritten
+ * until the document is next saved.
+ *
+ * Legacy is decided *per thread*, by whether it has a round at all. An
+ * earlier version filled `seenRound` on any thread that lacked one, which
+ * silently marked genuinely unread threads as read on every load — the
+ * whole point of the field, undone by its own migration.
  */
 function backfillRounds(data: ReviewData): void {
   for (const c of data.comments) {
-    c.round ??= 0;
+    if (c.round === undefined) {
+      c.round = 0;
+      c.seenRound ??= data.round;
+    }
     for (const r of c.replies) r.round ??= 0;
-    c.seenRound ??= data.round;
   }
   for (const s of data.suggestions) s.round ??= 0;
 }

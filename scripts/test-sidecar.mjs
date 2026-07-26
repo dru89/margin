@@ -59,6 +59,19 @@ head('sidecars written before round stamps (spec §1)');
   t('so old work reads as already seen', r.comments[0].seenRound >= r.comments[0].replies[0].round, true);
 }
 
+head('a stamped sidecar is left alone');
+{
+  // Backfilling seenRound on every load would mark a genuinely unread
+  // thread as read the moment the document is opened.
+  const r0 = review();
+  r0.comments[0].round = 3;
+  r0.comments[0].replies[0].round = 4;      // Claude spoke in round 4
+  const f = fixture('doc.md', r0);          // ...and seenRound is absent
+  const r = await loadReview(f.doc, TEXT);
+  t('a thread that carries a round keeps its own seenRound', r.comments[0].seenRound, undefined);
+  t('its rounds are untouched', [r.comments[0].round, r.comments[0].replies[0].round], [3, 4]);
+}
+
 head('a rename outside Margin (#126)');
 {
   // The sidecar still carries the OLD document's name.
