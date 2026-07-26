@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { CommentThread, Suggestion } from '@shared/types';
+import type { Anchor, CommentThread, Suggestion } from '@shared/types';
 import { useLocked, useStore } from '@/store';
 import {
   countThreads,
+  isUnread,
+  latestExternalRound,
   latestActivity,
   suggestionNeedsYou,
   suggestionState,
@@ -447,6 +449,156 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
   );
 }
 
+/**
+ * Take the reader to a card: center it, mark the passage in the document,
+ * and pulse the card so it is obvious which one arrived.
+ *
+ * Imperative on purpose. Driving this from an effect keyed on the active
+ * id means clicking the same jump twice does nothing, because the state
+ * never changes — and the pulse cannot be a class either, since the state
+ * change that comes with focusing rewrites the card's className and would
+ * strip it. A Web Animations call survives both.
+ */
+function focusCard(id: string): void {
+  const el = document.getElementById(`card-${id}`);
+  if (!el) return;
+  const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  el.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
+  if (still) return;
+  const pulse = () => {
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--user').trim();
+    // Grows in, then dissolves at full width rather than shrinking back —
+    // a ring collapsing to nothing is what made this read as a cut. The
+    // color is soft and the exit is long; the eye should catch it without
+    // being snapped at.
+    el.animate(
+      [
+        { boxShadow: `0 0 0 0px ${accent}00`, easing: 'ease-out' },
+        { boxShadow: `0 0 0 5px ${accent}59`, offset: 0.3, easing: 'ease-in-out' },
+        { boxShadow: `0 0 0 5px ${accent}00` },
+      ],
+      { duration: 1500 },
+    );
+  };
+  // Wait for the smooth scroll to land. Firing both at once means the pulse
+  // peaks while the card is still traveling — usually off-screen — and is
+  // over before it arrives.
+  const scroller = el.closest('.review-scroll');
+  if (!scroller) return pulse();
+  let done = false;
+  const run = () => {
+    if (done) return;
+    done = true;
+    scroller.removeEventListener('scrollend', run);
+    pulse();
+  };
+  scroller.addEventListener('scrollend', run, { once: true });
+  window.setTimeout(run, 700); // in case the card was already in place
+}
+
+/**
+ * What the last completed round produced, with a way into each piece
+ * (spec §5, #103).
+ *
+ * A turn writes to two surfaces: prose lands in the project discussion
+ * dock, per-thread replies and suggestions land here. Claude ends up
+ * writing "see my thread reply" and the reply is somewhere else — so the
+ * prose stays where it is, and this gives the sidebar its own record that
+ * a turn happened, with jump links.
+ *
+ * It clears itself once every item in it has been dealt with, so it never
+ * has to be dismissed to get out of the way.
+ */
+const MAX_JUMPS = 3;
+
+function RoundHeader({
+  filtered,
+  onToggleFilter,
+}: {
+  filtered: boolean;
+  onToggleFilter: () => void;
+}) {
+  const review = useStore((s) => s.review);
+  const setActiveAnchor = useStore((s) => s.setActiveAnchor);
+  const markThreadSeen = useStore((s) => s.markThreadSeen);
+  const [dismissed, setDismissed] = useState<number | null>(null);
+
+  const round = review?.round ?? 0;
+  const answered = (review?.comments ?? []).filter(
+    (c) => c.status === 'open' && latestExternalRound(c) === round,
+  );
+  const proposed = (review?.suggestions ?? []).filter(
+    (s) => s.round === round && s.author === 'agent',
+  );
+  const outstanding =
+    answered.some((c) => isUnread(c)) || proposed.some((s) => s.status === 'pending');
+
+  if (round === 0 || dismissed === round || !outstanding) return null;
+
+  // One list, document order — the same rule the sidebar itself follows.
+  const items: Array<CommentThread | Suggestion> = [...answered, ...proposed.filter((s) => s.status === 'pending')]
+    .sort((a, b) => a.anchor.from - b.anchor.from);
+  const shown = items.slice(0, MAX_JUMPS);
+  const rest = items.length - shown.length;
+
+  const go = (id: string, anchor: Anchor, seen?: string) => {
+    setActiveAnchor(id);
+    if (seen) markThreadSeen(seen);
+    // Mark the passage in the document too — a jump that only moves the
+    // sidebar leaves the reader to find the text themselves.
+    if (!anchor.orphaned) revealRange(anchor.from, anchor.to);
+    // After the state change has rendered, so the card is there to scroll to.
+    requestAnimationFrame(() => focusCard(id));
+  };
+  const parts = [
+    answered.length > 0 && `replied to ${answered.length} ${answered.length === 1 ? 'thread' : 'threads'}`,
+    proposed.length > 0 && `proposed ${proposed.length} ${proposed.length === 1 ? 'edit' : 'edits'}`,
+  ].filter(Boolean);
+
+  return (
+    <div className="round-header">
+      <div className="round-header-top">
+        <strong>Round {round}</strong>
+        <button
+          className="round-dismiss"
+          aria-label="Dismiss"
+          title="Dismiss"
+          onClick={() => setDismissed(round)}
+        >
+          ✕
+        </button>
+      </div>
+      <p>Claude {parts.join(' and ')}.</p>
+      <div className="round-jumps">
+        {shown.map((it) => (
+          <button
+            key={it.id}
+            className="round-jump"
+            onClick={() => go(it.id, it.anchor, 'replies' in it ? it.id : undefined)}
+          >
+            ↳ “{it.anchor.quote.length > 26 ? `${it.anchor.quote.slice(0, 25)}…` : it.anchor.quote}”
+          </button>
+        ))}
+        {/* No attempt to rank: a turn can answer a dozen threads and nothing
+            in the data says which matters most. Document order, capped, and
+            the rest handed to the filter that already exists for this. */}
+        {rest > 0 && (
+          // Shares state with the All / Need you pair rather than silently
+          // setting it: a control that changes something elsewhere and then
+          // looks unchanged leaves no way back that the reader can see.
+          <button
+            className={`round-jump round-jump-more${filtered ? ' on' : ''}`}
+            aria-pressed={filtered}
+            onClick={onToggleFilter}
+          >
+            +{rest} more — review all
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function Sidebar() {
   const review = useStore((s) => s.review);
   const setThreadStatus = useStore((s) => s.setThreadStatus);
@@ -506,12 +658,17 @@ export function Sidebar() {
   // The card being read stays put even once it stops qualifying, so the list
   // never moves out from under a click.
   const keep = (id: string, qualifies: boolean) => qualifies || id === activeAnchorId;
-  const shownThreads = onlyNeedsYou
-    ? openThreads.filter((t) => keep(t.id, threadNeedsYou(t, currentRound)))
-    : openThreads;
-  const shownSuggestions = onlyNeedsYou
-    ? pendingSuggestions.filter((s) => keep(s.id, suggestionNeedsYou(s, currentRound)))
-    : pendingSuggestions;
+  // Threads and suggestions are one list in document order. Two sections
+  // meant a comment on the first paragraph sat below a suggestion on the
+  // ninth, which is not what a margin does (spec §4).
+  const shown: Array<CommentThread | Suggestion> = [
+    ...(onlyNeedsYou
+      ? openThreads.filter((t) => keep(t.id, threadNeedsYou(t, currentRound)))
+      : openThreads),
+    ...(onlyNeedsYou
+      ? pendingSuggestions.filter((s) => keep(s.id, suggestionNeedsYou(s, currentRound)))
+      : pendingSuggestions),
+  ].sort((a, b) => a.anchor.from - b.anchor.from);
 
   return (
     <aside className="sidebar">
@@ -543,6 +700,7 @@ export function Sidebar() {
         </div>
       )}
       <div className="review-scroll">
+        <RoundHeader filtered={onlyNeedsYou} onToggleFilter={() => setOnlyNeedsYou(!onlyNeedsYou)} />
         <Composer />
         {pendingSuggestions.length === 0 && openThreads.length === 0 && (
           <div className="sidebar-empty">
@@ -553,23 +711,18 @@ export function Sidebar() {
             </p>
           </div>
         )}
-        {shownSuggestions.length > 0 && (
+        {shown.length > 0 && (
           <section>
-            <h3 className="sidebar-heading">Suggestions · {shownSuggestions.length}</h3>
-            {shownSuggestions.map((s) => (
-              <SuggestionCard key={s.id} suggestion={s} />
-            ))}
+            {shown.map((it) =>
+              'replies' in it ? (
+                <ThreadCard key={it.id} thread={it} />
+              ) : (
+                <SuggestionCard key={it.id} suggestion={it} />
+              ),
+            )}
           </section>
         )}
-        {shownThreads.length > 0 && (
-          <section>
-            <h3 className="sidebar-heading">Comments · {shownThreads.length}</h3>
-            {shownThreads.map((c) => (
-              <ThreadCard key={c.id} thread={c} />
-            ))}
-          </section>
-        )}
-        {onlyNeedsYou && shownThreads.length === 0 && shownSuggestions.length === 0 && (
+        {onlyNeedsYou && shown.length === 0 && (
           <p className="hint sidebar-filtered-empty">
             Nothing waiting on you.{' '}
             <button className="linkish" onClick={() => setOnlyNeedsYou(false)}>Show everything</button>

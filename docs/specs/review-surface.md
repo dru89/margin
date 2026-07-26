@@ -103,7 +103,7 @@ now-shorter document.)
 Suggestions collapse to three: **Draft** (yours, unsent), **Pending**
 (awaiting your accept/reject), **Decided** (accepted or rejected).
 
-### Deliberately not modelled
+### Deliberately not modeled
 
 There is no "needs a reply from you" state. Whether Claude's answer
 asks a question or merely reports is not knowable from the data, and
@@ -115,29 +115,29 @@ explicitly through a tool argument rather than have the UI infer it.
 ## 3. Visual language
 
 One rule: **state is carried by the card's leading edge, authorship by
-colour, operation by the diff.** These are three independent axes today
+color, operation by the diff.** These are three independent axes today
 fighting over the same pixels.
 
 - **Unread** — a filled dot on the leading edge, and the card's rule in
-  the agent colour. Clears on view (see §4).
+  the agent color. Clears on view (see §4).
 - **Draft** — dashed leading edge, matching the dashed anchor
   decoration already used in the document for an unsubmitted composer
   (§64/#87). Same meaning in both places: written, not committed.
-- **Awaiting** — leading edge in the user colour, muted. Quiet: this is
+- **Awaiting** — leading edge in the user color, muted. Quiet: this is
   the normal state of a submitted round and shouldn't compete.
 - **Read** — a quiet neutral spine (`--rule`), not nothing. Dropping the
   edge entirely on click made the card look like it had broken rather
   than settled; the spine stays, it just stops meaning anything.
 - **Settled** — collapsed to one line, below the fold (§5).
 
-Nothing blinks, and nothing uses colour alone: the dot is a shape
+Nothing blinks, and nothing uses color alone: the dot is a shape
 difference, the dash is a texture difference.
 
 **Hover and selected sit on different properties**, so hover, selected,
 and selected-while-hovered are three visibly different things. Hover is
 transient and gets the light touch — the surface lifts. Selected is
 persistent and gets the structural one — the spine widens and a hairline
-ring appears. Neither recolours the card: colour is state, and selecting
+ring appears. Neither recolours the card: color is state, and selecting
 a card must not appear to change what it is. They previously differed
 only by a 40% versus 55% border tint, which is invisible.
 
@@ -150,7 +150,7 @@ label.** "Deletion" set in `--danger` shouted over every other card's
 quiet uppercase; the word alone carries it, and the struck red text
 says the rest. A deletion in a card reads the way one reads in the
 document: ordinary text, struck through, on a red wash — not the
-insertion colour sitting on a red background.
+insertion color sitting on a red background.
 
 **Within a card, messages run oldest first** — the order the
 conversation happened in. A thread read backwards is incoherent, since
@@ -199,8 +199,10 @@ lives in the tooltip (`Round 3 · 24 Jul`) rather than on screen.
 
 ## 4. Ordering, grouping, and what clears "unread"
 
-**Order by document position. Always.** The sidebar is a margin; its
-job is to correspond to the text beside it. Sorting by recency or
+**Order by document position. Always — and in one list.** Threads and
+suggestions interleave; separate sections for each put a comment on the
+first paragraph below a suggestion on the ninth, which is not what a
+margin does. The sidebar's job is to correspond to the text beside it. Sorting by recency or
 grouping by state breaks the spatial memory that makes a margin
 readable, and means a card moves when its state changes — the exact
 complaint in #88 about a comment sliding away after submission.
@@ -298,8 +300,34 @@ Round 4 · Claude replied to 2 threads, proposed 3 edits
   ↳ [ thread: "moved from C+I…" ]  [ thread: "TIM program" ]  [ 3 suggestions ]
 ```
 
-Each entry jumps to the card and expands it. The header is dismissible
-and disappears once every item in it has been seen.
+**At most three entries, in document order, then a hand-off.** A turn
+can answer a dozen threads, and nothing in the data says which of them
+matters most — so no ranking is attempted. The first three by document
+position get an entry; the rest become "+N more — review all", which
+**shares state with the All / Need you pair** — it presses in, and
+pressing it again returns to All. A control that silently changes
+something elsewhere and then looks unchanged leaves no visible way
+back.
+
+Each entry **centers** the card, **marks the passage in the document**
+and gives the card a brief pulse. Landing a card barely inside the
+viewport asks the reader to find it again, and moving only the sidebar
+leaves them to locate the text themselves.
+
+The jump is driven imperatively rather than by an effect watching the
+active id — otherwise clicking the same entry twice does nothing,
+because the state never changed. The pulse is a Web Animations call
+rather than a class, because focusing a card changes its state and
+rewrites its `className`, which would strip one. Both respect
+`prefers-reduced-motion`. The pulse waits for the scroll to land
+(`scrollend`, with a timeout fallback): fired together, it peaks while
+the card is still traveling — usually off-screen — and is over before
+it arrives. It also **dissolves at full width rather than shrinking
+back** — a ring collapsing to nothing reads as a cut — over about 1.5s
+with a soft, low-alpha color.
+
+The header is dismissible and disappears once every item in it has been
+seen or decided.
 
 The prose stays in the discussion dock — it is about the document as a
 whole and does not belong to any one thread. What changes is that it is
@@ -324,20 +352,20 @@ card, and it is what #102 is really about: a pure deletion currently
 renders as "everything struck, nothing inserted", which reads as a
 glitch rather than as a deletion.
 
-**Colour by operation, not by author.** Insertions in the agent colour,
+**Color by operation, not by author.** Insertions in the agent color,
 deletions in `--danger`. #102 asks whether a deletion-only suggestion
 should read red rather than green — yes, and the rule that produces
-that answer is that the colour describes what will happen to the text.
+that answer is that the color describes what will happen to the text.
 
 Two places carry it, and one deliberately does not:
 
 - **The kind label** — "Deletion" is set in `--danger`, "Edit" in the
-  agent colour. This is what makes the operation legible before the
+  agent color. This is what makes the operation legible before the
   reader parses the diff.
 - **The diff** — but at card strength, not document strength. The
   inline decoration in the document uses `--danger` at 9%, tuned for
   17px prose that has to stay readable underneath it. The same value in
-  a 13px sidebar card reads as a grey smudge rather than as red. Cards
+  a 13px sidebar card reads as a gray smudge rather than as red. Cards
   run around 20%.
 - **Not the leading edge.** That is state, and only state. A deletion
   sitting unread keeps a teal edge; colouring it red would mean an
@@ -473,12 +501,12 @@ a sidecar remains readable.
 Answering the question in the issue: TK handling **is** shipped, but
 only in the agent prompt — it treats `(TK: …)` as an author note and
 answers it. No UI has ever highlighted TK, deliberately (DECISIONS §8).
-So the observed behaviour was correct.
+So the observed behavior was correct.
 
 Proposed, low priority: a quiet inline decoration on TK markers so the
 author can see what the agent will treat as a note before submitting.
 Same texture as the draft anchor, different hue. If it makes the
-document noisy in practice, drop it — the prompt behaviour is the
+document noisy in practice, drop it — the prompt behavior is the
 feature and it works.
 
 ## 11. Build order

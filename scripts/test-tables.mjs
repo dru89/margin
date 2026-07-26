@@ -16,7 +16,7 @@ const { isTableLine, formatTableLines } = mod;
 const { t, head, done } = reporter();
 const fmt = (...lines) => formatTableLines(lines);
 
-head('recognising a table line');
+head('recognizing a table line');
 t('a plain row', isTableLine('| a | b |'), true);
 t('an indented row', isTableLine('   | a |'), true);
 t('prose', isTableLine('not a table'), false);
@@ -35,9 +35,9 @@ t('formatting twice matches formatting once',
   fmt('|a|bbbb|', '|---|---|', '|cccc|d|'));
 
 head('alignment markers survive');
-// Note the middle column: centre-aligned cells are actually centred, not
+// Note the middle column: center-aligned cells are actually centered, not
 // just left-padded. Right-aligned cells pad on the left.
-t('left, centre and right each pad on the correct side',
+t('left, center and right each pad on the correct side',
   fmt('| a | b | c |', '| :-- | :-: | --: |', '| 1 | 2 | 3 |'),
   ['| a   |  b  |   c |', '| :-- | :-: | --: |', '| 1   |  2  |   3 |']);
 
