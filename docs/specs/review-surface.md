@@ -540,6 +540,15 @@ is precisely what makes the remap necessary. Text deleted from under an
 open draft leaves it anchored to nothing, and it commits as orphaned
 rather than onto whatever moved into its place.
 
+**A draft belongs to its document, not to the window.** Documents in one
+project share a window, so switching files parks the draft and coming
+back restores it, re-resolved against whatever the file says by then.
+Neither blocking the switch nor discarding the draft is right, and
+bouncing back the way a refused re-target does is worst of all: switching
+is often *because* of what is being drafted, since a `@path` chip is a
+link to another file (§9). An empty composer is not parked — leaving with
+nothing typed is what closing it means.
+
 **Anything in Draft state is editable and deletable** (#89). It hasn't
 left the building, so the asymmetry where a queued discussion message
 can be deleted but not edited, and an inline comment neither, has no
