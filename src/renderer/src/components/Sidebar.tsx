@@ -95,7 +95,7 @@ function Message({
 }
 
 function usePair(id: string, anchor: { from: number; to: number; orphaned?: boolean }) {
-  const setActiveAnchor = useStore((s) => s.setActiveAnchor);
+  const focusAnchor = useStore((s) => s.focusAnchor);
   const setHoveredAnchor = useStore((s) => s.setHoveredAnchor);
   const active = useStore((s) => s.activeAnchorId === id);
   const hot = useStore((s) => s.hoveredAnchorId === id);
@@ -104,8 +104,11 @@ function usePair(id: string, anchor: { from: number; to: number; orphaned?: bool
     props: {
       onMouseEnter: () => setHoveredAnchor(id),
       onMouseLeave: () => setHoveredAnchor(null),
+      // The third entry point. All of them — a card, marked text, a
+      // round-header jump — raise the same request, so the pair lights up
+      // at both ends whichever end was clicked.
       onClick: () => {
-        setActiveAnchor(id);
+        focusAnchor(id);
         if (!anchor.orphaned) revealRange(anchor.from, anchor.to);
       },
     },
@@ -288,7 +291,6 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
   const imported = thread.provenance === 'imported';
   const addDocReply = useStore((s) => s.addDocReply);
   const currentRound = useStore((s) => s.review?.round ?? 0);
-  const markThreadSeen = useStore((s) => s.markThreadSeen);
   const state = threadState(thread, currentRound);
   const last = latestActivity(thread);
   const [expanded, setExpanded] = useState(false);
@@ -323,12 +325,9 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
       className={`card card-comment state-${state}${pair.classes}`}
       aria-label="comment thread"
       {...pair.props}
-      onClick={() => {
-        // Clicking a thread is a deliberate "I'm looking at this", and it
-        // already focuses the anchor — so it is what clears unread (spec §4).
-        pair.props.onClick();
-        markThreadSeen(thread.id);
-      }}
+      // focusAnchor already clears unread — clicking a thread is a
+      // deliberate "I'm looking at this" (spec §4).
+      {...pair.props}
     >
       <div className="card-head">
         {/* Always mounted so clearing unread fades rather than snaps. */}
@@ -468,41 +467,50 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
  * change that comes with focusing rewrites the card's className and would
  * strip it. A Web Animations call survives both.
  */
+/** A brief ring, in the accent, that survives a re-render (see focusCard). */
+function pulse(el: Element): void {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--user').trim();
+  el.animate(
+    [
+      { boxShadow: `0 0 0 0px ${accent}00`, easing: 'ease-out' },
+      { boxShadow: `0 0 0 5px ${accent}59`, offset: 0.3, easing: 'ease-in-out' },
+      { boxShadow: `0 0 0 5px ${accent}00` },
+    ],
+    { duration: 1500 },
+  );
+}
+
+/** The marked text in the document, so both ends of a focus behave alike. */
+function pulseAnchorText(id: string): void {
+  for (const el of document.querySelectorAll(
+    `.cm-editor .anchor[data-anchor-id="${CSS.escape(id)}"]`,
+  )) {
+    pulse(el);
+  }
+}
+
 function focusCard(id: string): void {
   const el = document.getElementById(`card-${id}`);
   if (!el) return;
   const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   el.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
   if (still) return;
-  const pulse = () => {
-    const accent = getComputedStyle(document.documentElement).getPropertyValue('--user').trim();
-    // Grows in, then dissolves at full width rather than shrinking back —
-    // a ring collapsing to nothing is what made this read as a cut. The
-    // color is soft and the exit is long; the eye should catch it without
-    // being snapped at.
-    el.animate(
-      [
-        { boxShadow: `0 0 0 0px ${accent}00`, easing: 'ease-out' },
-        { boxShadow: `0 0 0 5px ${accent}59`, offset: 0.3, easing: 'ease-in-out' },
-        { boxShadow: `0 0 0 5px ${accent}00` },
-      ],
-      { duration: 1500 },
-    );
-  };
+  const run = () => pulse(el);
   // Wait for the smooth scroll to land. Firing both at once means the pulse
   // peaks while the card is still traveling — usually off-screen — and is
   // over before it arrives.
   const scroller = el.closest('.review-scroll');
-  if (!scroller) return pulse();
+  if (!scroller) return run();
   let done = false;
-  const run = () => {
+  const once = () => {
     if (done) return;
     done = true;
-    scroller.removeEventListener('scrollend', run);
-    pulse();
+    scroller.removeEventListener('scrollend', once);
+    run();
   };
-  scroller.addEventListener('scrollend', run, { once: true });
-  window.setTimeout(run, 700); // in case the card was already in place
+  scroller.addEventListener('scrollend', once, { once: true });
+  window.setTimeout(once, 700); // in case the card was already in place
 }
 
 /**
@@ -626,7 +634,11 @@ export function Sidebar() {
   useEffect(() => {
     if (!focusRequest) return;
     const id = focusRequest.id;
-    requestAnimationFrame(() => focusCard(id));
+    requestAnimationFrame(() => {
+      focusCard(id);
+      // Both ends of the pair light up, whichever end was clicked.
+      pulseAnchorText(id);
+    });
   }, [focusRequest]);
 
   const currentRound = review?.round ?? 0;
