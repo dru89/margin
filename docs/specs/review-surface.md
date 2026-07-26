@@ -383,8 +383,25 @@ anchored range.
 **A deletion-only suggestion still gets an accept/reject pill.** The
 pill lives on the inserted half's widget, which used to be placed only
 when there was a replacement — so a deletion had nothing to act on
-inline (#102). The widget is now always placed, at the end of the struck
-span, and renders no inserted text when there is none.
+inline (#102). The widget is now always placed and renders no inserted
+text when there is none.
+
+**The pill sits below the change and centered on the seam** between the
+struck and inserted text. Above put it over the previous line, where it
+read as annotating the wrong text; pinned to the left of the insertion
+it hung off the end of the edit. A deletion has no seam, so its widget
+is anchored mid-run instead and the pill centers on the words it removes
+rather than trailing past them.
+
+**Large changes are left to degrade.** A rewrite spanning several lines
+renders as the old passage struck and the new one after it, which reads
+as an old-then-new paragraph and is legible, but it doubles the text and
+pushes the document down. If the change runs past the viewport its pill
+can be off-screen. That is acceptable because **the sidebar card carries
+the same Accept/Reject and is always reachable** — the inline pill is a
+convenience for local edits, not the primary control. If it becomes a
+problem the answer is to collapse very large inline suggestions to a
+marker, not to make the floating pill cleverer.
 
 **Color by operation, not by author.** Insertions in the agent color,
 deletions in `--danger`. #102 asks whether a deletion-only suggestion

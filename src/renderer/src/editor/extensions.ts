@@ -155,9 +155,16 @@ function buildDecorations(annotations: EditorAnnotation[], state: EditorState): 
       // Always placed, even when nothing is inserted: the widget carries the
       // accept/reject pill, so guarding it on `replacement` left a
       // deletion-only suggestion with no way to act on it (#102).
+      //
+      // A replacement anchors it at the seam between the struck and the
+      // inserted text, which the pill then centers on. A deletion has no
+      // inserted half, so the seam is the end of the struck run and the
+      // pill would sit past the words it acts on — anchor it mid-run
+      // instead so it centers on them.
+      const pillAt = added ? delTo : delFrom + Math.floor(removed.length / 2);
       builder.add(
-        delTo,
-        delTo,
+        pillAt,
+        pillAt,
         Decoration.widget({
           widget: new ReplacementWidget(a.id, added, stateCls, contextClasses(state, a.from)),
           side: 1,
