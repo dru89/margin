@@ -924,6 +924,36 @@ kbd {
 .md-body pre { background: var(--paper-inset); border-radius: 6px; padding: 8px 10px; overflow-x: auto; }
 .md-body h1, .md-body h2, .md-body h3, .md-body h4 { font-size: 1em; margin: 0 0 6px; }
 
+/* ——— @path file chips (spec §9) ——— */
+
+/* Sits in running text, so it keeps the line's rhythm: monospace for the
+   path, a wash to say it is a thing rather than prose, and no border —
+   a bordered pill mid-sentence reads as a button in a paragraph. */
+.file-chip {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  /* Matches inline code, and for the same reason: any more horizontal
+     padding and the sentence's next comma appears to float away from it. */
+  padding: 0 3px;
+  border: none;
+  border-radius: 3px;
+  background: var(--paper-inset);
+  color: var(--user);
+  cursor: pointer;
+  /* Keep a long path from breaking mid-chip and reading as two things. */
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+.file-chip:hover { background: var(--user-wash); text-decoration: underline; }
+/* Names nothing in this project. Same vocabulary as a lost anchor: struck
+   through, muted, and not a control — there is nowhere to go. */
+.file-chip.file-chip-lost {
+  color: var(--ink-faint);
+  cursor: default;
+  text-decoration: line-through;
+}
+.file-chip.file-chip-lost:hover { background: var(--paper-inset); }
+
 .diff {
   font-family: var(--font-prose);
   font-size: 13.5px;

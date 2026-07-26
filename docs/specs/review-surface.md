@@ -577,11 +577,22 @@ Store as plain `@path` text; render as a chip. Storage stays plain so
 the reference survives a round trip through the agent unchanged, and so
 a sidecar remains readable.
 
-- Clicking a chip opens that file in the window.
-- A chip whose file no longer exists renders in the orphaned style —
-  same vocabulary as a lost anchor.
+- **A chip resolves against the workspace file list, not the
+  filesystem.** That is what confines references to the project without
+  a containment check of its own: the scan is rooted at the project
+  root, so anything outside names no file. Matching is exact on the
+  relative path — fuzzy matching reads as helpful right up until two
+  files share a basename.
+- **Clicking follows the explorer's rule.** Markdown opens in Margin;
+  anything else opens in its default app. Chips exist to point at
+  anything in the project — the CSV behind a number, the diagram — and
+  most of that is not markdown.
+- A chip that names no file in the project is not a control, and
+  renders in the orphaned style: same vocabulary as a lost anchor, and
+  the same for a deleted file as for a path that was never here.
 - The agent can emit them, and they render identically. This is why
-  the plain-text storage matters.
+  the plain-text storage matters — and why the main process validates
+  independently of what the renderer chose to make clickable.
 
 ## 10. TK markers (#84)
 

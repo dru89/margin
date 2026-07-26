@@ -10,13 +10,13 @@
  *   node scripts/test-workspace.mjs
  */
 import { execFileSync } from 'child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'fs';
 import { tmpdir, homedir } from 'os';
 import path from 'path';
 import { load, reporter } from './lib/compile.mjs';
 
 const { mod, dir: build } = await load('src/main/workspace.ts');
-const { findWorkspaceRoot } = mod;
+const { findWorkspaceRoot, resolveInsideWorkspace } = mod;
 const { t, head, done } = reporter();
 
 const base = mkdtempSync(path.join(tmpdir(), 'margin-roots-'));
@@ -72,6 +72,36 @@ const proj = make('proj', { marker: true });
 const projSub = make('proj/sub');
 doc(proj, 'alpha.md');
 t('opening a nested file keeps the project', await rootOf(doc(projSub, 'nested.md')), 'proj');
+
+head('opening a file: nothing outside the project (#90)');
+// A chip's path comes from comment text and the agent writes comment
+// text, so "open this in its default app" is an untrusted request now.
+const openRoot = make('open-me');
+const openDoc = doc(openRoot, 'notes.md');
+mkdirSync(path.join(openRoot, 'sub'), { recursive: true });
+doc(path.join(openRoot, 'sub'), 'deep.md');
+const outsider = doc(make('not-mine'), 'secret.md');
+const inside = async (p) => {
+  const got = await resolveInsideWorkspace(openRoot, p);
+  return got === null ? null : path.relative(openRoot, got);
+};
+t('a file in the project', await inside(openDoc), 'notes.md');
+t('by relative path', await inside('sub/deep.md'), path.join('sub', 'deep.md'));
+t('a file in another project', await inside(outsider), null);
+t('traversal out', await inside('../not-mine/secret.md'), null);
+t('an absolute path elsewhere', await inside('/etc/hostname'), null);
+t('a path that does not exist', await inside('sub/ghost.md'), null);
+// Opening one hands the request to a file manager, which is not what
+// naming a file in a comment asks for.
+t('a directory', await inside('sub'), null);
+// The containment test runs on the resolved target: a link inside the
+// project pointing out of it must not smuggle its target through.
+try {
+  symlinkSync(outsider, path.join(openRoot, 'escape.md'));
+  t('a symlink pointing out of the project', await inside('escape.md'), null);
+} catch {
+  console.log('skip  symlink case (not permitted here)');
+}
 
 rmSync(base, { recursive: true, force: true });
 rmSync(build, { recursive: true, force: true });

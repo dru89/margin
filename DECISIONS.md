@@ -1354,3 +1354,56 @@ Submitting deliberately does not save an open edit. The author typed it
 and never confirmed it; committing half a rewrite sends it to Claude and
 writes it into the record, which is worse than losing it because it
 cannot be taken back.
+
+## 67. `@path` chips resolve against the project's file list (#90)
+
+Stored as plain `@path` text, always. The reference travels to the agent
+and back through a round unchanged, and a sidecar stays readable in a text
+editor — both stop being true the moment a chip becomes a structure with
+an id in it. Everything below follows from the storage being plain.
+
+**A chip resolves against the workspace file list, and nothing else.**
+Not against the filesystem. That single rule answers two questions at
+once:
+
+- *References are confined to the project* without a containment check of
+  its own. The scan is rooted at the project root, so `../secrets.md` and
+  `/etc/passwd` name no file in the list and render as lost.
+- *A reference to a file that has been deleted or renamed* renders the
+  same way, in the same vocabulary as a lost anchor. There is nothing to
+  distinguish "gone" from "never here", and nothing that needs to.
+
+Matching is exact on the workspace-relative path, after normalizing
+separators and stripping a leading `/` or `./`. Deliberately not fuzzy:
+resolving `@plan.md` to `docs/plan.md` because it is the only match reads
+as helpful until two files share a basename, and then a chip silently
+points at the wrong one.
+
+**Clicking follows the explorer's rule**, so a file behaves the same
+wherever it is named: markdown opens in Margin, anything else opens in
+whatever the desktop uses for it. Chips exist so the author and the agent
+can point at *anything* in the project — a CSV of the evidence, a PNG of
+the diagram — and most of that is not markdown. Sending a non-markdown
+file to Margin would open an editor for a format it cannot edit.
+
+**`openExternal` now refuses anything outside the project.** It used to
+`shell.openPath` whatever it was given, which was fine while the explorer
+was the only caller and every path came from the scan. A chip's path
+comes from comment text, and the agent writes comment text — so this
+became an untrusted request the moment chips shipped. The renderer
+declining to make a bad chip clickable is a rendering decision; this is
+the boundary that reaches the disk, and it is checked independently.
+Symlinks are resolved before the containment test, and directories are
+refused: opening one hands the request to a file manager, which is not
+what naming a file in a comment asks for.
+
+**The email guard is an exclusion, not a whitelist.** A reference opens
+on `@` unless the character before it could continue a word — which is
+what `drew@hays.fm` looks like. Stating it as "start of line or after
+whitespace" instead would have been wrong for `(@docs/plan.md)`, which is
+how a reference in an aside is usually written. Trailing sentence
+punctuation is trimmed off the path for the same reason: the period in
+"see @docs/plan.md." belongs to the sentence.
+
+The agent is told it may write them, since they render identically from
+either author. That is the payoff for plain storage.

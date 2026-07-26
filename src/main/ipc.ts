@@ -19,7 +19,7 @@ import { getSettings, updateSettings } from './settings';
 import { listModels } from './models';
 import { loadProjectSettings, saveProjectSettings } from './projectSettings';
 import { saveDiscussion } from './discussionStore';
-import { getWorkspace } from './workspace';
+import { getWorkspace, resolveInsideWorkspace } from './workspace';
 import { getRecentFiles } from './recents';
 import {
   acceptProposal,
@@ -101,8 +101,11 @@ export function registerIpcHandlers(): void {
     return getRecentFiles();
   });
 
-  ipcMain.handle(IPC.openExternal, async (_event, filePath: string) => {
-    await shell.openPath(path.resolve(filePath));
+  ipcMain.handle(IPC.openExternal, async (event, filePath: string) => {
+    const session = requireSession(event.sender.id);
+    const abs = await resolveInsideWorkspace(session.workspaceRoot, filePath);
+    if (!abs) throw new Error('That file is not in this project.');
+    await shell.openPath(abs);
   });
 
   ipcMain.handle(IPC.openFolderDialog, async (event) => {
