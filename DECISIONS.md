@@ -1407,3 +1407,44 @@ punctuation is trimmed off the path for the same reason: the period in
 
 The agent is told it may write them, since they render identically from
 either author. That is the payoff for plain storage.
+## 68. A draft comment belongs to its document, not to its window
+
+Found by asking what happens with two files open, and it was a
+regression introduced by §66: lifting the composer's text into the store
+is what let it outlive the document it was written for. Before that the
+text lived in the component, which unmounted with the composer and took
+the draft with it.
+
+The observed behavior was both halves wrong at once. Drafting a comment
+on `a.md` and switching to `b.md` closed the composer, so the draft
+looked discarded — and then opening a composer on `b.md` produced a box
+already holding the words written about `a.md`, attached to `b.md`'s
+text. That is exactly the failure §66 exists to prevent, reached by a
+route no single-document test can see.
+
+**A draft is parked per document and restored on return.** The review
+sidecar is per document; an uncommitted comment is a sidecar entry that
+has not been committed yet, so the document is where it belongs. The
+alternatives were all worse:
+
+- *Blocking the file switch* is heavier than blocking submission, which
+  is already refused (§66).
+- *Discarding on switch* destroys typing, the thing every rule in §66
+  refuses to do.
+- *Bouncing back to the other document*, the way a refused re-target
+  does, is wrong here: switching files is often **because** of what is
+  being drafted. A `@path` chip in a comment is a link to another file
+  (§67), so following one must not cost the comment being written.
+
+The parked anchor is a full `Anchor`, and the return trip re-resolves it
+with `reanchor` rather than trusting the offsets — the file can be edited
+by the agent, by a round, or on disk while the draft is away, which is
+the same reason stored anchors are re-resolved on load.
+
+Per window and not persisted. Closing the window still loses the draft;
+that is a smaller promise than "nothing typed is discarded" makes, and
+worth revisiting if it bites.
+
+**An empty composer is not parked.** Leaving a document with nothing
+typed is what closing the composer means, and a composer that reopens by
+itself on return is a surprise rather than a courtesy.

@@ -11,7 +11,7 @@ import type {
   ReviewData,
   WorkspaceState,
 } from '@shared/types';
-import { makeAnchor, resolveQuote } from '@shared/anchors';
+import { makeAnchor, reanchor, resolveQuote } from '@shared/anchors';
 import {
   markSeen,
   replyEditable,
@@ -48,6 +48,21 @@ interface MarginState {
    * focus too, and setting the same value twice is not a state change.
    */
   composerFocus: number;
+  /**
+   * Unsent composer drafts for documents this window is not showing,
+   * keyed by file path (spec §8).
+   *
+   * A draft belongs to a document, the way its review sidecar does — so
+   * switching files parks it rather than destroying it, and coming back
+   * restores it. Switching is not a reason to lose typing, and it is
+   * often *because* of what is being drafted: a chip in a comment is a
+   * link to another file (§9), and that must not cost the comment.
+   *
+   * Per window, and not persisted. The parked anchor is a full Anchor so
+   * the return trip can re-resolve it against a file that changed while
+   * it was away, exactly as a stored anchor is on load.
+   */
+  parkedDrafts: Record<string, { anchor: Anchor; draft: ComposerDraft }>;
   /**
    * Edit boxes currently open on already-staged items, by key.
    *
@@ -242,7 +257,40 @@ export const useStore = create<MarginState>((set, get) => {
       if (initialized) return;
       initialized = true;
 
-      const load = (doc: DocState) =>
+      /**
+       * Swap the window onto a document, parking the outgoing draft and
+       * restoring the incoming one.
+       *
+       * Every route into a different document lands here — the explorer,
+       * a chip, the Open… menu — which is why the parking happens here
+       * rather than in `switchToFile`. Doing it in the one renderer path
+       * left the menu route to drop the draft.
+       */
+      const load = (doc: DocState) => {
+        const prev = get();
+        const parked = { ...prev.parkedDrafts };
+        if (prev.doc) {
+          const anchor = prev.composerAnchor;
+          if (anchor && draftHasContent(prev.composerDraft, anchor.quote)) {
+            parked[prev.doc.filePath] = {
+              anchor: anchor.orphaned
+                ? { from: anchor.from, to: anchor.to, quote: anchor.quote, orphaned: true }
+                : makeAnchor(prev.content, anchor.from, anchor.to),
+              draft: prev.composerDraft,
+            };
+          } else {
+            // Cancelled, committed, or never written in: leaving with an
+            // empty composer is what closing it means.
+            delete parked[prev.doc.filePath];
+          }
+        }
+        const restored = parked[doc.filePath];
+        delete parked[doc.filePath]; // it is live again, not parked
+        // The file may have changed while the draft was away, so its
+        // anchor is re-resolved rather than trusted, like a stored one.
+        const back = restored?.anchor.orphaned
+          ? restored.anchor
+          : restored && reanchor(doc.content, restored.anchor);
         set({
           dockOpen: localStorage.getItem(`margin-dock-open:${doc.workspaceRoot}`) === 'true',
           modelPref: {},
@@ -254,11 +302,16 @@ export const useStore = create<MarginState>((set, get) => {
           activity: [],
           selection: null,
           activeAnchorId: null,
-          composerAnchor: null,
+          parkedDrafts: parked,
+          composerAnchor: back
+            ? { from: back.from, to: back.to, quote: back.quote, orphaned: back.orphaned }
+            : null,
+          composerDraft: restored ? restored.draft : emptyDraft,
           dirty: false,
           diskConflict: false,
           viewingProposalId: null,
         });
+      };
 
       void window.margin.getDoc().then((doc) => {
         if (doc) {
@@ -371,6 +424,7 @@ export const useStore = create<MarginState>((set, get) => {
     composerDraft: emptyDraft,
     setComposerDraft: (patch) => set({ composerDraft: { ...get().composerDraft, ...patch } }),
     composerFocus: 0,
+    parkedDrafts: {},
 
     openRevisions: [],
     setRevisionOpen: (key, open) => {
