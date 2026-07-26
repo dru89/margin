@@ -13,6 +13,7 @@ import {
   type ThreadState,
 } from '@shared/reviewState';
 import { revealRange } from '@/editorBridge';
+import { wordDiff } from '@shared/worddiff';
 import { DiscussionDock } from '@/components/DiscussionDock';
 import { MentionTextarea } from '@/components/MentionTextarea';
 import { Md } from '@/components/Md';
@@ -189,10 +190,9 @@ function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
   const state = suggestionState(suggestion, currentRound);
   const deletion = suggestion.replacement === '';
 
-  // One ellipsized context line: the tail of what lands (or leaves).
-  const context = suggestion.replacement
-    ? `→ …${suggestion.replacement.slice(-70)}`
-    : `− …${suggestion.anchor.quote.slice(-70)}`;
+  // Only what changes, rather than the whole clause struck and re-inserted
+  // (#98). Both strings are already stored — this is presentation.
+  const parts = wordDiff(suggestion.anchor.quote, suggestion.replacement);
 
   return (
     <div
@@ -215,7 +215,16 @@ function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
       <div className="thread-msg-head">
         <AuthorChip author={suggestion.author} />
       </div>
-      <p className={`card-context${deletion ? ' card-context-del' : ''}`}>{context}</p>
+      <p className="card-diff">
+        {parts.map((p, i) => (
+          <span
+            key={i}
+            className={p.kind === 'del' ? 'diff-del' : p.kind === 'ins' ? 'diff-ins' : undefined}
+          >
+            {p.text}
+          </span>
+        ))}
+      </p>
       {suggestion.note && <Md text={suggestion.note} />}
       {suggestion.anchor.orphaned && (
         <p className="orphan-note">anchor text no longer found — accept is disabled</p>

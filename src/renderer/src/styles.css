@@ -410,6 +410,28 @@ kbd {
    9% wash is tuned for 17px prose and disappears here (#102). */
 /* Two classes, so it does not depend on sitting after `.card-context` —
    which sets the insertion color and is defined further down the file. */
+/* The diff inside a suggestion card. Unchanged words stay ordinary so the
+   eye lands on what actually differs; the operation carries the colour. */
+.card-diff {
+  margin: 0 0 6px;
+  font-family: var(--font-prose);
+  font-size: 13px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.card-diff .diff-del {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 70%, transparent);
+  text-decoration-thickness: 1.5px;
+  border-radius: 3px;
+}
+.card-diff .diff-ins {
+  background: color-mix(in srgb, var(--agent) 18%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--agent) 70%, transparent);
+  border-radius: 3px;
+}
+
 .card-context.card-context-del {
   color: var(--ink);
   background: color-mix(in srgb, var(--danger) 16%, transparent);
