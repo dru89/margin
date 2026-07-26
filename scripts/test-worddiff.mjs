@@ -60,12 +60,24 @@ t('irregular whitespace is preserved, not normalized',
   beforeText(wordDiff('a  b   c', 'a b c')), 'a  b   c');
 t('newlines survive', afterText(wordDiff('one\ntwo', 'one\ntwo\nthree')), 'one\ntwo\nthree');
 
-head('a rewrite is shown whole, not shredded');
+head('one suggestion stays one replacement');
+// A real diff anchors on the shared word and splits this into two edits,
+// which reads as two things you could take separately. You cannot.
+t('a shared word in the middle does not fragment it',
+  show('alpha and beta', 'gamma and delta'),
+  '[-alpha and beta-]{+gamma and delta+}');
+t('nor does a shared word inside a sentence',
+  show('Start the alpha and beta projects.', 'Start the gamma and delta projects.'),
+  'Start the [-alpha and beta -]{+gamma and delta +}projects.');
+t('repeated words do not create false anchors',
+  show('the cat and the dog', 'the bird and the fish'),
+  'the [-cat and the dog-]{+bird and the fish+}');
+
+head('large replacements need no special case');
 const long = Array.from({ length: 450 }, (_, i) => `w${i}`).join(' ');
 const other = Array.from({ length: 450 }, (_, i) => `v${i}`).join(' ');
 const big = wordDiff(long, other);
-t('past the token cap it degrades to one del and one ins',
-  big.map((p) => p.kind), ['del', 'ins']);
+t('a wholesale rewrite is one del and one ins', big.map((p) => p.kind), ['del', 'ins']);
 t('and still reassembles', [beforeText(big) === long, afterText(big) === other], [true, true]);
 
 rmSync(dir, { recursive: true, force: true });

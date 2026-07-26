@@ -339,13 +339,21 @@ are document- and anchor-scoped. Merging them would lose the anchor.
 
 ## 6. Suggestions: diff granularity and removals (#98, #102)
 
-**Diff within the suggestion, not across the anchor.** Today the whole
-anchored range renders struck and the whole replacement renders
-inserted, so `C+I → Commerce & Identity (C&I)` displays as two full
-clauses when three words changed. Compute a word-level diff between
-`anchor.quote` and `replacement` at render time and mark only the
-changed spans. **No schema change** — both strings are already stored;
-this is presentation.
+**Trim the suggestion; do not diff it.** The whole anchored range used
+to render struck with the whole replacement after it, so
+`C+I → Commerce & Identity (C&I)` displayed as two full clauses when
+three words changed. Strip the words the quote and the replacement share
+at each end and show everything between as **one** deletion and **one**
+insertion. No schema change — both strings are already stored.
+
+A real diff is wrong here rather than merely different. Replacing
+"alpha and beta" with "gamma and delta" shares the word *and*, and a
+diff anchors on it: `[alpha|gamma] and [beta|delta]`. That reads as two
+edits you could take separately, when a suggestion is one replacement
+you accept or reject whole — and a suggestion that fragments into five
+small swaps is harder to judge than the sentence it came from.
+
+Trimming also has no pathological case, so it needs no size cap.
 
 This is the same code path in the inline decoration and the sidebar
 card, and it is what #102 is really about: a pure deletion currently
