@@ -205,6 +205,21 @@ grouping by state breaks the spatial memory that makes a margin
 readable, and means a card moves when its state changes — the exact
 complaint in #88 about a comment sliding away after submission.
 
+**The filter is "needs you", not "unread".** Unread changes the moment
+the author looks at something, so a list filtered on it rearranges
+itself as it is read — cards vanish mid-click. Outstanding work is the
+stable question: a thread needs the author whenever the last word came
+from someone else, and only replying, resolving or deciding removes it.
+Reading is not responding.
+
+Unread remains as a *state* on the card — it says what is new, which is
+a different and still useful thing. It is simply not what a filter
+should be built on.
+
+**Whatever is selected stays visible**, even once it stops qualifying.
+Acting on a card should not make it disappear from under the cursor; it
+leaves the list when the author moves on.
+
 **Answer "what's new" with a summary bar, not with order.** A single
 row above the list:
 

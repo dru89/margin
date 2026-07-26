@@ -109,6 +109,29 @@ export function markSeen(t: CommentThread): CommentThread {
   return { ...t, seenRound: external };
 }
 
+/**
+ * Is this thread waiting on the author?
+ *
+ * True whenever the last word came from someone else — the agent, or a
+ * collaborator on a linked Doc. Note that *reading* a thread does not
+ * settle it: looking is not responding.
+ *
+ * This is deliberately a different question from `isUnread`. Unread is
+ * about what is new and changes the moment the author looks; "needs you"
+ * is about what is outstanding and changes only when they act. A filter
+ * built on unread rearranges itself as it is read, which is what made
+ * cards vanish mid-click.
+ */
+export function threadNeedsYou(t: CommentThread, currentRound: number): boolean {
+  const state = threadState(t, currentRound);
+  return state === 'unread' || state === 'read';
+}
+
+/** A suggestion waits on the author whenever it is undecided and not theirs. */
+export function suggestionNeedsYou(s: Suggestion, currentRound: number): boolean {
+  return suggestionState(s, currentRound) === 'pending' && s.author === 'agent';
+}
+
 export interface ReviewCounts {
   unread: number;
   draft: number;

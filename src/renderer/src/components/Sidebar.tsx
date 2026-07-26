@@ -4,7 +4,9 @@ import { useLocked, useStore } from '@/store';
 import {
   countThreads,
   latestActivity,
+  suggestionNeedsYou,
   suggestionState,
+  threadNeedsYou,
   threadState,
   type ThreadState,
 } from '@shared/reviewState';
@@ -460,7 +462,7 @@ export function Sidebar() {
   }, [activeAnchorId]);
 
   const currentRound = review?.round ?? 0;
-  const [onlyUnread, setOnlyUnread] = useState(false);
+  const [onlyNeedsYou, setOnlyNeedsYou] = useState(false);
 
   const { pendingSuggestions, openThreads, archived, counts } = useMemo(() => {
     const comments = review?.comments ?? [];
@@ -479,9 +481,11 @@ export function Sidebar() {
       },
       counts: {
         ...c,
-        // A pending suggestion is someone waiting on a decision, which is
-        // the same call on the author's attention as an unread thread.
-        unread: c.unread + pending.filter((s) => s.author === 'agent').length,
+        // Everything outstanding, threads and undecided suggestions alike —
+        // both are someone waiting on the author.
+        needsYou:
+          open.filter((t) => threadNeedsYou(t, currentRound)).length +
+          pending.filter((s) => suggestionNeedsYou(s, currentRound)).length,
         draft:
           c.draft + pending.filter((s) => suggestionState(s, currentRound) === 'draft').length,
       },
@@ -489,10 +493,14 @@ export function Sidebar() {
   }, [review, currentRound]);
 
   const archivedCount = archived.threads.length + archived.suggestions.length;
-  const isUnread = (t: CommentThread) => threadState(t, currentRound) === 'unread';
-  const shownThreads = onlyUnread ? openThreads.filter(isUnread) : openThreads;
-  const shownSuggestions = onlyUnread
-    ? pendingSuggestions.filter((s) => s.author === 'agent')
+  // The card being read stays put even once it stops qualifying, so the list
+  // never moves out from under a click.
+  const keep = (id: string, qualifies: boolean) => qualifies || id === activeAnchorId;
+  const shownThreads = onlyNeedsYou
+    ? openThreads.filter((t) => keep(t.id, threadNeedsYou(t, currentRound)))
+    : openThreads;
+  const shownSuggestions = onlyNeedsYou
+    ? pendingSuggestions.filter((s) => keep(s.id, suggestionNeedsYou(s, currentRound)))
     : pendingSuggestions;
 
   return (
@@ -503,24 +511,24 @@ export function Sidebar() {
       {(openThreads.length > 0 || pendingSuggestions.length > 0 || archivedCount > 0) && (
         <div className="review-summary">
           <div className="review-counts">
-            {counts.unread > 0 && <span><b>{counts.unread}</b> unread</span>}
+            {counts.needsYou > 0 && <span><b>{counts.needsYou}</b> need you</span>}
             {counts.draft > 0 && <span><b>{counts.draft}</b> queued</span>}
             {counts.awaiting > 0 && <span><b>{counts.awaiting}</b> awaiting</span>}
             {archivedCount > 0 && <span><b>{archivedCount}</b> settled</span>}
           </div>
-          {counts.unread > 0 && (
+          {counts.needsYou > 0 && (
             <div className="review-filters">
               <button
-                className={`btn btn-toggle${onlyUnread ? '' : ' on'}`}
-                onClick={() => setOnlyUnread(false)}
+                className={`btn btn-toggle${onlyNeedsYou ? '' : ' on'}`}
+                onClick={() => setOnlyNeedsYou(false)}
               >
                 All
               </button>
               <button
-                className={`btn btn-toggle${onlyUnread ? ' on' : ''}`}
-                onClick={() => setOnlyUnread(true)}
+                className={`btn btn-toggle${onlyNeedsYou ? ' on' : ''}`}
+                onClick={() => setOnlyNeedsYou(true)}
               >
-                Unread
+                Needs you
               </button>
             </div>
           )}
@@ -553,9 +561,10 @@ export function Sidebar() {
             ))}
           </section>
         )}
-        {onlyUnread && shownThreads.length === 0 && shownSuggestions.length === 0 && (
+        {onlyNeedsYou && shownThreads.length === 0 && shownSuggestions.length === 0 && (
           <p className="hint sidebar-filtered-empty">
-            Nothing unread. <button className="linkish" onClick={() => setOnlyUnread(false)}>Show all</button>
+            Nothing waiting on you.{' '}
+            <button className="linkish" onClick={() => setOnlyNeedsYou(false)}>Show all</button>
           </p>
         )}
         {archivedCount > 0 && (

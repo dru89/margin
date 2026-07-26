@@ -15,7 +15,8 @@ import { pathToFileURL } from 'url';
 const dir = mkdtempSync(path.join(tmpdir(), 'margin-state-'));
 const out = path.join(dir, 'reviewState.mjs');
 execFileSync('npx', ['esbuild', 'src/shared/reviewState.ts', '--format=esm', `--outfile=${out}`, '--log-level=error'], { stdio: 'inherit' });
-const { threadState, suggestionState, isUnread, markSeen, countThreads } = await import(pathToFileURL(out).href);
+const { threadState, suggestionState, isUnread, markSeen, countThreads, threadNeedsYou, suggestionNeedsYou } =
+  await import(pathToFileURL(out).href);
 
 let fails = 0;
 const t = (label, got, want) => {
@@ -65,6 +66,23 @@ t('yours, already sent', suggestionState(sug({ author: 'user', round: 3 }), 4), 
 t('the agent’s, awaiting you', suggestionState(sug(), 4), 'pending');
 t('accepted', suggestionState(sug({ status: 'accepted' }), 4), 'decided');
 t('rejected', suggestionState(sug({ status: 'rejected' }), 4), 'decided');
+
+head('needs you — outstanding, not merely new');
+// The point of this predicate over `unread`: reading is not responding, so
+// looking at a thread must not remove it from the list being worked through.
+{
+  const answered2 = thread({ round: 3, replies: [reply({ round: 4 })] });
+  t('the agent replied and you have not looked', threadNeedsYou(answered2, 4), true);
+  t('...and still after you look', threadNeedsYou(markSeen(answered2), 4), true);
+  t('until you reply', threadNeedsYou(markSeen({ ...answered2, replies: [reply({ round: 4 }), reply({ author: 'user', round: 4 })] }), 4), false);
+  t('a thread you are waiting on does not need you', threadNeedsYou(thread({ round: 3 }), 4), false);
+  t('your own unsent draft does not need you', threadNeedsYou(thread({ round: 4 }), 4), false);
+  t('a resolved thread does not need you', threadNeedsYou({ ...answered2, status: 'resolved' }, 4), false);
+  t('a collaborator waiting on you', threadNeedsYou(thread({ provenance: 'imported', round: 4 }), 4), true);
+  t("the agent's undecided suggestion", suggestionNeedsYou(sug(), 4), true);
+  t('once decided', suggestionNeedsYou(sug({ status: 'accepted' }), 4), false);
+  t('your own draft suggestion', suggestionNeedsYou(sug({ author: 'user', round: 4 }), 4), false);
+}
 
 head('counts');
 const counts = countThreads([thread({ round: 4 }), answered, { ...answered, status: 'resolved' }, thread({ round: 1 })], 4);
