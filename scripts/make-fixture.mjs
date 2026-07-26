@@ -59,7 +59,11 @@ const at = (quote) => {
 };
 const iso = (daysAgo) => new Date(Date.now() - daysAgo * 864e5).toISOString();
 
-const ROUND = 5; // the round being drafted now
+// `review.round` increments at the top of submitReview, so a completed
+// turn's output carries the *current* round — the agent answering round 5
+// stamps its replies 5, and the author's next drafts are 5 as well. A
+// fixture with the agent one round behind models a state that cannot occur.
+const ROUND = 5;
 
 const comments = [
   {
@@ -77,7 +81,7 @@ const comments = [
     text: 'Can we prove the rotation shipped before February?',
     anchor: at('PagerDuty rotation'),
     replies: [{
-      id: 'rp-1', author: 'agent', round: 4, createdAt: iso(1),
+      id: 'rp-1', author: 'agent', round: ROUND, createdAt: iso(1),
       text: 'Found the evidence — the rotation predates the Super Bowl by three weeks. Worth saying so explicitly; "before" undersells it.',
     }],
     status: 'open',
@@ -101,7 +105,7 @@ const comments = [
       { id: 'rp-l2', author: 'user', round: 2, createdAt: iso(6), text: 'Tried that — it reads like bragging without the artefacts to back it.' },
       { id: 'rp-l3', author: 'agent', round: 2, createdAt: iso(6), text: 'Then keep the list but compress it to one clause.' },
       { id: 'rp-l4', author: 'user', round: 3, createdAt: iso(4), text: 'Closer. Can we get the P1 numbers in there?' },
-      { id: 'rp-l5', author: 'agent', round: 4, createdAt: iso(1), text: 'Added them from the PagerDuty export — proposed as an edit.' },
+      { id: 'rp-l5', author: 'agent', round: ROUND, createdAt: iso(1), text: 'Added them from the PagerDuty export — proposed as an edit.' },
     ],
     status: 'open',
   },
@@ -134,18 +138,18 @@ const comments = [
 
 const suggestions = [
   {
-    id: 'sg-edit', author: 'agent', round: 4, createdAt: iso(1),
+    id: 'sg-edit', author: 'agent', round: ROUND, createdAt: iso(1),
     anchor: at('moved from C+I, where'),
     replacement: 'moved from Commerce & Identity (C&I), where',
     note: 'Spell out on first use.', status: 'pending',
   },
   {
-    id: 'sg-del', author: 'agent', round: 4, createdAt: iso(1),
+    id: 'sg-del', author: 'agent', round: ROUND, createdAt: iso(1),
     anchor: at(', and it was well received internally'),
     replacement: '', note: 'Unsupported claim — no evidence in the document.', status: 'pending',
   },
   {
-    id: 'sg-edit2', author: 'agent', round: 4, createdAt: iso(1),
+    id: 'sg-edit2', author: 'agent', round: ROUND, createdAt: iso(1),
     anchor: at('the C+I roadmap review'),
     replacement: 'the C&I roadmap review',
     note: 'Same rename as above.', status: 'pending',

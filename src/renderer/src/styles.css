@@ -432,6 +432,43 @@ kbd {
   font-size: 12px;
   color: var(--ink-soft);
 }
+/* ——— round header (spec §5) ——— */
+.round-header {
+  border: 1px solid color-mix(in srgb, var(--agent) 40%, var(--rule));
+  background: color-mix(in srgb, var(--agent) 8%, var(--paper-raised));
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.round-header-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.round-header strong { font-size: 12.5px; }
+.round-header p { margin: 3px 0 9px; font-size: 12.5px; color: var(--ink-soft); }
+.round-dismiss {
+  background: none; border: 0; padding: 0 2px; cursor: pointer;
+  color: var(--ink-faint); font-size: 13px; line-height: 1;
+}
+.round-dismiss:hover { color: var(--ink); }
+.round-jumps { display: flex; flex-wrap: wrap; gap: 6px; }
+.round-jump {
+  font: inherit;
+  font-size: 11.5px;
+  max-width: 100%;
+  padding: 3px 9px;
+  border-radius: 20px;
+  cursor: pointer;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--agent) 45%, transparent);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  transition: background 0.14s ease;
+}
+.round-jump:hover { background: color-mix(in srgb, var(--agent) 16%, transparent); }
+
 /* Facts, then the control beneath them. */
 .review-counts { display: flex; flex-wrap: wrap; gap: 2px 6px; }
 .review-counts b { color: var(--ink); font-variant-numeric: tabular-nums; }

@@ -3,6 +3,8 @@ import type { CommentThread, Suggestion } from '@shared/types';
 import { useLocked, useStore } from '@/store';
 import {
   countThreads,
+  isUnread,
+  latestExternalRound,
   latestActivity,
   suggestionNeedsYou,
   suggestionState,
@@ -447,6 +449,76 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
   );
 }
 
+/**
+ * What the last completed round produced, with a way into each piece
+ * (spec §5, #103).
+ *
+ * A turn writes to two surfaces: prose lands in the project discussion
+ * dock, per-thread replies and suggestions land here. Claude ends up
+ * writing "see my thread reply" and the reply is somewhere else — so the
+ * prose stays where it is, and this gives the sidebar its own record that
+ * a turn happened, with jump links.
+ *
+ * It clears itself once every item in it has been dealt with, so it never
+ * has to be dismissed to get out of the way.
+ */
+function RoundHeader() {
+  const review = useStore((s) => s.review);
+  const setActiveAnchor = useStore((s) => s.setActiveAnchor);
+  const markThreadSeen = useStore((s) => s.markThreadSeen);
+  const [dismissed, setDismissed] = useState<number | null>(null);
+
+  const round = review?.round ?? 0;
+  const answered = (review?.comments ?? []).filter(
+    (c) => c.status === 'open' && latestExternalRound(c) === round,
+  );
+  const proposed = (review?.suggestions ?? []).filter(
+    (s) => s.round === round && s.author === 'agent',
+  );
+  const outstanding =
+    answered.some((c) => isUnread(c)) || proposed.some((s) => s.status === 'pending');
+
+  if (round === 0 || dismissed === round || !outstanding) return null;
+
+  const go = (id: string, seen?: string) => {
+    setActiveAnchor(id);
+    if (seen) markThreadSeen(seen);
+  };
+  const parts = [
+    answered.length > 0 && `replied to ${answered.length} ${answered.length === 1 ? 'thread' : 'threads'}`,
+    proposed.length > 0 && `proposed ${proposed.length} ${proposed.length === 1 ? 'edit' : 'edits'}`,
+  ].filter(Boolean);
+
+  return (
+    <div className="round-header">
+      <div className="round-header-top">
+        <strong>Round {round}</strong>
+        <button
+          className="round-dismiss"
+          aria-label="Dismiss"
+          title="Dismiss"
+          onClick={() => setDismissed(round)}
+        >
+          ✕
+        </button>
+      </div>
+      <p>Claude {parts.join(' and ')}.</p>
+      <div className="round-jumps">
+        {answered.map((c) => (
+          <button key={c.id} className="round-jump" onClick={() => go(c.id, c.id)}>
+            ↳ “{c.anchor.quote.length > 26 ? `${c.anchor.quote.slice(0, 25)}…` : c.anchor.quote}”
+          </button>
+        ))}
+        {proposed.length > 0 && (
+          <button className="round-jump" onClick={() => go(proposed[0].id)}>
+            {proposed.length} {proposed.length === 1 ? 'suggestion' : 'suggestions'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function Sidebar() {
   const review = useStore((s) => s.review);
   const setThreadStatus = useStore((s) => s.setThreadStatus);
@@ -543,6 +615,7 @@ export function Sidebar() {
         </div>
       )}
       <div className="review-scroll">
+        <RoundHeader />
         <Composer />
         {pendingSuggestions.length === 0 && openThreads.length === 0 && (
           <div className="sidebar-empty">
