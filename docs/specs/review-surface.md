@@ -148,8 +148,19 @@ only by a 40% versus 55% border tint, which is invisible.
 wrap among themselves and the action never moves: a thread carrying a
 state label, an orphan badge, and a round stamp used to push Resolve onto
 a line of its own, so the card reported its own width rather than its
-state. When the row runs out of room the round stamp drops to a second
-line, which is the right thing to lose.
+state.
+
+**Every card carries a locator, and it is the elastic fact.** Read is the
+state with no label, and its round stamp is usually suppressed as
+redundant — which left the head of a thread you had just read empty but
+for a right-floated Resolve. That reads as something having failed to
+render rather than as a card with nothing to declare, and it is the
+common case, not an edge one: it is where every thread lands the moment
+you read this round's reply. The locator (`¶ nearest heading`) is true of
+every card in every state, and suggestion cards already carried it. It
+takes whatever width the labels and stamps leave and truncates rather
+than wrapping, so adding it costs no height: state and round win the room
+when they need it, and the section name gives way.
 
 **The spine stays inside the card.** It sits within the border rather
 than straddling it — an edge hanging past the rounded corners draws the

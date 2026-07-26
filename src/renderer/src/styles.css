@@ -855,6 +855,17 @@ kbd {
   min-width: 0;
   flex: 1 1 auto;
 }
+/* The locator is the elastic fact: it takes whatever room the labels and
+   stamps leave and truncates, rather than wrapping the head onto a second
+   line. Two classes, so it beats the plain `.card-locator` rule that
+   right-aligns it on a suggestion card. */
+.card-facts > .card-locator {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .card-head.card-head-split > .btn-ghost,
 .card-head.card-head-split > .resolve-wrap { margin-left: 0; flex: 0 0 auto; }
 

@@ -594,6 +594,7 @@ function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
 
 function ThreadCard({ thread }: { thread: CommentThread }) {
   const locked = useLocked();
+  const content = useStore((s) => s.content);
   const replyTo = useStore((s) => s.replyToThread);
   const editComment = useStore((s) => s.editComment);
   const deleteComment = useStore((s) => s.deleteComment);
@@ -668,6 +669,14 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
           {thread.anchor.orphaned && <span className="badge">Text gone</span>}
           {imported && <span className="chip chip-source" title="Imported from the linked Google Doc">Docs</span>}
           <RoundStamp round={last.round} at={thread.createdAt} />
+          {/* Where in the document this is, the same fact a suggestion
+              card has always carried. A thread whose state is Read has no
+              label and often no stamp either, which left the head empty
+              but for a right-floated Resolve — that reads as something
+              having failed to render rather than as a card with nothing
+              to declare. The locator is true of every card, so the head
+              has a left-hand fact in every state. */}
+          <span className="card-locator">{locatorFor(content, thread.anchor.from)}</span>
         </span>
         {imported ? (
           <span className="resolve-wrap">
