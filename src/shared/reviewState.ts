@@ -162,6 +162,71 @@ export function suggestionEditable(s: Suggestion, currentRound: number): boolean
   return suggestionState(s, currentRound) === 'draft';
 }
 
+/**
+ * Links between a comment and the edits that answer it (spec §7, #100).
+ *
+ * All derived from `Suggestion.inReplyTo`, the only place the link is
+ * stored. Each of these returns a fresh array — never call one from
+ * inside a zustand selector, or the renderer re-renders forever
+ * (React #185). Derive after selecting.
+ */
+export function linkedSuggestions(suggestions: Suggestion[], threadId: string): Suggestion[] {
+  return suggestions.filter((s) => s.inReplyTo === threadId);
+}
+
+export function linkedThread(
+  comments: CommentThread[],
+  suggestion: Suggestion,
+): CommentThread | undefined {
+  return suggestion.inReplyTo
+    ? comments.find((c) => c.id === suggestion.inReplyTo)
+    : undefined;
+}
+
+export interface LinkSummary {
+  /** Still asking something of the author. */
+  pending: Suggestion[];
+  accepted: number;
+  rejected: number;
+}
+
+/**
+ * How a thread's linked edits stand.
+ *
+ * Pending and decided are split because they read differently: pending
+ * rows are work, and decided ones are a record. Deciding every linked
+ * edit deliberately does not resolve the thread — the edits being
+ * handled is not evidence the comment is answered — so the decided
+ * count stays visible as the evidence the author would resolve *on*.
+ */
+export function linkSummary(suggestions: Suggestion[], threadId: string): LinkSummary {
+  const linked = linkedSuggestions(suggestions, threadId);
+  return {
+    pending: linked.filter((s) => s.status === 'pending'),
+    accepted: linked.filter((s) => s.status === 'accepted').length,
+    rejected: linked.filter((s) => s.status === 'rejected').length,
+  };
+}
+
+/**
+ * Validate an agent-supplied `in_reply_to` before it is stored.
+ *
+ * The agent writes this id, so it is untrusted input in the same sense
+ * an agent-supplied path is. The check is deliberately narrow: reject
+ * only what would be *false* — an id naming no thread in this document.
+ * A link to a resolved thread is unusual but true, and refusing it would
+ * throw away a correct edit over a judgement call that is the author's.
+ */
+export function validateInReplyTo(
+  comments: CommentThread[],
+  id: string | undefined,
+): { threadId?: string } | { error: string } {
+  if (id === undefined || id === '') return {};
+  return comments.some((c) => c.id === id)
+    ? { threadId: id }
+    : { error: `no comment thread with id ${id} on this document` };
+}
+
 export interface ReviewCounts {
   unread: number;
   draft: number;

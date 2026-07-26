@@ -68,6 +68,20 @@ export interface Suggestion {
   replacement: string;
   /** The author's rationale for the change. */
   note?: string;
+  /**
+   * Id of the comment thread this edit answers (spec §7, #100).
+   *
+   * The link lives here and only here, which gives both directions from
+   * one place: a thread's linked edits are found by scanning suggestions
+   * for its id. A second field on the thread would be a second source of
+   * truth, and the two ends could disagree.
+   *
+   * One comment producing several edits is the multiplicity that occurs
+   * ("change every C+I to C&I"), and N suggestions carrying the same
+   * thread id express it. One edit answering several comments is rare
+   * enough not to model, and a single id keeps the render unambiguous.
+   */
+  inReplyTo?: string;
   status: SuggestionStatus;
   /** Optional comment left by the user when accepting/rejecting. */
   decisionComment?: string;

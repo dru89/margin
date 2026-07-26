@@ -1448,3 +1448,57 @@ worth revisiting if it bites.
 **An empty composer is not parked.** Leaving a document with nothing
 typed is what closing the composer means, and a composer that reopens by
 itself on return is a surprise rather than a courtesy.
+
+## 69. An edit links to the comment it answers, and the agent sets it (#100)
+
+Claude often replies to a comment *and* proposes an edit. Those were two
+unrelated objects that referenced each other only in prose — which is why
+it wrote "see my thread reply", and why #100 read as a layout problem
+when it was a data one. The tools could not express the relationship, so
+it got expressed in English, and English does not render.
+
+**One optional field, on the suggestion.** `inReplyTo` holds a thread id,
+and that gives both directions from one place: a thread's linked edits
+are found by scanning suggestions for its id. A second field on the
+thread would be a second source of truth and the two ends could
+disagree. One comment producing several edits is the multiplicity that
+actually occurs ("change every C+I to C&I"), and N suggestions carrying
+one thread id express it; one edit answering several comments is rare
+enough not to model.
+
+**The agent sets it**, through an optional `in_reply_to` on
+`suggest_edit`, because the agent is the one proposing an edit in answer
+to a thread. That makes the id untrusted input in the same sense an
+agent-supplied path is, so it is validated before it is stored — and the
+validation is deliberately **narrow: reject only what would be false**,
+an id naming no thread on this document. A link to a *resolved* thread is
+unusual but true, and refusing it would throw away a correct edit over a
+judgement call that belongs to the author. The check runs before the
+quote is resolved, so a call that gets both wrong reports both in one
+round trip.
+
+**Link, don't merge; pointers, not nesting.** The cards stay separate and
+each keeps its own position in document order. Nesting would have made a
+card sort somewhere other than its own anchor — the first exception to
+the document-order rule, and every later feature would have cited it.
+Instead each card carries a row pointing at its counterpart, and hovering
+that row lights the counterpart card *and* its text in the document,
+because it raises the same hover the pair already uses. Focusing a card
+lights its counterpart too, one step quieter than hover or selected so it
+answers "where is the other one" without competing with what is being
+read.
+
+**Deciding every linked edit does not resolve the thread, and does not
+offer to.** The edits being handled is not evidence the comment is
+answered — the author may have meant something broader than the edits
+Claude found. What changes is that the rows stop being work: decided ones
+collapse into one muted line recording what happened rather than
+vanishing, because that line is the evidence the author would resolve
+*on*.
+
+**"Accept all" is still not built.** It is the obvious affordance once N
+edits hang off one instruction, and it is a bulk irreversible action over
+changes that may be spread across more document than fits on screen. #128
+made a single accept recoverable, which was its prerequisite; it should
+still be designed on its own rather than as a rider on the model it
+depends on.

@@ -11,6 +11,7 @@ import type {
   Suggestion,
 } from '@shared/types';
 import { resolveQuote, makeAnchor } from '@shared/anchors';
+import { validateInReplyTo } from '@shared/reviewState';
 import type { DocumentSession } from './session';
 import { addProposal, loadProposals, validateProposalPath } from './proposalsStore';
 
@@ -160,11 +161,21 @@ function buildReviewServer(sdk: AgentSdk, session: DocumentSession) {
           quote: z.string().describe('Exact text from the document to replace'),
           replacement: z.string().describe('The new text (empty string deletes the quoted text)'),
           note: z.string().describe('One or two sentences explaining why'),
+          in_reply_to: z
+            .string()
+            .optional()
+            .describe(
+              'Id of the comment thread this edit answers, when it answers one. Margin shows the two together; do not describe the link in prose instead.',
+            ),
         },
         async (args) => {
           if (args.quote === args.replacement) {
             return ok('Error: replacement is identical to the quote.');
           }
+          // Checked before the quote so a bad link is reported even when
+          // the quote is also wrong — one round trip, both problems.
+          const link = validateInReplyTo(session.review.comments, args.in_reply_to);
+          if ('error' in link) return ok(`Error: ${link.error}. Use list_review_state for the ids.`);
           const found = resolveQuote(session.content, args.quote);
           if (!found) {
             return ok(
@@ -179,6 +190,7 @@ function buildReviewServer(sdk: AgentSdk, session: DocumentSession) {
             anchor: makeAnchor(session.content, found.from, found.to),
             replacement: args.replacement,
             note: args.note,
+            inReplyTo: link.threadId,
             status: 'pending',
           };
           await session.mutateReview((r) => r.suggestions.push(suggestion));
@@ -212,7 +224,7 @@ convention the author prefers, project context that lives in no document.
 
 How to work:
 1. Read the document with read_document, and the existing threads/suggestions with list_review_state. Consult your working notes.
-2. Address every open comment thread: reply with reply_to_comment. If a comment asks for a change, also propose it concretely with suggest_edit.
+2. Address every open comment thread: reply with reply_to_comment. If a comment asks for a change, also propose it concretely with suggest_edit, passing that thread's id as in_reply_to so Margin can show the edit beside the comment it answers. One comment often needs several edits ("change every X to Y") — link each of them to it.
 3. Treat inline "(TK: ...)" markers in the document text as author notes written outside this app — respond to them (add_comment anchored to the marker), and when you can, propose a suggest_edit replacing the marker with real text. In-app comments are the primary channel; TK markers are a fallback.
 4. Propose your own improvements as suggestions (suggest_edit) and observations as comments (add_comment).
 

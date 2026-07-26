@@ -133,6 +133,16 @@ const comments = [
     replies: [], status: 'open',
   },
   {
+    id: 'th-naming', author: 'user', round: 3, createdAt: iso(2), seenRound: 3,
+    text: 'Use the full name on first mention and be consistent — "C+I" is wrong everywhere.',
+    anchor: at('moved from C+I'),
+    replies: [{
+      id: 'rp-n1', author: 'agent', round: ROUND, createdAt: iso(1),
+      text: 'Agreed. Proposed both occurrences as edits.',
+    }],
+    status: 'open',
+  },
+  {
     id: 'th-docs', author: 'user', round: 4, createdAt: iso(1),
     text: 'Should this mention the training numbers? — from the shared Doc',
     anchor: at('training program'), provenance: 'imported',
@@ -150,7 +160,7 @@ const suggestions = [
     id: 'sg-edit', author: 'agent', round: ROUND, createdAt: iso(1),
     anchor: at('moved from C+I, where'),
     replacement: 'moved from Commerce & Identity (C&I), where',
-    note: 'Spell out on first use.', status: 'pending',
+    note: 'Spell out on first use.', status: 'pending', inReplyTo: 'th-naming',
   },
   {
     id: 'sg-del', author: 'agent', round: ROUND, createdAt: iso(1),
@@ -161,7 +171,7 @@ const suggestions = [
     id: 'sg-edit2', author: 'agent', round: ROUND, createdAt: iso(1),
     anchor: at('the C+I roadmap review'),
     replacement: 'the C&I roadmap review',
-    note: 'Same rename as above.', status: 'pending',
+    note: 'Same rename as above.', status: 'pending', inReplyTo: 'th-naming',
   },
   {
     id: 'sg-draft', author: 'user', round: ROUND, createdAt: iso(0),
@@ -183,7 +193,7 @@ const suggestions = [
   {
     id: 'sg-accepted', author: 'agent', round: 3, createdAt: iso(4),
     anchor: at('Getting it unstuck meant'), replacement: 'Getting it unstuck meant',
-    note: 'Tightened the transition.', status: 'accepted',
+    note: 'Tightened the transition.', status: 'accepted', inReplyTo: 'th-long',
   },
   {
     id: 'sg-rejected', author: 'agent', round: 3, createdAt: iso(4),

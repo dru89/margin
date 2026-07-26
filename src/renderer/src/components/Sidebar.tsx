@@ -6,6 +6,8 @@ import {
   isUnread,
   latestExternalRound,
   latestActivity,
+  linkSummary,
+  linkedSuggestions,
   replyEditable,
   suggestionEditable,
   suggestionNeedsYou,
@@ -191,13 +193,130 @@ function useRevisionOpen(key: string | null | false): void {
   }, [key, setRevisionOpen]);
 }
 
-function usePair(id: string, anchor: { from: number; to: number; orphaned?: boolean }) {
+/**
+ * The edits that answer a thread (spec §7).
+ *
+ * Pending ones are work and get a row each; several collapse under one
+ * expandable summary rather than becoming a stack of chips. Decided ones
+ * are a record, not a call to action, so they shrink to one muted line —
+ * kept rather than removed, because that line is the evidence the author
+ * would resolve the thread on. Deciding them never resolves it.
+ */
+function LinkedEdits({ threadId }: { threadId: string }) {
+  const suggestions = useStore((s) => s.review?.suggestions);
+  const [expanded, setExpanded] = useState(false);
+  const { pending, accepted, rejected } = useMemo(
+    () => linkSummary(suggestions ?? [], threadId),
+    [suggestions, threadId],
+  );
+  if (pending.length === 0 && accepted + rejected === 0) return null;
+
+  // "1 accepted" on its own says nothing about what — it has to name
+  // edits and keep the ↳ so it reads as the same family as the rows
+  // above it, only settled.
+  const edits = (n: number) => `${n} ${n === 1 ? 'edit' : 'edits'}`;
+  const decided =
+    accepted > 0 && rejected > 0
+      ? `↳ ${accepted} accepted, ${rejected} rejected`
+      : accepted > 0
+        ? `↳ ${edits(accepted)} accepted`
+        : rejected > 0
+          ? `↳ ${edits(rejected)} rejected`
+          : '';
+
+  return (
+    <div className="card-links">
+      {pending.length === 1 && (
+        <PointerRow id={pending[0].id} anchor={pending[0].anchor}>
+          ↳ answered by an edit to “{brief(pending[0].anchor.quote)}”
+        </PointerRow>
+      )}
+      {pending.length > 1 && !expanded && (
+        <button
+          className="pointer-row"
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded(true);
+          }}
+        >
+          ↳ answered by {pending.length} edits
+        </button>
+      )}
+      {pending.length > 1 &&
+        expanded &&
+        pending.map((s) => (
+          <PointerRow key={s.id} id={s.id} anchor={s.anchor}>
+            ↳ “{brief(s.anchor.quote)}”
+          </PointerRow>
+        ))}
+      {decided && <p className="card-links-decided">{decided}</p>}
+    </div>
+  );
+}
+
+/** Shorten a quote for a pointer row — enough to say *where*, not what. */
+const brief = (text: string, max = 30) =>
+  text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+
+/**
+ * A row pointing at the card's counterpart (spec §7, #100).
+ *
+ * Clicking jumps; hovering lights the counterpart card *and* its text in
+ * the document, because it raises the same hover the pair already uses.
+ * That is the "glance for free, jump when you want the detail" half of
+ * the design — you see the relationship without leaving where you are.
+ */
+function PointerRow({
+  id,
+  anchor,
+  children,
+  muted,
+}: {
+  id: string;
+  anchor: Anchor;
+  children: React.ReactNode;
+  muted?: boolean;
+}) {
+  const focusAnchor = useStore((s) => s.focusAnchor);
+  const setHoveredAnchor = useStore((s) => s.setHoveredAnchor);
+  return (
+    <button
+      className={`pointer-row${muted ? ' pointer-row-muted' : ''}`}
+      onMouseEnter={() => setHoveredAnchor(id)}
+      onMouseLeave={() => setHoveredAnchor(null)}
+      onClick={(e) => {
+        e.stopPropagation();
+        focusAnchor(id);
+        if (!anchor.orphaned) revealRange(anchor.from, anchor.to);
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function usePair(
+  id: string,
+  anchor: { from: number; to: number; orphaned?: boolean },
+  /** Counterpart card ids, so focusing one end lights the other (spec §7). */
+  linkedIds: string[] = [],
+) {
   const focusAnchor = useStore((s) => s.focusAnchor);
   const setHoveredAnchor = useStore((s) => s.setHoveredAnchor);
   const active = useStore((s) => s.activeAnchorId === id);
   const hot = useStore((s) => s.hoveredAnchorId === id);
+  // Booleans, not the matching ids: a selector returning a fresh array
+  // re-renders forever (React #185).
+  const linkActive = useStore(
+    (s) => s.activeAnchorId !== null && linkedIds.includes(s.activeAnchorId),
+  );
+  const linkHot = useStore(
+    (s) => s.hoveredAnchorId !== null && linkedIds.includes(s.hoveredAnchorId),
+  );
   return {
-    classes: `${active ? ' pair-active' : ''}${hot ? ' pair-hot' : ''}`,
+    classes: `${active ? ' pair-active' : ''}${hot ? ' pair-hot' : ''}${
+      !active && (linkActive || linkHot) ? ' pair-linked' : ''
+    }`,
     props: {
       onMouseEnter: () => setHoveredAnchor(id),
       onMouseLeave: () => setHoveredAnchor(null),
@@ -301,7 +420,15 @@ function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
   const reject = useStore((s) => s.rejectSuggestion);
   const editSuggestion = useStore((s) => s.editSuggestion);
   const deleteSuggestion = useStore((s) => s.deleteSuggestion);
-  const pair = usePair(suggestion.id, suggestion.anchor);
+  const comments = useStore((s) => s.review?.comments);
+  const answers = suggestion.inReplyTo
+    ? comments?.find((c) => c.id === suggestion.inReplyTo)
+    : undefined;
+  const pair = usePair(
+    suggestion.id,
+    suggestion.anchor,
+    suggestion.inReplyTo ? [suggestion.inReplyTo] : [],
+  );
   const [rejecting, setRejecting] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
   const [editing, setEditing] = useState<{ replacement: string; note: string } | null>(null);
@@ -408,6 +535,13 @@ function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
         </p>
       )}
       {suggestion.note && !editing && <Md text={suggestion.note} />}
+      {/* What this edit is an answer to. A link the agent set, rather than
+          the sentence "see my thread reply" it used to write instead. */}
+      {answers && !editing && (
+        <PointerRow id={answers.id} anchor={answers.anchor}>
+          ↳ answers “{brief(answers.text, 42)}”
+        </PointerRow>
+      )}
       {suggestion.anchor.orphaned && (
         <p className="orphan-note">anchor text no longer found — accept is disabled</p>
       )}
@@ -466,7 +600,12 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
   const editReply = useStore((s) => s.editReply);
   const deleteReply = useStore((s) => s.deleteReply);
   const setThreadStatus = useStore((s) => s.setThreadStatus);
-  const pair = usePair(thread.id, thread.anchor);
+  const suggestions = useStore((s) => s.review?.suggestions);
+  const linkedIds = useMemo(
+    () => linkedSuggestions(suggestions ?? [], thread.id).map((s) => s.id),
+    [suggestions, thread.id],
+  );
+  const pair = usePair(thread.id, thread.anchor, linkedIds);
   const [reply, setReply] = useState('');
   // 'body', or a reply id. One at a time, and the reply box steps aside
   // while it is open — two composers in one card is a guess about which
@@ -651,6 +790,7 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
           />
         );
       })}
+      <LinkedEdits threadId={thread.id} />
       <div
         className="card-replybox"
         hidden={editingId !== null}

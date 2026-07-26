@@ -18,6 +18,7 @@ execFileSync('npx', ['esbuild', 'src/shared/reviewState.ts', '--format=esm', `--
 const {
   threadState, suggestionState, isUnread, markSeen, countThreads, threadNeedsYou,
   suggestionNeedsYou, threadEditable, replyEditable, suggestionEditable,
+  validateInReplyTo, linkedSuggestions, linkSummary,
 } = await import(pathToFileURL(out).href);
 
 let fails = 0;
@@ -159,6 +160,34 @@ t('your suggestion, already sent', suggestionEditable(sug({ author: 'user', roun
 t('the agent’s suggestion', suggestionEditable(sug({ round: 4 }), 4), false);
 t('your suggestion, already decided',
   suggestionEditable(sug({ author: 'user', round: 4, status: 'accepted' }), 4), false);
+
+head('linking an edit to the comment it answers (spec §7, #100)');
+const threads = [thread({ id: 't1' }), thread({ id: 't2', status: 'resolved' })];
+const link = (o) => sug({ author: 'agent', round: 4, ...o });
+// The agent writes this id, so it is untrusted in the same sense a path is.
+// The check is narrow on purpose: reject only what would be false.
+t('no link at all is fine', 'error' in validateInReplyTo(threads, undefined), false);
+t('an empty string is no link', JSON.stringify(validateInReplyTo(threads, '')), '{}');
+t('a thread on this document', validateInReplyTo(threads, 't1').threadId, 't1');
+t('an id naming nothing', 'error' in validateInReplyTo(threads, 'nope'), true);
+// Unusual but true, and refusing it would throw away a correct edit over a
+// judgement call that belongs to the author.
+t('a resolved thread is still a real thread', validateInReplyTo(threads, 't2').threadId, 't2');
+
+const linked = [
+  link({ id: 's1', inReplyTo: 't1' }),
+  link({ id: 's2', inReplyTo: 't1', status: 'accepted' }),
+  link({ id: 's3', inReplyTo: 't1', status: 'rejected' }),
+  link({ id: 's4', inReplyTo: 't2' }),
+  link({ id: 's5' }),
+];
+t('one comment, many edits', linkedSuggestions(linked, 't1').map((s) => s.id).join(','), 's1,s2,s3');
+t('an unlinked edit belongs to no thread', linkedSuggestions(linked, 'tX').length, 0);
+// Pending and decided are split because they read differently: rows that
+// are work, versus a record of what happened.
+t('pending are the ones still asking', linkSummary(linked, 't1').pending.map((s) => s.id).join(','), 's1');
+t('decided are counted, not listed',
+  `${linkSummary(linked, 't1').accepted}/${linkSummary(linked, 't1').rejected}`, '1/1');
 
 rmSync(dir, { recursive: true, force: true });
 console.log(fails === 0 ? '\nAll review-state cases pass.' : `\n${fails} FAILING`);
