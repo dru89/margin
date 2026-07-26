@@ -38,7 +38,7 @@ head('escaping the workspace');
 t('parent traversal', await err('../outside.md'), 'rejected');
 t('traversal in the middle', await err('docs/../../outside.md'), 'rejected');
 t('traversal that normalizes back inside is still refused', await err('docs/../notes.md'), 'notes.md');
-// Current behaviour, not an endorsement: the leading slash is stripped, so
+// Current behavior, not an endorsement: the leading slash is stripped, so
 // this stays inside the workspace but lands somewhere the agent did not ask
 // for, with no error telling it so. Contained, and still gated by Accept —
 // see #133 for whether it should be refused outright instead.

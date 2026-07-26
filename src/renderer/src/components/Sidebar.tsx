@@ -450,7 +450,7 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
 }
 
 /**
- * Take the reader to a card: centre it, mark the passage in the document,
+ * Take the reader to a card: center it, mark the passage in the document,
  * and pulse the card so it is obvious which one arrived.
  *
  * Imperative on purpose. Driving this from an effect keyed on the active
@@ -469,7 +469,7 @@ function focusCard(id: string): void {
     const accent = getComputedStyle(document.documentElement).getPropertyValue('--user').trim();
     // Grows in, then dissolves at full width rather than shrinking back —
     // a ring collapsing to nothing is what made this read as a cut. The
-    // colour is soft and the exit is long; the eye should catch it without
+    // color is soft and the exit is long; the eye should catch it without
     // being snapped at.
     el.animate(
       [
@@ -481,7 +481,7 @@ function focusCard(id: string): void {
     );
   };
   // Wait for the smooth scroll to land. Firing both at once means the pulse
-  // peaks while the card is still travelling — usually off-screen — and is
+  // peaks while the card is still traveling — usually off-screen — and is
   // over before it arrives.
   const scroller = el.closest('.review-scroll');
   if (!scroller) return pulse();

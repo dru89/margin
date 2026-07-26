@@ -149,12 +149,12 @@ npx electron . --remote-debugging-port=9224 "path/to/doc.md" &   # background
 - **CodeMirror theme injection wins over the stylesheet** for same-specificity
   rules (CM injects later). If a CM default style won't die, remove the
   extension (as done for `highlightActiveLine`) or raise specificity.
-- **`styles.css` is long enough that source order is not a defence.** A new
+- **`styles.css` is long enough that source order is not a defense.** A new
   single-class rule loses to an existing single-class rule defined further
   down, silently. This has bitten three times: `.cm-selectionMatch` (dead
   for months, matches painted CodeMirror's green), the review-state spine
   (`.card::before` is defined late, so the whole state vocabulary rendered
-  as the old pair-accent), and `.card-context-del` (the insertion colour
+  as the old pair-accent), and `.card-context-del` (the insertion color
   won, so deleted text stayed green). Win on **specificity** — two classes,
   or a custom property the base rule reads — not on where the rule sits.
   And verify the computed value, not that the class is present.
