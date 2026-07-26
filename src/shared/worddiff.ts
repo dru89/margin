@@ -55,11 +55,46 @@ export function wordDiff(before: string, after: string): DiffPart[] {
     tail++;
   }
 
+  let before2 = a.slice(head, a.length - tail).join('');
+  let after2 = b.slice(head, b.length - tail).join('');
+  let lead = a.slice(0, head).join('');
+  let trail = a.slice(a.length - tail).join('');
+
+  // Whitespace that both sides share is unchanged, so it belongs outside
+  // the marked spans. Leaving it in strikes and re-underlines a space that
+  // was never touched, and the highlight stops matching the words that
+  // actually differ.
+  //
+  // Only when *both* sides have it: inserting a word into a sentence adds
+  // a space as well as a word, and that space really is new.
+  if (before2 !== '' && after2 !== '') {
+    const shared = (x: string, y: string, at: 'start' | 'end') => {
+      const re = at === 'end' ? /\s+$/ : /^\s+/;
+      const mx = re.exec(x)?.[0] ?? '';
+      const my = re.exec(y)?.[0] ?? '';
+      const n = Math.min(mx.length, my.length);
+      if (n === 0) return '';
+      return at === 'end' ? mx.slice(mx.length - n) : mx.slice(0, n);
+    };
+    const tailWs = shared(before2, after2, 'end');
+    if (tailWs) {
+      before2 = before2.slice(0, before2.length - tailWs.length);
+      after2 = after2.slice(0, after2.length - tailWs.length);
+      trail = tailWs + trail;
+    }
+    const leadWs = shared(before2, after2, 'start');
+    if (leadWs) {
+      before2 = before2.slice(leadWs.length);
+      after2 = after2.slice(leadWs.length);
+      lead += leadWs;
+    }
+  }
+
   return [
-    ...part('same', a.slice(0, head)),
-    ...part('del', a.slice(head, a.length - tail)),
-    ...part('ins', b.slice(head, b.length - tail)),
-    ...part('same', a.slice(a.length - tail)),
+    ...part('same', [lead]),
+    ...part('del', [before2]),
+    ...part('ins', [after2]),
+    ...part('same', [trail]),
   ];
 }
 

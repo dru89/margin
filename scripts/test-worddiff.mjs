@@ -24,9 +24,9 @@ const show = (a, b) =>
 head('only what changed is marked');
 t('the C+I case from #98',
   show('moved from C+I, where', 'moved from Commerce & Identity (C&I), where'),
-  'moved from [-C+I, -]{+Commerce & Identity (C&I), +}where');
+  'moved from [-C+I,-]{+Commerce & Identity (C&I),+} where');
 t('one word in the middle', show('the quick brown fox', 'the quick red fox'),
-  'the quick [-brown -]{+red +}fox');
+  'the quick [-brown-]{+red+} fox');
 t('a word appended', show('the quick fox', 'the quick brown fox'),
   'the quick {+brown +}fox');
 t('a word removed', show('the quick brown fox', 'the quick fox'),
@@ -60,6 +60,16 @@ t('irregular whitespace is preserved, not normalized',
   beforeText(wordDiff('a  b   c', 'a b c')), 'a  b   c');
 t('newlines survive', afterText(wordDiff('one\ntwo', 'one\ntwo\nthree')), 'one\ntwo\nthree');
 
+head('unchanged whitespace stays outside the marks');
+// The space between the replaced words and what follows exists in both
+// strings. Marking it struck-and-reinserted misreports it.
+t('a shared trailing space is hoisted out',
+  show('alpha beta gamma', 'alpha delta gamma'), 'alpha [-beta-]{+delta+} gamma');
+t('but an inserted word brings its own space',
+  show('the quick fox', 'the quick brown fox'), 'the quick {+brown +}fox');
+t('and a removed word takes its space with it',
+  show('the quick brown fox', 'the quick fox'), 'the quick [-brown -]fox');
+
 head('one suggestion stays one replacement');
 // A real diff anchors on the shared word and splits this into two edits,
 // which reads as two things you could take separately. You cannot.
@@ -68,7 +78,7 @@ t('a shared word in the middle does not fragment it',
   '[-alpha and beta-]{+gamma and delta+}');
 t('nor does a shared word inside a sentence',
   show('Start the alpha and beta projects.', 'Start the gamma and delta projects.'),
-  'Start the [-alpha and beta -]{+gamma and delta +}projects.');
+  'Start the [-alpha and beta-]{+gamma and delta+} projects.');
 t('repeated words do not create false anchors',
   show('the cat and the dog', 'the bird and the fish'),
   'the [-cat and the dog-]{+bird and the fish+}');

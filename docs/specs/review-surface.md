@@ -353,6 +353,16 @@ edits you could take separately, when a suggestion is one replacement
 you accept or reject whole — and a suggestion that fragments into five
 small swaps is harder to judge than the sentence it came from.
 
+**Whitespace the two sides share stays outside the marks.** The space
+between the replaced words and what follows exists in both strings, so
+striking and re-underlining it misreports an untouched character, and
+the highlight stops matching the words that actually differ — hence
+`[-C+I,-]{+Commerce & Identity (C&I),+} where`, not `[-C+I, -]…`.
+
+Only when both sides have it, though: inserting a word into a sentence
+adds a space as well as a word, and that space really is new, so it
+stays inside the insertion.
+
 Trimming also has no pathological case, so it needs no size cap.
 
 This is the same code path in the inline decoration and the sidebar
