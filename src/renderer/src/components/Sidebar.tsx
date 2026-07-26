@@ -507,29 +507,31 @@ export function Sidebar() {
 
   return (
     <aside className="sidebar">
-      {/* One interactive thing, three plain facts. Counts sitting beside a
-          pair of buttons read as filters when they are not — so the count
-          that is worth filtering by *is* the filter, and the rest are
-          stated, not offered (spec §4). */}
+      {/* Facts on top, the filter beneath them (spec §4). */}
       {(openThreads.length > 0 || pendingSuggestions.length > 0 || archivedCount > 0) && (
         <div className="review-summary">
-          {counts.needsYou > 0 ? (
-            <button
-              className={`needs-you-chip${onlyNeedsYou ? ' on' : ''}`}
-              aria-pressed={onlyNeedsYou}
-              title={onlyNeedsYou ? 'Show everything' : 'Show only what is waiting on you'}
-              onClick={() => setOnlyNeedsYou(!onlyNeedsYou)}
-            >
-              <b>{counts.needsYou}</b> need you
-            </button>
-          ) : (
-            <span className="review-clear">Nothing waiting on you</span>
-          )}
           <div className="review-counts">
+            {counts.needsYou > 0 && <span><b>{counts.needsYou}</b> need you</span>}
             {counts.draft > 0 && <span><b>{counts.draft}</b> not sent</span>}
             {counts.awaiting > 0 && <span><b>{counts.awaiting}</b> awaiting reply</span>}
             {archivedCount > 0 && <span><b>{archivedCount}</b> resolved</span>}
           </div>
+          {counts.needsYou > 0 && (
+            <div className="review-filters">
+              <button
+                className={`btn btn-toggle${onlyNeedsYou ? '' : ' on'}`}
+                onClick={() => setOnlyNeedsYou(false)}
+              >
+                All
+              </button>
+              <button
+                className={`btn btn-toggle${onlyNeedsYou ? ' on' : ''}`}
+                onClick={() => setOnlyNeedsYou(true)}
+              >
+                Need you
+              </button>
+            </div>
+          )}
         </div>
       )}
       <div className="review-scroll">

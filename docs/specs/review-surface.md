@@ -223,14 +223,17 @@ leaves the list when the author moves on.
 **Answer "what's new" with a summary bar, not with order.**
 
 ```
-( 7 need you )                     <- the only control
-2 not sent · 2 awaiting reply · 3 resolved
+7 need you · 2 not sent · 2 awaiting reply · 3 resolved
+[ All ] [ Need you ]
 ```
 
-**One interactive thing, three plain facts.** Counts rendered beside a
-row of buttons read as filters even when they aren't, so the count worth
-filtering by *is* the filter — a chip that presses in — and the rest are
-stated in plain muted text with no border, background or pointer.
+**Facts on one line, the filter beneath them.** Counts and buttons on the
+same row read as one control strip, so the counts looked clickable;
+stacking separates what is stated from what is offered without having to
+strip the buttons of their affordance. A single toggle chip carrying the
+count was tried and reads worse — the paired toggle is the app's existing
+vocabulary (it is what Write/Preview uses), and it makes the inactive
+option visible rather than implied.
 
 **The words say who holds the ball**, and the bar and the cards use the
 same ones. "Queued" and "awaiting" were indistinguishable, and
