@@ -42,7 +42,10 @@ export function MentionTextarea({
 
   useEffect(() => {
     if (!focusKey) return; // 0 / undefined = nobody has asked yet
-    ref.current?.focus();
+    // `preventScroll` because the caller is mid-animation: focusing an
+    // off-screen textarea otherwise yanks its scroller into place in one
+    // frame, and the smooth scroll it was running loses the argument.
+    ref.current?.focus({ preventScroll: true });
   }, [focusKey]);
   const [token, setToken] = useState<{ start: number; text: string } | null>(null);
   const [selected, setSelected] = useState(0);

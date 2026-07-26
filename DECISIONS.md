@@ -1286,6 +1286,12 @@ the author cannot find reads as nothing happening. The editor is scrolled
 without being focused (`centerOnPos`, not `revealRange`) — focus belongs
 to the draft, which is the whole point of the refusal.
 
+Moving focus to the draft is also what made the sidebar half of that snap
+while the editor half glided: `focus()` on an off-screen element scrolls
+its container instantly, overwriting the smooth scroll on its first
+frame. `preventScroll: true` fixes it. Worth remembering generally — the
+animation reads as correctly written and is simply outvoted.
+
 Not a second composer. Committing already stages a comment without sending
 it, so several drafts before a round already work; a second buffer would
 add a state to manage without adding capability.
