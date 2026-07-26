@@ -141,6 +141,13 @@ ring appears. Neither recolors the card: color is state, and selecting
 a card must not appear to change what it is. They previously differed
 only by a 40% versus 55% border tint, which is invisible.
 
+**A card head is facts on the left, one action in the corner.** The facts
+wrap among themselves and the action never moves: a thread carrying a
+state label, an orphan badge, and a round stamp used to push Resolve onto
+a line of its own, so the card reported its own width rather than its
+state. When the row runs out of room the round stamp drops to a second
+line, which is the right thing to lose.
+
 **The spine stays inside the card.** It sits within the border rather
 than straddling it — an edge hanging past the rounded corners draws the
 eye to the overhang instead of to the state it is reporting.

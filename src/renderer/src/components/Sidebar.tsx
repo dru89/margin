@@ -15,7 +15,7 @@ import {
   threadState,
   type ThreadState,
 } from '@shared/reviewState';
-import { revealRange } from '@/editorBridge';
+import { centerOnPos, revealRange } from '@/editorBridge';
 import { wordDiff } from '@shared/worddiff';
 import { DiscussionDock } from '@/components/DiscussionDock';
 import { MentionTextarea } from '@/components/MentionTextarea';
@@ -206,12 +206,18 @@ function Composer() {
   const addSuggestion = useStore((s) => s.addSuggestion);
   const closeComposer = useStore((s) => s.closeComposer);
   const cardRef = useRef<HTMLDivElement>(null);
-  // A refused re-target moves focus here, which is easy to miss when the
-  // sidebar is long. The same pulse the jumps use says where it went.
+  // A refused re-target is a "take me back to what you were writing", so it
+  // behaves like every other jump: both ends of the pair centered, eased
+  // into place, and pulsed. Anything quieter leaves the reader looking for
+  // a draft that is off-screen at the other end of a long sidebar.
   useEffect(() => {
-    if (!focusKey || !cardRef.current) return;
-    cardRef.current.scrollIntoView({ block: 'nearest' });
-    pulse(cardRef.current);
+    if (!focusKey) return;
+    const anchor = useStore.getState().composerAnchor;
+    if (anchor && !anchor.orphaned) centerOnPos(anchor.from);
+    requestAnimationFrame(() => {
+      focusCard(cardRef.current);
+      pulsePendingAnchor();
+    });
   }, [focusKey]);
   if (!composerAnchor) return null;
 
@@ -494,13 +500,19 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
       // deliberate "I'm looking at this" (spec §4).
       {...pair.props}
     >
-      <div className="card-head">
-        {/* Always mounted so clearing unread fades rather than snaps. */}
-        <span className={`unread-dot${state === 'unread' ? '' : ' is-gone'}`} aria-hidden="true" />
-        {STATE_LABEL[state] && <span className="state-label">{STATE_LABEL[state]}</span>}
-        {thread.anchor.orphaned && <span className="badge">Text gone</span>}
-        {imported && <span className="chip chip-source" title="Imported from the linked Google Doc">Docs</span>}
-        <RoundStamp round={last.round} at={thread.createdAt} />
+      <div className="card-head card-head-split">
+        {/* The facts wrap among themselves; Resolve keeps the corner. A
+            long state label next to a badge used to push it onto a line of
+            its own, so a card said more about its own width than its
+            state. */}
+        <span className="card-facts">
+          {/* Always mounted so clearing unread fades rather than snaps. */}
+          <span className={`unread-dot${state === 'unread' ? '' : ' is-gone'}`} aria-hidden="true" />
+          {STATE_LABEL[state] && <span className="state-label">{STATE_LABEL[state]}</span>}
+          {thread.anchor.orphaned && <span className="badge">Text gone</span>}
+          {imported && <span className="chip chip-source" title="Imported from the linked Google Doc">Docs</span>}
+          <RoundStamp round={last.round} at={thread.createdAt} />
+        </span>
         {imported ? (
           <span className="resolve-wrap">
             <button
@@ -692,8 +704,12 @@ function pulseAnchorText(id: string): void {
   }
 }
 
-function focusCard(id: string): void {
-  const el = document.getElementById(`card-${id}`);
+/** The open composer's subject, which carries no id of its own yet. */
+function pulsePendingAnchor(): void {
+  for (const el of document.querySelectorAll('.cm-editor .anchor-pending')) pulse(el);
+}
+
+function focusCard(el: HTMLElement | null): void {
   if (!el) return;
   const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   el.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
@@ -837,7 +853,7 @@ export function Sidebar() {
     if (!focusRequest) return;
     const id = focusRequest.id;
     requestAnimationFrame(() => {
-      focusCard(id);
+      focusCard(document.getElementById(`card-${id}`));
       // Both ends of the pair light up, whichever end was clicked.
       pulseAnchorText(id);
     });

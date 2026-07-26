@@ -60,6 +60,19 @@ export function revealRange(from: number, to: number): void {
   const b = Math.min(to, len);
   view.dispatch({ selection: { anchor: a, head: b } });
   view.focus();
+  centerOnPos(a);
+}
+
+/**
+ * Center a position without touching selection or focus.
+ *
+ * The composer needs the passage it is about brought back into view while
+ * focus goes to the draft — `revealRange` would pull focus into the
+ * editor, which is the opposite of what a refused re-target is for.
+ */
+export function centerOnPos(pos: number): void {
+  if (!view) return;
+  const a = Math.min(pos, view.state.doc.length);
   const scroller = view.scrollDOM;
   const coords = view.coordsAtPos(a);
   if (!coords) {

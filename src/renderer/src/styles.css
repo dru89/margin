@@ -836,6 +836,21 @@ kbd {
 .card-head > .btn-ghost { margin-left: auto; }
 .card-head > .card-locator ~ .rnd { margin-left: 0; }
 
+/* Facts left, one action pinned to the corner. Two classes on both sides
+   so this beats the `.card-head > .btn-ghost` rule above outright rather
+   than by sitting below it. */
+.card-head-split { flex-wrap: nowrap; align-items: flex-start; }
+.card-head-split > .card-facts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.card-head.card-head-split > .btn-ghost,
+.card-head.card-head-split > .resolve-wrap { margin-left: 0; flex: 0 0 auto; }
+
 /* ——— draft editing (spec §8) ——— */
 
 /* Managing an unsent item sits with the other item-level controls, on the

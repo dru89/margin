@@ -1278,6 +1278,14 @@ holding work keeps its anchor, takes focus, and pulses.
 replacement counts on its own — there, the replacement *is* the work, and
 requiring a rationale before protecting it would throw away the edit.
 
+A refusal is a jump like any other, so it behaves like one: the passage
+comes back to the center of the editor, the composer to the center of the
+sidebar, both eased rather than snapped, and both pulsed. The draft can
+be a long way off-screen at the moment it is protected, and a protection
+the author cannot find reads as nothing happening. The editor is scrolled
+without being focused (`centerOnPos`, not `revealRange`) — focus belongs
+to the draft, which is the whole point of the refusal.
+
 Not a second composer. Committing already stages a comment without sending
 it, so several drafts before a round already work; a second buffer would
 add a state to manage without adding capability.
