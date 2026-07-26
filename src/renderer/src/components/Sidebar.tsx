@@ -568,7 +568,7 @@ export function Sidebar() {
           </p>
         )}
         {archivedCount > 0 && (
-          <section>
+          <section className="review-archive">
             <button
               className="btn btn-ghost sidebar-archive-toggle"
               onClick={() => setShowArchive(!showArchive)}

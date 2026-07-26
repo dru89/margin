@@ -618,7 +618,15 @@ kbd {
   overflow-y: auto;
   min-height: 0;
   padding: 14px 14px 24px;
+  /* A column so the archive can be pushed to the bottom. */
+  display: flex;
+  flex-direction: column;
 }
+/* Resolved work belongs at the end. `margin-top: auto` takes up the slack
+   when the list is short — so the fold sits on the floor instead of
+   floating mid-pane — and does nothing once the list scrolls, where it is
+   already last. */
+.review-archive { margin-top: auto; }
 
 .sidebar-heading {
   font-size: 11px;
