@@ -319,7 +319,8 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
       }}
     >
       <div className="card-head">
-        {state === 'unread' && <span className="unread-dot" aria-hidden="true" />}
+        {/* Always mounted so clearing unread fades rather than snaps. */}
+        <span className={`unread-dot${state === 'unread' ? '' : ' is-gone'}`} aria-hidden="true" />
         {STATE_LABEL[state] && <span className="state-label">{STATE_LABEL[state]}</span>}
         {thread.anchor.orphaned && <span className="badge">Text gone</span>}
         {imported && <span className="chip chip-source" title="Imported from the linked Google Doc">Docs</span>}

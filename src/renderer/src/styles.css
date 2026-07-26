@@ -344,30 +344,41 @@ kbd {
    card's leading edge is state, the author chip is authorship, the diff is
    what happens to the text. Nothing relies on colour alone — the unread dot
    is a shape difference and the draft edge is a texture one. */
-/* State travels to the spine as a custom property rather than as another
-   ::before. An element has one ::before, and `.card::before` is defined
-   later at equal specificity — a second rule here silently lost, which is
-   how the whole vocabulary shipped invisible the first time. */
-.state-unread { --state-edge: var(--agent); }
-.state-awaiting { --state-edge: color-mix(in srgb, var(--user) 45%, transparent); }
-.state-pending { --state-edge: color-mix(in srgb, var(--agent) 45%, transparent); }
+/* The spine's colour sits on the pseudo-element itself, qualified by the
+   card class so it beats `.card::before` on specificity rather than on
+   source order. It cannot travel as a custom property: unregistered custom
+   properties do not interpolate, so the transition had nothing to animate
+   and the colour snapped. */
+.card.state-unread::before { background-color: var(--agent); }
+.card.state-awaiting::before { background-color: color-mix(in srgb, var(--user) 45%, transparent); }
+.card.state-pending::before { background-color: color-mix(in srgb, var(--agent) 45%, transparent); }
+.card.state-read::before,
+.card.state-decided::before,
+.card.state-settled::before { background-color: var(--rule); }
 /* Dashed: the same language the document uses for an uncommitted anchor. */
-.state-draft {
-  --state-edge: repeating-linear-gradient(
+.card.state-draft::before {
+  background-color: transparent;
+  background-image: repeating-linear-gradient(
     to bottom, var(--comment-edge) 0 4px, transparent 4px 8px
   );
 }
-.state-read, .state-decided, .state-settled { --state-edge: var(--rule); }
 .state-unread { border-color: color-mix(in srgb, var(--agent) 45%, var(--rule)); }
 .state-draft {
   border-style: dashed;
   border-color: color-mix(in srgb, var(--comment-edge) 50%, var(--rule));
 }
 
+/* Kept mounted so it can fade and collapse; unmounting it made the row
+   snap. The negative margin cancels the head's gap as the width goes. */
 .unread-dot {
   width: 7px; height: 7px; border-radius: 50%;
   background: var(--agent); flex: 0 0 auto;
+  transition:
+    opacity 0.34s ease,
+    width 0.34s cubic-bezier(0.4, 0, 0.2, 1),
+    margin-right 0.34s cubic-bezier(0.4, 0, 0.2, 1);
 }
+.unread-dot.is-gone { opacity: 0; width: 0; margin-right: -6px; }
 .state-label {
   font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase;
   color: var(--ink-faint);
@@ -689,11 +700,14 @@ kbd {
   inset: 8px auto 8px 0;
   width: 3px;
   border-radius: 0 3px 3px 0;
-  background: var(--state-edge, var(--pair-accent, transparent));
+  background-color: var(--pair-accent, transparent);
   opacity: 1;
-  /* Clicking an unread thread changes its spine; a fade reads as the state
-     settling, where a snap to nothing read as the card breaking. */
-  transition: background 0.18s ease, opacity 0.12s ease;
+  /* Clicking an unread thread hands it from teal to neutral. Slow enough to
+     read as the state settling rather than as a repaint. */
+  transition:
+    background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.12s ease;
 }
 .card-suggestion { --pair-accent: var(--agent); }
 .card-comment { --pair-accent: var(--comment-edge); }
