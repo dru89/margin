@@ -161,7 +161,13 @@ kbd {
   color: var(--on-accent);
   font-weight: 500;
 }
-.btn-primary:hover:not(:disabled) { filter: brightness(1.1); border-color: var(--user); }
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.12);
+  border-color: var(--user);
+  /* Independent of the surface behind it — brightness alone stopped
+     reading once a hovered card lifted underneath. */
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--user) 32%, transparent);
+}
 
 .btn-danger {
   background: var(--danger);
@@ -631,7 +637,9 @@ kbd {
   margin-bottom: 10px;
   box-shadow: 0 1px 2px rgb(33 29 23 / 5%);
   cursor: pointer;
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  /* Includes background: the hover lift was landing instantly because the
+     earlier `.anchor, .card` transition rule loses to this one. */
+  transition: background 0.16s ease, border-color 0.14s ease, box-shadow 0.14s ease;
 }
 .card { position: relative; }
 .card::before { /* the spine — the card's state, on its leading edge */
@@ -657,7 +665,7 @@ kbd {
    Selected is persistent, so it gets the structural one: the spine
    thickens and the card firms up. Both is naturally both. */
 .pair-hot.card {
-  background: color-mix(in srgb, var(--ink) 9%, var(--paper-raised));
+  background: color-mix(in srgb, var(--ink) 6%, var(--paper-raised));
   border-color: color-mix(in srgb, var(--ink-faint) 45%, var(--rule));
 }
 .pair-active.card {
