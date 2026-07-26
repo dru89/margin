@@ -21,6 +21,7 @@ import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/lang
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
 import { tags as t } from '@lezer/highlight';
 import { formatTableLines, isTableLine } from '@shared/tables';
+import { wordDiff } from '@shared/worddiff';
 
 export interface EditorAnnotation {
   id: string;
@@ -89,11 +90,13 @@ class ReplacementWidget extends WidgetType {
     wrap.className = `suggest-ins-wrap${this.stateClasses}`;
     wrap.dataset.anchorId = this.id;
 
-    const ins = document.createElement('span');
-    ins.className = `anchor anchor-suggestion-ins${this.mdClasses}${this.stateClasses}`;
-    ins.dataset.anchorId = this.id;
-    ins.textContent = this.text;
-    wrap.appendChild(ins);
+    if (this.text !== '') {
+      const ins = document.createElement('span');
+      ins.className = `anchor anchor-suggestion-ins${this.mdClasses}${this.stateClasses}`;
+      ins.dataset.anchorId = this.id;
+      ins.textContent = this.text;
+      wrap.appendChild(ins);
+    }
 
     const pill = document.createElement('span');
     pill.className = 'suggest-pill';
@@ -129,24 +132,37 @@ function buildDecorations(annotations: EditorAnnotation[], state: EditorState): 
     if (a.from < lastEnd) continue; // overlapping anchors: first one wins
     const stateCls = pairClasses(a);
     if (a.kind === 'suggestion') {
-      builder.add(
-        a.from,
-        a.to,
-        Decoration.mark({
-          class: `anchor anchor-suggestion-del${stateCls}`,
-          attributes: { 'data-anchor-id': a.id },
-        }),
-      );
-      if (a.replacement) {
+      // Strike only the words that actually change, and insert only the
+      // words that replace them, so an edit to three words in a long
+      // sentence does not restate the sentence twice (#98).
+      const quote = state.doc.sliceString(a.from, a.to);
+      const parts = wordDiff(quote, a.replacement ?? '');
+      const lead = parts[0]?.kind === 'same' ? parts[0].text.length : 0;
+      const removed = parts.find((p) => p.kind === 'del')?.text ?? '';
+      const added = parts.find((p) => p.kind === 'ins')?.text ?? '';
+      const delFrom = a.from + lead;
+      const delTo = delFrom + removed.length;
+      if (removed) {
         builder.add(
-          a.to,
-          a.to,
-          Decoration.widget({
-            widget: new ReplacementWidget(a.id, a.replacement, stateCls, contextClasses(state, a.from)),
-            side: 1,
+          delFrom,
+          delTo,
+          Decoration.mark({
+            class: `anchor anchor-suggestion-del${stateCls}`,
+            attributes: { 'data-anchor-id': a.id },
           }),
         );
       }
+      // Always placed, even when nothing is inserted: the widget carries the
+      // accept/reject pill, so guarding it on `replacement` left a
+      // deletion-only suggestion with no way to act on it (#102).
+      builder.add(
+        delTo,
+        delTo,
+        Decoration.widget({
+          widget: new ReplacementWidget(a.id, added, stateCls, contextClasses(state, a.from)),
+          side: 1,
+        }),
+      );
     } else {
       builder.add(
         a.from,

@@ -49,6 +49,23 @@ const cases = [
   ['', 'x'],
   ['x', ''],
   ['same', 'same'],
+  // Everything discussed while the rules were being settled.
+  ['(something parenthetical)', '(something in parentheses)'],
+  ['alpha and beta', 'gamma and delta'],
+  ['Start the alpha and beta projects.', 'Start the gamma and delta projects.'],
+  ['the cat and the dog', 'the bird and the fish'],
+  ['“alpha”', '“beta”'],
+  ['running', 'runner'],
+  ['v1', 'v2'],
+  ['café', 'cafés'],
+  ['日本語', '中国語'],
+  ['done 🎉', 'ready 🎉'],
+  ['...', '!!!'],
+  ['a,', 'a'],
+  ['   ', ' '],
+  ['\n\n', '\n'],
+  ['a\tb', 'a\tc'],
+  ['   leading', '   leading edge'],
 ];
 let ok = true;
 for (const [a, b] of cases) {
@@ -80,6 +97,18 @@ t('a shared trailing comma', show('C+I,', 'C&I,'), '[-C+I-]{+C&I+},');
 t('letters are never hoisted — no split words',
   show('running', 'runner'), '[-running-]{+runner+}');
 t('digits are never hoisted', show('v1', 'v2'), '[-v1-]{+v2+}');
+
+head('edges of the hoist rule');
+t('punctuation on both ends is hoisted at once', show('“alpha”', '“beta”'), '“[-alpha-]{+beta+}”');
+t('an em dash', show('a — b', 'a — c'), 'a — [-b-]{+c+}');
+t('accented letters are letters', show('café', 'cafés'), '[-café-]{+cafés+}');
+t('CJK is not punctuation', show('日本語', '中国語'), '[-日本語-]{+中国語+}');
+t('an emoji is not a letter, so it can ride out',
+  show('done 🎉', 'ready 🎉'), '[-done-]{+ready+} 🎉');
+t('punctuation-only strings', show('...', '!!!'), '[-...-]{+!!!+}');
+t('a trailing mark with nothing to pair against', show('a,', 'a'), '[-a,-]{+a+}');
+t('whitespace-only strings still reassemble',
+  [beforeText(wordDiff('   ', ' ')), afterText(wordDiff('   ', ' '))], ['   ', ' ']);
 
 head('one suggestion stays one replacement');
 // A real diff anchors on the shared word and splits this into two edits,

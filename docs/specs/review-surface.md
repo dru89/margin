@@ -376,10 +376,15 @@ inside the insertion; deleting a word takes its space with it.
 
 Trimming also has no pathological case, so it needs no size cap.
 
-This is the same code path in the inline decoration and the sidebar
-card, and it is what #102 is really about: a pure deletion currently
-renders as "everything struck, nothing inserted", which reads as a
-glitch rather than as a deletion.
+The same trim drives the inline decoration and the sidebar card, so
+the document strikes only the words that change rather than the whole
+anchored range.
+
+**A deletion-only suggestion still gets an accept/reject pill.** The
+pill lives on the inserted half's widget, which used to be placed only
+when there was a replacement — so a deletion had nothing to act on
+inline (#102). The widget is now always placed, at the end of the struck
+span, and renders no inserted text when there is none.
 
 **Color by operation, not by author.** Insertions in the agent color,
 deletions in `--danger`. #102 asks whether a deletion-only suggestion
