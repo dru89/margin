@@ -10,7 +10,7 @@ const MAX_FILES = 500;
 
 function git(cwd: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile('git', args, { cwd, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) =>
+    execFile('git', args, { cwd, maxBuffer: 10 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) =>
       err ? reject(new Error(stderr.trim() || err.message)) : resolve(stdout),
     );
   });
