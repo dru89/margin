@@ -161,6 +161,17 @@ const suggestions = [
     note: 'Trying a more specific opening.', status: 'pending',
   },
   {
+    // Deliberately large: spans several lines, to show what the inline
+    // treatment does when a change is not a local edit.
+    id: 'sg-big', author: 'agent', round: ROUND, createdAt: iso(1),
+    // Anchored after sg-draft's range so the two do not overlap —
+    // overlapping anchors are dropped, first one wins.
+    anchor: at('The version that landed was the fourth, and the first three taught me things I could have learned in a week of conversations.'),
+    replacement:
+      'The version that shipped was the fourth. The three before it taught me things that a week of conversations would have taught me faster, and breaking that habit is the thing I most want to carry into next year.',
+    note: 'A wholesale rewrite of the closing paragraph.', status: 'pending',
+  },
+  {
     id: 'sg-accepted', author: 'agent', round: 3, createdAt: iso(4),
     anchor: at('Getting it unstuck meant'), replacement: 'Getting it unstuck meant',
     note: 'Tightened the transition.', status: 'accepted',

@@ -21,6 +21,7 @@ import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/lang
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
 import { tags as t } from '@lezer/highlight';
 import { formatTableLines, isTableLine } from '@shared/tables';
+import { wordDiff } from '@shared/worddiff';
 
 export interface EditorAnnotation {
   id: string;
@@ -89,11 +90,13 @@ class ReplacementWidget extends WidgetType {
     wrap.className = `suggest-ins-wrap${this.stateClasses}`;
     wrap.dataset.anchorId = this.id;
 
-    const ins = document.createElement('span');
-    ins.className = `anchor anchor-suggestion-ins${this.mdClasses}${this.stateClasses}`;
-    ins.dataset.anchorId = this.id;
-    ins.textContent = this.text;
-    wrap.appendChild(ins);
+    if (this.text !== '') {
+      const ins = document.createElement('span');
+      ins.className = `anchor anchor-suggestion-ins${this.mdClasses}${this.stateClasses}`;
+      ins.dataset.anchorId = this.id;
+      ins.textContent = this.text;
+      wrap.appendChild(ins);
+    }
 
     const pill = document.createElement('span');
     pill.className = 'suggest-pill';
@@ -129,24 +132,44 @@ function buildDecorations(annotations: EditorAnnotation[], state: EditorState): 
     if (a.from < lastEnd) continue; // overlapping anchors: first one wins
     const stateCls = pairClasses(a);
     if (a.kind === 'suggestion') {
-      builder.add(
-        a.from,
-        a.to,
-        Decoration.mark({
-          class: `anchor anchor-suggestion-del${stateCls}`,
-          attributes: { 'data-anchor-id': a.id },
-        }),
-      );
-      if (a.replacement) {
+      // Strike only the words that actually change, and insert only the
+      // words that replace them, so an edit to three words in a long
+      // sentence does not restate the sentence twice (#98).
+      const quote = state.doc.sliceString(a.from, a.to);
+      const parts = wordDiff(quote, a.replacement ?? '');
+      const lead = parts[0]?.kind === 'same' ? parts[0].text.length : 0;
+      const removed = parts.find((p) => p.kind === 'del')?.text ?? '';
+      const added = parts.find((p) => p.kind === 'ins')?.text ?? '';
+      const delFrom = a.from + lead;
+      const delTo = delFrom + removed.length;
+      if (removed) {
         builder.add(
-          a.to,
-          a.to,
-          Decoration.widget({
-            widget: new ReplacementWidget(a.id, a.replacement, stateCls, contextClasses(state, a.from)),
-            side: 1,
+          delFrom,
+          delTo,
+          Decoration.mark({
+            class: `anchor anchor-suggestion-del${stateCls}`,
+            attributes: { 'data-anchor-id': a.id },
           }),
         );
       }
+      // Always placed, even when nothing is inserted: the widget carries the
+      // accept/reject pill, so guarding it on `replacement` left a
+      // deletion-only suggestion with no way to act on it (#102).
+      //
+      // A replacement anchors it at the seam between the struck and the
+      // inserted text, which the pill then centers on. A deletion has no
+      // inserted half, so the seam is the end of the struck run and the
+      // pill would sit past the words it acts on — anchor it mid-run
+      // instead so it centers on them.
+      const pillAt = added ? delTo : delFrom + Math.floor(removed.length / 2);
+      builder.add(
+        pillAt,
+        pillAt,
+        Decoration.widget({
+          widget: new ReplacementWidget(a.id, added, stateCls, contextClasses(state, a.from)),
+          side: 1,
+        }),
+      );
     } else {
       builder.add(
         a.from,
@@ -236,6 +259,66 @@ const pendingAnchorHighlight = ViewPlugin.fromClass(
     }
   },
   { decorations: (v) => v.decorations },
+);
+
+/**
+ * Center each accept/reject pill on the whole change, not on the seam.
+ *
+ * CSS cannot do this: the struck text is a document mark and the inserted
+ * text lives in a widget, so nothing wraps both. This measures the union
+ * of the two after layout and offsets the pill onto its center. On a
+ * multi-line change that puts the pill under the middle of the block,
+ * which is where the eye expects a control for the whole thing.
+ */
+const centerPills = ViewPlugin.fromClass(
+  class {
+    private ro: ResizeObserver;
+    constructor(readonly view: EditorView) {
+      this.measure();
+      // Line wrapping decides where a change begins and ends, so anything
+      // that reflows the column invalidates the offsets. A first pass runs
+      // before webfonts settle and measures the wrong boxes — hence the
+      // observer rather than a one-shot.
+      this.ro = new ResizeObserver(() => this.measure());
+      this.ro.observe(view.contentDOM);
+    }
+    destroy() {
+      this.ro.disconnect();
+    }
+    update() {
+      this.measure();
+    }
+    measure() {
+      requestAnimationFrame(() => {
+        const root = this.view.dom;
+        for (const wrap of root.querySelectorAll<HTMLElement>('.suggest-ins-wrap')) {
+          const id = wrap.dataset.anchorId;
+          if (!id) continue;
+          const boxes = [
+            ...root.querySelectorAll<HTMLElement>(
+              `.anchor-suggestion-del[data-anchor-id="${CSS.escape(id)}"]`,
+            ),
+          ].map((e) => e.getBoundingClientRect());
+          // The pill is positioned against the wrap's *first* line box, so
+          // that is the origin the offset has to be measured from.
+          const origin = wrap.getClientRects()[0];
+          if (!origin) continue;
+          boxes.push(...wrap.getClientRects());
+          const left = Math.min(...boxes.map((b) => b.left));
+          const right = Math.max(...boxes.map((b) => b.right));
+          const top = Math.min(...boxes.map((b) => b.top));
+          const bottom = Math.max(...boxes.map((b) => b.bottom));
+          // Only center when the change sits on one line. Across several,
+          // the union spans most of the column and its middle is a point in
+          // the middle of a paragraph — no more "the control for this edit"
+          // than the seam, and further from where the reader is looking.
+          const oneLine = bottom - top < origin.height * 1.6;
+          const dx = oneLine ? (left + right) / 2 - origin.left : 0;
+          wrap.style.setProperty('--pill-dx', `${Math.round(dx)}px`);
+        }
+      });
+    }
+  },
 );
 
 const markdownHighlight = HighlightStyle.define([
@@ -461,6 +544,7 @@ export function createExtensions(callbacks: EditorCallbacks) {
     lineStyles,
     tablePill,
     annotationsField,
+    centerPills,
     pendingAnchorField,
     pendingAnchorHighlight,
     readOnlyCompartment.of(EditorState.readOnly.of(false)),

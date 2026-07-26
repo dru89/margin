@@ -13,6 +13,7 @@ import {
   type ThreadState,
 } from '@shared/reviewState';
 import { revealRange } from '@/editorBridge';
+import { wordDiff } from '@shared/worddiff';
 import { DiscussionDock } from '@/components/DiscussionDock';
 import { MentionTextarea } from '@/components/MentionTextarea';
 import { Md } from '@/components/Md';
@@ -94,7 +95,7 @@ function Message({
 }
 
 function usePair(id: string, anchor: { from: number; to: number; orphaned?: boolean }) {
-  const setActiveAnchor = useStore((s) => s.setActiveAnchor);
+  const focusAnchor = useStore((s) => s.focusAnchor);
   const setHoveredAnchor = useStore((s) => s.setHoveredAnchor);
   const active = useStore((s) => s.activeAnchorId === id);
   const hot = useStore((s) => s.hoveredAnchorId === id);
@@ -103,8 +104,11 @@ function usePair(id: string, anchor: { from: number; to: number; orphaned?: bool
     props: {
       onMouseEnter: () => setHoveredAnchor(id),
       onMouseLeave: () => setHoveredAnchor(null),
+      // The third entry point. All of them — a card, marked text, a
+      // round-header jump — raise the same request, so the pair lights up
+      // at both ends whichever end was clicked.
       onClick: () => {
-        setActiveAnchor(id);
+        focusAnchor(id);
         if (!anchor.orphaned) revealRange(anchor.from, anchor.to);
       },
     },
@@ -189,10 +193,9 @@ function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
   const state = suggestionState(suggestion, currentRound);
   const deletion = suggestion.replacement === '';
 
-  // One ellipsized context line: the tail of what lands (or leaves).
-  const context = suggestion.replacement
-    ? `→ …${suggestion.replacement.slice(-70)}`
-    : `− …${suggestion.anchor.quote.slice(-70)}`;
+  // Only what changes, rather than the whole clause struck and re-inserted
+  // (#98). Both strings are already stored — this is presentation.
+  const parts = wordDiff(suggestion.anchor.quote, suggestion.replacement);
 
   return (
     <div
@@ -215,7 +218,16 @@ function SuggestionCard({ suggestion }: { suggestion: Suggestion }) {
       <div className="thread-msg-head">
         <AuthorChip author={suggestion.author} />
       </div>
-      <p className={`card-context${deletion ? ' card-context-del' : ''}`}>{context}</p>
+      <p className="card-diff">
+        {parts.map((p, i) => (
+          <span
+            key={i}
+            className={p.kind === 'del' ? 'diff-del' : p.kind === 'ins' ? 'diff-ins' : undefined}
+          >
+            {p.text}
+          </span>
+        ))}
+      </p>
       {suggestion.note && <Md text={suggestion.note} />}
       {suggestion.anchor.orphaned && (
         <p className="orphan-note">anchor text no longer found — accept is disabled</p>
@@ -279,7 +291,6 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
   const imported = thread.provenance === 'imported';
   const addDocReply = useStore((s) => s.addDocReply);
   const currentRound = useStore((s) => s.review?.round ?? 0);
-  const markThreadSeen = useStore((s) => s.markThreadSeen);
   const state = threadState(thread, currentRound);
   const last = latestActivity(thread);
   const [expanded, setExpanded] = useState(false);
@@ -314,12 +325,9 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
       className={`card card-comment state-${state}${pair.classes}`}
       aria-label="comment thread"
       {...pair.props}
-      onClick={() => {
-        // Clicking a thread is a deliberate "I'm looking at this", and it
-        // already focuses the anchor — so it is what clears unread (spec §4).
-        pair.props.onClick();
-        markThreadSeen(thread.id);
-      }}
+      // focusAnchor already clears unread — clicking a thread is a
+      // deliberate "I'm looking at this" (spec §4).
+      {...pair.props}
     >
       <div className="card-head">
         {/* Always mounted so clearing unread fades rather than snaps. */}
@@ -459,41 +467,50 @@ function ThreadCard({ thread }: { thread: CommentThread }) {
  * change that comes with focusing rewrites the card's className and would
  * strip it. A Web Animations call survives both.
  */
+/** A brief ring, in the accent, that survives a re-render (see focusCard). */
+function pulse(el: Element): void {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--user').trim();
+  el.animate(
+    [
+      { boxShadow: `0 0 0 0px ${accent}00`, easing: 'ease-out' },
+      { boxShadow: `0 0 0 5px ${accent}59`, offset: 0.3, easing: 'ease-in-out' },
+      { boxShadow: `0 0 0 5px ${accent}00` },
+    ],
+    { duration: 1500 },
+  );
+}
+
+/** The marked text in the document, so both ends of a focus behave alike. */
+function pulseAnchorText(id: string): void {
+  for (const el of document.querySelectorAll(
+    `.cm-editor .anchor[data-anchor-id="${CSS.escape(id)}"]`,
+  )) {
+    pulse(el);
+  }
+}
+
 function focusCard(id: string): void {
   const el = document.getElementById(`card-${id}`);
   if (!el) return;
   const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   el.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
   if (still) return;
-  const pulse = () => {
-    const accent = getComputedStyle(document.documentElement).getPropertyValue('--user').trim();
-    // Grows in, then dissolves at full width rather than shrinking back —
-    // a ring collapsing to nothing is what made this read as a cut. The
-    // color is soft and the exit is long; the eye should catch it without
-    // being snapped at.
-    el.animate(
-      [
-        { boxShadow: `0 0 0 0px ${accent}00`, easing: 'ease-out' },
-        { boxShadow: `0 0 0 5px ${accent}59`, offset: 0.3, easing: 'ease-in-out' },
-        { boxShadow: `0 0 0 5px ${accent}00` },
-      ],
-      { duration: 1500 },
-    );
-  };
+  const run = () => pulse(el);
   // Wait for the smooth scroll to land. Firing both at once means the pulse
   // peaks while the card is still traveling — usually off-screen — and is
   // over before it arrives.
   const scroller = el.closest('.review-scroll');
-  if (!scroller) return pulse();
+  if (!scroller) return run();
   let done = false;
-  const run = () => {
+  const once = () => {
     if (done) return;
     done = true;
-    scroller.removeEventListener('scrollend', run);
-    pulse();
+    scroller.removeEventListener('scrollend', once);
+    run();
   };
-  scroller.addEventListener('scrollend', run, { once: true });
-  window.setTimeout(run, 700); // in case the card was already in place
+  scroller.addEventListener('scrollend', once, { once: true });
+  window.setTimeout(once, 700); // in case the card was already in place
 }
 
 /**
@@ -519,8 +536,7 @@ function RoundHeader({
   onToggleFilter: () => void;
 }) {
   const review = useStore((s) => s.review);
-  const setActiveAnchor = useStore((s) => s.setActiveAnchor);
-  const markThreadSeen = useStore((s) => s.markThreadSeen);
+  const focusAnchor = useStore((s) => s.focusAnchor);
   const [dismissed, setDismissed] = useState<number | null>(null);
 
   const round = review?.round ?? 0;
@@ -541,14 +557,11 @@ function RoundHeader({
   const shown = items.slice(0, MAX_JUMPS);
   const rest = items.length - shown.length;
 
-  const go = (id: string, anchor: Anchor, seen?: string) => {
-    setActiveAnchor(id);
-    if (seen) markThreadSeen(seen);
+  const go = (id: string, anchor: Anchor) => {
+    focusAnchor(id);
     // Mark the passage in the document too — a jump that only moves the
     // sidebar leaves the reader to find the text themselves.
     if (!anchor.orphaned) revealRange(anchor.from, anchor.to);
-    // After the state change has rendered, so the card is there to scroll to.
-    requestAnimationFrame(() => focusCard(id));
   };
   const parts = [
     answered.length > 0 && `replied to ${answered.length} ${answered.length === 1 ? 'thread' : 'threads'}`,
@@ -574,7 +587,7 @@ function RoundHeader({
           <button
             key={it.id}
             className="round-jump"
-            onClick={() => go(it.id, it.anchor, 'replies' in it ? it.id : undefined)}
+            onClick={() => go(it.id, it.anchor)}
           >
             ↳ “{it.anchor.quote.length > 26 ? `${it.anchor.quote.slice(0, 25)}…` : it.anchor.quote}”
           </button>
@@ -614,14 +627,19 @@ export function Sidebar() {
     if (showArchive) archiveRef.current?.scrollIntoView({ block: 'start' });
   }, [showArchive]);
   const activeAnchorId = useStore((s) => s.activeAnchorId);
+  const focusRequest = useStore((s) => s.focusRequest);
 
-  // Bring the focused card into view when an editor highlight is clicked.
+  // Every "take me there" — a card, a round-header jump, or marked text in
+  // the document — lands here, so all three behave the same.
   useEffect(() => {
-    if (!activeAnchorId) return;
-    document
-      .getElementById(`card-${activeAnchorId}`)
-      ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [activeAnchorId]);
+    if (!focusRequest) return;
+    const id = focusRequest.id;
+    requestAnimationFrame(() => {
+      focusCard(id);
+      // Both ends of the pair light up, whichever end was clicked.
+      pulseAnchorText(id);
+    });
+  }, [focusRequest]);
 
   const currentRound = review?.round ?? 0;
   const [onlyNeedsYou, setOnlyNeedsYou] = useState(false);

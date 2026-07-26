@@ -268,7 +268,14 @@ kbd {
   padding: 48px 56px 40vh;
 }
 
-.cm-content { caret-color: var(--user); }
+/* Two classes: CodeMirror's injected theme sets caret-color on .cm-content
+   too and lands later, so the single-class rule lost and the caret stayed
+   black in dark mode. (Fourth time this file has been bitten by it — see
+   CLAUDE.md.) The .cm-cursor rules cover the drawn caret if drawSelection
+   is ever enabled. */
+.cm-editor .cm-content { caret-color: var(--user); }
+.cm-editor .cm-cursor,
+.cm-editor .cm-dropCursor { border-left-color: var(--user); border-left-width: 2px; }
 .cm-line { padding: 0; }
 .cm-content ::selection,
 .cm-content::selection { background: color-mix(in srgb, var(--user) 25%, transparent); }
@@ -410,6 +417,28 @@ kbd {
    9% wash is tuned for 17px prose and disappears here (#102). */
 /* Two classes, so it does not depend on sitting after `.card-context` —
    which sets the insertion color and is defined further down the file. */
+/* The diff inside a suggestion card. Unchanged words stay ordinary so the
+   eye lands on what actually differs; the operation carries the colour. */
+.card-diff {
+  margin: 0 0 6px;
+  font-family: var(--font-prose);
+  font-size: 13px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.card-diff .diff-del {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 70%, transparent);
+  text-decoration-thickness: 1.5px;
+  border-radius: 3px;
+}
+.card-diff .diff-ins {
+  background: color-mix(in srgb, var(--agent) 18%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--agent) 70%, transparent);
+  border-radius: 3px;
+}
+
 .card-context.card-context-del {
   color: var(--ink);
   background: color-mix(in srgb, var(--danger) 16%, transparent);
@@ -1140,11 +1169,20 @@ button.status-chip:active { transform: translateY(1px); }
 /* ——— inline accept pill ——— */
 
 .suggest-ins-wrap { position: relative; }
+/* Below the change and centered on it.
+   Above put it over the previous line, which read as annotating the wrong
+   text. Pinned left, it hung off the end of the change — the pill belongs
+   to the whole edit, not to the first character of the inserted half. */
 .suggest-pill {
   position: absolute;
-  bottom: calc(100% + 6px);
+  top: calc(100% + 2px);
   left: 0;
+  /* --pill-dx is measured per suggestion (see centerPills): the offset from
+     the widget to the middle of the whole change, struck text included.
+     Falls back to the seam if measurement has not run yet. */
+  transform: translateX(calc(var(--pill-dx, 0px) - 50%));
   z-index: 5;
+  box-shadow: var(--shadow);
   display: flex;
   align-items: center;
   gap: 2px;
@@ -1161,12 +1199,17 @@ button.status-chip:active { transform: translateY(1px); }
   pointer-events: none;
   transition: opacity 0.12s ease;
 }
+/* Fading out slowly and in quickly means crossing the ragged gap between
+   two wrapped lines does not blink the pill: the pointer leaves one span
+   and reaches the next before the fade finishes. */
+.suggest-pill { transition: opacity 0.45s ease 0.12s; }
 .pair-hot .suggest-pill,
 .pair-active .suggest-pill,
 .suggest-ins-wrap.pair-hot .suggest-pill,
 .suggest-ins-wrap.pair-active .suggest-pill {
   opacity: 1;
   pointer-events: auto;
+  transition: opacity 0.1s ease;
 }
 .pill-accept {
   border: none;

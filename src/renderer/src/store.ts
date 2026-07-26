@@ -57,6 +57,14 @@ interface MarginState {
   undoDecision: (id: string) => void;
   /** Clear a thread's unread mark — the author has looked at it (spec §4). */
   markThreadSeen: (id: string) => void;
+  /**
+   * "Take me to this." Focuses the anchor, clears its unread mark, and asks
+   * the sidebar to center and pulse the card. The counter makes a repeat
+   * request observable — asking for the anchor you are already on has to
+   * work, and setting the same id twice is not a state change (#103).
+   */
+  focusRequest: { id: string; n: number } | null;
+  focusAnchor: (id: string) => void;
   save: () => Promise<void>;
   /** Model + effort for this project's rounds (cascade: project → app default). */
   modelPref: ModelPreference;
@@ -432,6 +440,13 @@ export const useStore = create<MarginState>((set, get) => {
           x.id === id ? { ...x, status: 'accepted' as const, applied } : x,
         ),
       }));
+    },
+
+    focusRequest: null,
+    focusAnchor: (id) => {
+      const prev = get().focusRequest;
+      set({ activeAnchorId: id, focusRequest: { id, n: (prev?.id === id ? prev.n : 0) + 1 } });
+      get().markThreadSeen(id);
     },
 
     markThreadSeen: (id) => {

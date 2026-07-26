@@ -339,18 +339,69 @@ are document- and anchor-scoped. Merging them would lose the anchor.
 
 ## 6. Suggestions: diff granularity and removals (#98, #102)
 
-**Diff within the suggestion, not across the anchor.** Today the whole
-anchored range renders struck and the whole replacement renders
-inserted, so `C+I → Commerce & Identity (C&I)` displays as two full
-clauses when three words changed. Compute a word-level diff between
-`anchor.quote` and `replacement` at render time and mark only the
-changed spans. **No schema change** — both strings are already stored;
-this is presentation.
+**Trim the suggestion; do not diff it.** The whole anchored range used
+to render struck with the whole replacement after it, so
+`C+I → Commerce & Identity (C&I)` displayed as two full clauses when
+three words changed. Strip the words the quote and the replacement share
+at each end and show everything between as **one** deletion and **one**
+insertion. No schema change — both strings are already stored.
 
-This is the same code path in the inline decoration and the sidebar
-card, and it is what #102 is really about: a pure deletion currently
-renders as "everything struck, nothing inserted", which reads as a
-glitch rather than as a deletion.
+A real diff is wrong here rather than merely different. Replacing
+"alpha and beta" with "gamma and delta" shares the word *and*, and a
+diff anchors on it: `[alpha|gamma] and [beta|delta]`. That reads as two
+edits you could take separately, when a suggestion is one replacement
+you accept or reject whole — and a suggestion that fragments into five
+small swaps is harder to judge than the sentence it came from.
+
+**Characters the two sides share at the edges stay outside the marks** —
+whitespace *and* punctuation. They exist in both strings, so marking
+them misreports something untouched and the highlight stops matching
+the words that differ:
+
+```
+[-C+I,-]{+Commerce & Identity (C&I),+} where     two commas
+(something [-parenthetical)-]{+in parentheses)+} two closing parens
+```
+
+The second reads worse, because a closing paren is half a matched pair
+and two of them look like broken markup rather than repeated content —
+but it is the same artifact, so one rule covers both.
+
+**Never letters or digits.** Hoisting those cuts words in half
+(`runn[-ing-]{+er+}`), trading one oddity for a worse one.
+
+**And only when both sides have it.** Inserting a word into a sentence
+adds a space as well as a word, so that space really is new and stays
+inside the insertion; deleting a word takes its space with it.
+
+Trimming also has no pathological case, so it needs no size cap.
+
+The same trim drives the inline decoration and the sidebar card, so
+the document strikes only the words that change rather than the whole
+anchored range.
+
+**A deletion-only suggestion still gets an accept/reject pill.** The
+pill lives on the inserted half's widget, which used to be placed only
+when there was a replacement — so a deletion had nothing to act on
+inline (#102). The widget is now always placed and renders no inserted
+text when there is none.
+
+**The pill sits below the change and centered on the seam** between the
+struck and inserted text. Above put it over the previous line, where it
+read as annotating the wrong text; pinned to the left of the insertion
+it hung off the end of the edit. A deletion has no seam, so its widget
+is anchored mid-run instead and the pill centers on the words it removes
+rather than trailing past them.
+
+**Large changes are left to degrade.** A rewrite spanning several lines
+renders as the old passage struck and the new one after it, which reads
+as an old-then-new paragraph and is legible, but it doubles the text and
+pushes the document down. If the change runs past the viewport its pill
+can be off-screen. That is acceptable because **the sidebar card carries
+the same Accept/Reject and is always reachable** — the inline pill is a
+convenience for local edits, not the primary control. If it becomes a
+problem the answer is to collapse very large inline suggestions to a
+marker, not to make the floating pill cleverer.
 
 **Color by operation, not by author.** Insertions in the agent color,
 deletions in `--danger`. #102 asks whether a deletion-only suggestion
