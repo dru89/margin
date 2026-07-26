@@ -1,6 +1,9 @@
 # Review surface — design spec
 
-**Status:** model settled with Drew (2026-07-25). Nothing here is built.
+**Status:** model settled with Drew (2026-07-25); all eight build steps
+shipped (2026-07-26). What is written here is what the app does — read
+it as the current design, and DECISIONS §62-69 for what changed while
+building it.
 **Covers:** #84, #88, #89, #90, #98, #100, #102, #103, #104, #121, #128.
 
 ## The problem
@@ -145,8 +148,19 @@ only by a 40% versus 55% border tint, which is invisible.
 wrap among themselves and the action never moves: a thread carrying a
 state label, an orphan badge, and a round stamp used to push Resolve onto
 a line of its own, so the card reported its own width rather than its
-state. When the row runs out of room the round stamp drops to a second
-line, which is the right thing to lose.
+state.
+
+**Every card carries a locator, and it is the elastic fact.** Read is the
+state with no label, and its round stamp is usually suppressed as
+redundant — which left the head of a thread you had just read empty but
+for a right-floated Resolve. That reads as something having failed to
+render rather than as a card with nothing to declare, and it is the
+common case, not an edge one: it is where every thread lands the moment
+you read this round's reply. The locator (`¶ nearest heading`) is true of
+every card in every state, and suggestion cards already carried it. It
+takes whatever width the labels and stamps leave and truncates rather
+than wrapping, so adding it costs no height: state and round win the room
+when they need it, and the section name gives way.
 
 **The spine stays inside the card.** It sits within the border rather
 than straddling it — an edge hanging past the rounded corners draws the
@@ -453,6 +467,12 @@ Plus an optional `in_reply_to` on the `suggest_edit` tool, and a prompt
 line telling the agent to link an edit that answers a comment instead
 of describing the link.
 
+**The agent writes that id, so it is validated before it is stored** —
+untrusted in the same sense an agent-supplied path is. The check is
+narrow on purpose: reject only an id naming no thread on this document.
+A link to a resolved thread is unusual but true, and refusing it would
+throw away a correct edit over a judgement that is the author's.
+
 **The field lives on the suggestion, which gives both directions from
 one place.** A thread's linked edits are found by scanning suggestions
 for its id — no second field, nothing to keep in sync, no way for the
@@ -618,7 +638,8 @@ feature and it works.
 
 ## 11. Build order
 
-The state model is the dependency; everything else reads from it.
+The state model is the dependency; everything else reads from it. All
+eight shipped between 2026-07-25 and 2026-07-26.
 
 1. `round` / `seenRound` on the three types, stamped at creation,
    backfilled on load. Nothing visible changes.
@@ -629,8 +650,8 @@ The state model is the dependency; everything else reads from it.
    #102.
 6. Draft editing (§8) — closes #89, #121.
 7. Chips (§9) — closes #90. Independent of 1–6; can move earlier.
-8. `inReplyTo` + pointer rows (§7) — needs 1–2 for state, and #128
-   settled before any bulk accept.
+8. `inReplyTo` + pointer rows (§7) — closes #100. "Accept all"
+   deliberately left out; #128 was its prerequisite, not its design.
 
 ## Settled with Drew (2026-07-25)
 

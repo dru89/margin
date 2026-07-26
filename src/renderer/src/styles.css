@@ -817,6 +817,13 @@ kbd {
 /* Widening the spine emphasizes the card without recoloring it — the
    color is state, and selecting a card must not appear to change it. */
 .pair-active.card::before { width: 6px; }
+/* The counterpart of the card you are on (spec §7). Quieter than either
+   hover or selected on purpose: it answers "and where is the other one"
+   at a glance, and must not compete with the card actually being read. */
+.pair-linked.card {
+  border-color: color-mix(in srgb, var(--ink-faint) 30%, var(--rule));
+  background: color-mix(in srgb, var(--ink) 3%, var(--paper-raised));
+}
 .card-composer { border-color: var(--user); cursor: default; }
 .card-archived { opacity: 0.7; cursor: default; }
 
@@ -847,6 +854,17 @@ kbd {
   gap: 6px;
   min-width: 0;
   flex: 1 1 auto;
+}
+/* The locator is the elastic fact: it takes whatever room the labels and
+   stamps leave and truncates, rather than wrapping the head onto a second
+   line. Two classes, so it beats the plain `.card-locator` rule that
+   right-aligns it on a suggestion card. */
+.card-facts > .card-locator {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .card-head.card-head-split > .btn-ghost,
 .card-head.card-head-split > .resolve-wrap { margin-left: 0; flex: 0 0 auto; }
@@ -1008,6 +1026,37 @@ textarea:focus { outline: none; border-color: var(--user); }
 textarea::placeholder { color: var(--ink-faint); }
 
 .composer-replacement { font-family: var(--font-prose); min-height: 84px; }
+
+/* ——— pointer rows between a comment and its edits (spec §7) ——— */
+
+.card-links { margin-top: 8px; display: flex; flex-direction: column; gap: 2px; }
+.pointer-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 12px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+  /* A pointer names *where* the counterpart is, so it stays one line and
+     truncates rather than wrapping into a paragraph of its own. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pointer-row:hover { background: var(--paper-inset); color: var(--ink); }
+/* Decided edits are a record, not work. Kept rather than removed: this
+   line is the evidence the author would resolve the thread on. */
+.card-links-decided {
+  margin: 2px 0 0;
+  padding: 0 6px;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.card-suggestion .pointer-row { margin-top: 6px; }
 
 .card-replybox { margin-top: 8px; }
 .card-replybox textarea { min-height: 38px; }
