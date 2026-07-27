@@ -78,8 +78,8 @@ npm run test:e2e     # builds, then runs test/e2e/
 seeded `projectsDir`, so a test never touches real settings, recents, or
 `~/Documents/Margin`. `MARGIN_FAKE_AGENT=1` is always set. Assert on what
 the user ends up with — which window holds what, sidecar contents, file
-contents — never on markup, or a restyle breaks the suite. Journey 3 is
-still to come (#135); 1, 2 and 4 are in place.
+contents — never on markup, or a restyle breaks the suite. All four
+critical journeys are in place (#134, #135 and the two before them).
 
 **Journey 1 is the one to read first** — `journey-1-review-round.spec.ts`
 walks a whole round and crosses the four seams that have produced the
@@ -109,6 +109,11 @@ Traps this suite has already hit:
   agent keeps working after the visible output lands, and the editor
   stays read-only for all of it — correctly. Typing into that window
   silently does nothing.
+- **"No orphan badge" is not "the anchor is right."** An anchor that
+  migrated onto different text shows no badge either — the #126 failure
+  exactly. Assert the marked range's own text
+  (`.anchor[data-anchor-id=…]`), not the absence of a warning. Journey 3
+  passed a never-orphan mutant until it did.
 
 **When a change needs a test:**
 
