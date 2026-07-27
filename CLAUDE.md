@@ -34,6 +34,7 @@ npm run test:sidecar     # load, backfill, rename recovery, refusing a stranger'
 npm run test:tables      # GFM table formatting
 npm run test:git         # git is optional — runs with git off PATH (#145)
 npm run test:errors      # what a failed round says and whether it rolls back (§71)
+npm run test:project     # margin.json: the legacy fallback and the name
 npm run test:contract    # the REAL agent, unauthenticated — free, fast, CI-safe (§73)
 ```
 
