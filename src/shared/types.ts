@@ -301,6 +301,17 @@ export interface ModelPreference {
 }
 
 /** `<workspaceRoot>/.margin/project.json` — travels with the project. */
-export interface ProjectSettings extends ModelPreference {
+/**
+ * `margin.json` — what the author states about a project (spec §2).
+ *
+ * Visible, committed, hand-editable, and deliberately thin: this file
+ * *declares* a project, while `.margin/` stores the state Margin writes
+ * on its behalf. Extends the model preference because that is a stated
+ * choice rather than generated state, and it travels better here than in
+ * an invisible directory.
+ */
+export interface ProjectFile extends ModelPreference {
   version: 1;
+  /** Title, independent of the folder name. Falls back to the basename. */
+  name?: string;
 }

@@ -16,7 +16,7 @@ import { showOpenDialog, showOpenFolderDialog } from './menu';
 import { commitCheckpoint, fileLog, initProjectRepo, initRepo, isInRepo, restoreFromCommit } from './git';
 import { getAgent } from './agents';
 import { getSettings, updateSettings } from './settings';
-import { loadProjectSettings, saveProjectSettings } from './projectSettings';
+import { loadProjectFile, saveProjectFile } from './projectFile';
 import { saveDiscussion } from './discussionStore';
 import { getWorkspace, resolveInsideWorkspace } from './workspace';
 import { getRecentFiles } from './recents';
@@ -213,10 +213,10 @@ export function registerIpcHandlers(): void {
     async (event, migrateModel?: string): Promise<ModelPreference> => {
       const session = getSession(event.sender.id);
       if (!session) return {};
-      const project = await loadProjectSettings(session.workspaceRoot);
+      const project = await loadProjectFile(session.workspaceRoot);
       if (project.model) return { model: project.model, effort: project.effort };
       if (migrateModel) {
-        await saveProjectSettings(session.workspaceRoot, { model: migrateModel });
+        await saveProjectFile(session.workspaceRoot, { model: migrateModel });
         return { model: migrateModel };
       }
       const app = await getSettings();
@@ -227,7 +227,7 @@ export function registerIpcHandlers(): void {
   // Changing the model at turn time sticks to the project (Drew's cascade).
   ipcMain.handle(IPC.setProjectSettings, async (event, pref: ModelPreference) => {
     const session = requireSession(event.sender.id);
-    await saveProjectSettings(session.workspaceRoot, pref);
+    await saveProjectFile(session.workspaceRoot, pref);
   });
 
   // Folder picker for the projects directory; returns the updated settings.
@@ -293,7 +293,7 @@ export function registerIpcHandlers(): void {
       await saveDiscussion(target, { version: 1, messages });
       // The model chosen during setup becomes the project's default
       // for every later round (DECISIONS §61).
-      if (pref?.model || pref?.effort) await saveProjectSettings(target, pref);
+      if (pref?.model || pref?.effort) await saveProjectFile(target, pref);
       await initProjectRepo(target, `New project: ${proposal.title}`);
 
       if (!firstMd) throw new Error('The proposal contained no markdown file to open.');

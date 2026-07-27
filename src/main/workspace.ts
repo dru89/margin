@@ -4,6 +4,7 @@ import os from 'os';
 import path from 'path';
 import type { WorkspaceFile, WorkspaceState } from '@shared/types';
 import { loadProposals } from './proposalsStore';
+import { loadProjectFile, projectName } from './projectFile';
 
 const SKIP_DIRS = new Set(['.git', 'node_modules', 'out', 'dist', '.obsidian']);
 const MAX_FILES = 500;
@@ -192,11 +193,12 @@ async function listProjectSkills(root: string): Promise<string[]> {
 
 export async function getWorkspace(filePath: string): Promise<WorkspaceState> {
   const root = await findWorkspaceRoot(filePath);
-  const [allFiles, modified, skills, proposalsData] = await Promise.all([
+  const [allFiles, modified, skills, proposalsData, project] = await Promise.all([
     walkFiles(root),
     modifiedSet(root),
     listProjectSkills(root),
     loadProposals(root),
+    loadProjectFile(root),
   ]);
   const files: WorkspaceFile[] = await Promise.all(
     allFiles.map(async (p) => {
@@ -225,7 +227,9 @@ export async function getWorkspace(filePath: string): Promise<WorkspaceState> {
   }
   return {
     root,
-    rootName: path.basename(root),
+    // A project's stated name, else its folder's — the reason `name`
+    // exists in `margin.json` at all (spec §2).
+    rootName: projectName(root, project),
     files,
     skills,
     agentNotesPath,
