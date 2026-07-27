@@ -24,15 +24,28 @@ export async function initRepo(filePath: string): Promise<void> {
   await git(path.dirname(filePath), ['init']);
 }
 
-/** git init + first commit of everything in a freshly created project dir. */
+/**
+ * git init + first commit of everything in a freshly created project dir.
+ *
+ * Every step is optional (#145). A project without a repo is a working
+ * project: `inGitRepo` already gates History and restore, and the project
+ * root keys off `.margin/` rather than git (DECISIONS §63). The init was
+ * previously unguarded, so with no git on PATH `createProject` wrote the
+ * folder and every seed file and *then* threw — leaving a project on disk
+ * that Margin never opened, and that a retry refused as already existing.
+ *
+ * The old comment shows the shape of the mistake: it anticipated git
+ * present but unconfigured, the failure its author had seen, and not git
+ * absent, which they hadn't.
+ */
 export async function initProjectRepo(dir: string, message: string): Promise<void> {
-  await git(dir, ['init']);
   try {
+    await git(dir, ['init']);
     await git(dir, ['add', '-A']);
     await git(dir, ['commit', '-m', message]);
   } catch {
-    // e.g. no git identity configured — the repo exists, project creation
-    // still succeeds; round checkpoints surface git problems non-fatally.
+    // No git on PATH, or no identity configured. Either way the project
+    // itself is fine; checkpoints surface git problems non-fatally later.
   }
 }
 

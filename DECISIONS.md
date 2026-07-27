@@ -1502,3 +1502,33 @@ changes that may be spread across more document than fits on screen. #128
 made a single accept recoverable, which was its prerequisite; it should
 still be designed on its own rather than as a rider on the model it
 depends on.
+
+## 70. Git's absence never breaks a write path (#145, from the audit in #144)
+
+Margin degrades without git everywhere by design: History and restore are
+gated on `inGitRepo`, checkpoints fail non-fatally, and the project root
+keys off `.margin/` rather than a repo (§63). Project creation was the one
+place that did not. `initProjectRepo` guarded the *commit* and not the
+*init*, so with no git on PATH `createProject` wrote the folder and every
+seed file and then threw — leaving a project on disk that Margin never
+opened, and that a retry refused as already existing.
+
+The old comment is the interesting part: it anticipated git present but
+unconfigured, the failure its author had actually seen, and not git
+absent, which they hadn't. A guard written around one remembered failure
+is not a guard around the dependency.
+
+**The rule this settles: a missing optional dependency may remove a
+feature, never a write already in progress.** Anything that creates files
+completes; what needed git is simply absent afterwards.
+
+**An explicit request is allowed to fail, but must fail visibly.** The
+"No repo · Initialize" button is the other half: the user asked for a
+repo, so not getting one is a legitimate outcome — but it used to reject
+through IPC into a `void`ed promise, so the button did nothing at all,
+which is the same silence with none of the honesty. It now reports what
+happened and says git is unavailable.
+
+Tested by removing git from PATH rather than by mocking, since a mock
+would only assert the mock. The suite also covers the failure the
+original code did anticipate, so the fix cannot regress it.

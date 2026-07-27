@@ -38,6 +38,8 @@ export function Toolbar() {
       ? ellipsize(composerAnchor.quote, 32)
       : null;
   const [submitOpen, setSubmitOpen] = useState(false);
+  /** Initialize was clicked and the repo still isn't there — git is missing. */
+  const [gitUnavailable, setGitUnavailable] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => window.margin.onMenuSubmit(() => setSubmitOpen(true)), []);
@@ -110,10 +112,16 @@ export function Toolbar() {
         {!doc.inGitRepo && (
           <button
             className="status-chip status-warn"
-            title="Checkpoints are disabled without a git repository."
-            onClick={() => void window.margin.gitInit()}
+            title={
+              gitUnavailable
+                ? 'Margin could not run git. Install it to enable checkpoints and history.'
+                : 'Checkpoints are disabled without a git repository.'
+            }
+            // A click that changes nothing has to say why. Without this the
+            // button simply did nothing when git was missing (#145).
+            onClick={() => void window.margin.gitInit().then((ok) => setGitUnavailable(!ok))}
           >
-            No repo · Initialize
+            {gitUnavailable ? 'Git not available' : 'No repo · Initialize'}
           </button>
         )}
         <span className="tb-divider" />
