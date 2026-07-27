@@ -1,3 +1,5 @@
+import type { AgentFailure } from './agentErrors';
+
 export type Author = 'user' | 'agent';
 
 /**
@@ -147,6 +149,12 @@ export interface AgentStatus {
   phase: AgentPhase;
   /** Human-readable description of what the agent is doing / did. */
   detail: string;
+  /**
+   * On `error`: what went wrong, in the author's terms, and whether the
+   * round was put back the way it was so it can simply be sent again
+   * (#79, #106). Absent in every other phase.
+   */
+  failure?: AgentFailure & { rolledBack: boolean };
 }
 
 export interface WorkspaceFile {

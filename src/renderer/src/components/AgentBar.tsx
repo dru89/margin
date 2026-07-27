@@ -7,7 +7,16 @@ export function AgentBar() {
   const round = useStore((s) => s.review?.round ?? 0);
   const activity = useStore((s) => s.activity);
   const cancelReview = useStore((s) => s.cancelReview);
-  const [dismissed, setDismissed] = useState<string | null>(null);
+  const submit = useStore((s) => s.submit);
+  // Dismissal is per *occurrence*, cleared when the next round starts.
+  // Keying it to the message text meant a second identical failure — the
+  // retry that fails the same way, which is the likely one — stayed
+  // hidden behind the first dismissal, so clicking Submit appeared to do
+  // nothing at all.
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => {
+    if (agent.phase === 'running') setDismissed(false);
+  }, [agent.phase]);
   const [showLog, setShowLog] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -21,7 +30,7 @@ export function AgentBar() {
   }, [activity, showLog]);
 
   if (agent.phase === 'idle') return null;
-  if ((agent.phase === 'done' || agent.phase === 'error') && dismissed === agent.detail) return null;
+  if ((agent.phase === 'done' || agent.phase === 'error') && dismissed) return null;
 
   return (
     <footer className={`agent-bar agent-${agent.phase}`}>
@@ -34,7 +43,11 @@ export function AgentBar() {
         {agent.phase === 'done' && (
           <span className="status-chip status-agent">✓ Round {round} returned</span>
         )}
-        {agent.phase === 'error' && <span className="status-chip status-danger">✕ Round failed</span>}
+        {agent.phase === 'error' && (
+          <span className="status-chip status-danger">
+            {agent.failure?.rolledBack ? '✕ Round not sent' : '✕ Round failed'}
+          </span>
+        )}
         {activity.length > 0 ? (
           <button
             className="agent-detail agent-detail-button"
@@ -52,12 +65,22 @@ export function AgentBar() {
               {showLog ? 'Hide log' : 'Log'}
             </button>
           )}
+          {/* Offered only when the round was put back: retrying then means
+              exactly "send this again", the same act as the first attempt.
+              After a partial round it would mean something else — a new
+              round on top of work that already landed — so the author
+              submits that themselves, deliberately. */}
+          {agent.phase === 'error' && agent.failure?.rolledBack && agent.failure.retryable && (
+            <button className="btn btn-ghost" onClick={() => void submit()}>
+              Retry
+            </button>
+          )}
           {agent.phase === 'running' ? (
             <button className="btn btn-ghost" onClick={() => void cancelReview()}>
               Cancel
             </button>
           ) : (
-            <button className="btn btn-ghost" onClick={() => setDismissed(agent.detail)}>
+            <button className="btn btn-ghost" onClick={() => setDismissed(true)}>
               Dismiss
             </button>
           )}

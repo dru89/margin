@@ -342,6 +342,16 @@ export async function runReviewTurn(
   effort?: string,
 ): Promise<ActiveTurn> {
   if (process.env.MARGIN_FAKE_AGENT) {
+    // `MARGIN_FAKE_AGENT=fail:<text>` makes the turn reject with that
+    // text, which is the only way to drive the recovery path (#79, #106)
+    // without unplugging a network or expiring a token by hand.
+    const fail = /^fail:(.*)$/s.exec(process.env.MARGIN_FAKE_AGENT);
+    if (fail) {
+      return {
+        done: Promise.reject(new Error(fail[1] || 'scripted failure')),
+        cancel: async () => {},
+      };
+    }
     return runFakeReviewTurn(session, callbacks);
   }
   const sdk = await loadSdk();
