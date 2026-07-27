@@ -9,6 +9,7 @@ import type {
   DocState,
   ReviewData,
 } from '@shared/types';
+import { classifyAgentError, reviewOutputSize } from '@shared/agentErrors';
 import { IPC } from '@shared/ipc';
 import { loadReview, saveReview } from './reviewStore';
 import { loadDiscussion, saveDiscussion } from './discussionStore';
@@ -235,6 +236,11 @@ export class DocumentSession {
       }
     }
 
+    // Measured after the counter moved and before the turn starts, so the
+    // comparison in the catch below asks exactly one question: did this
+    // turn put anything into the review?
+    const outputBefore = reviewOutputSize(this.review);
+
     this.setAgentStatus({ phase: 'running', detail: 'Starting review…' });
     try {
       const turn = await runReviewTurn(
@@ -272,7 +278,38 @@ export class DocumentSession {
       }
       this.setAgentStatus({ phase: 'done', detail: summary });
     } catch (err) {
-      this.setAgentStatus({ phase: 'error', detail: err instanceof Error ? err.message : String(err) });
+      const raw = err instanceof Error ? err.message : String(err);
+      const failure = classifyAgentError(raw);
+      // A round that produced nothing did not happen, and is put back the
+      // way it was (#79, #106): the counter returns, and the discussion
+      // messages that rode along go back into the queue. Otherwise the
+      // author's drafts read as "awaiting reply" forever against a turn
+      // that never answered, and their queued messages are gone with no
+      // way to send them but retyping. Retry is then just Submit — there
+      // is no second path to build or to explain.
+      //
+      // Partial output is kept instead. Replies and suggestions that did
+      // land are real work, and a rollback would misstate them.
+      const rolledBack = reviewOutputSize(this.review) === outputBefore;
+      if (rolledBack) {
+        this.review.round -= 1;
+        await saveReview(this.filePath, this.review);
+        await this.mutateDiscussion((d) => {
+          for (const m of d.messages) {
+            if (this.lastSubmittedMessageIds.has(m.id)) m.pending = true;
+          }
+        });
+        this.lastSubmittedMessageIds = new Set();
+        this.sendToRenderer(IPC.reviewUpdated, this.review);
+      }
+      this.setAgentStatus({
+        phase: 'error',
+        detail: failure.message,
+        failure: { ...failure, rolledBack },
+      });
+      // The raw text is still worth having when the message above turns
+      // out to be the wrong guess about what happened.
+      this.sendToRenderer(IPC.agentActivity, `Round failed: ${raw}`);
     } finally {
       this.activeTurn = null;
     }

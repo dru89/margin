@@ -1532,3 +1532,56 @@ happened and says git is unavailable.
 Tested by removing git from PATH rather than by mocking, since a mock
 would only assert the mock. The suite also covers the failure the
 original code did anticipate, so the fix cannot regress it.
+
+## 71. A round that produced nothing did not happen (#79, #106)
+
+Two issues, one cause: **a failed round was recorded as a round that
+happened.** `submitReview` increments the counter and un-queues the
+author's discussion messages *before* the turn runs — correctly, since
+that is what makes "unsent" computable (§62) and what lets the agent see
+the messages. Nothing put either back when the turn then failed.
+
+What the author was left with: every draft they had written reading as
+"awaiting reply" against a turn that never answered; their queued
+messages marked sent, unsendable without retyping; and a Submit button
+that, pressed again, moved the counter *again* — stacking empty rounds
+behind the real ones. The error line was the SDK's own text, which for
+the case in #79 was "Failed to authenticate: OAuth session expired and
+could not be refreshed" — accurate, and silent about the one action that
+fixes it.
+
+**A round that added nothing to the review is put back.** The counter
+returns, the discussion messages go back into the queue. Drafts are
+drafts again and the work is exactly where it was. This is what makes
+**Retry mean the same thing as Submit** — there is no second code path,
+and nothing new for the author to understand.
+
+**A round that produced something keeps it.** Replies and suggestions
+that landed before the failure are real work, and rolling back would
+misstate them. Retry is not offered there, because pressing it would
+mean something different — a new round on top of work that already
+landed — and that is the author's call to make deliberately.
+
+Cancelling gets the same recovery for free, and should: a cancelled round
+is the clearest case of one that did not happen.
+
+**The message names a next step.** Auth failures say to run `claude
+/login`, since the fix is outside Margin and Margin cannot sign in on the
+author's behalf. Network failures say to check the connection.
+**Network is classified before auth**, deliberately: losing the
+connection while a token refreshes produces an error mentioning both, and
+of the two causes the connection is the one the author can see. Getting
+that backwards sends someone to re-run `/login` over dead Wi-Fi. An
+unrecognized error keeps its own words — inventing a friendly sentence
+for it would hide the only information there is. The raw text still goes
+to the activity log, for when the friendly guess is wrong.
+
+**The status bar dismisses per occurrence, not per message.** It keyed
+dismissal to the detail string, so a retry that failed *the same way* —
+the likely retry — stayed hidden behind the first dismissal, and pressing
+Retry appeared to do nothing at all. Found by the journey that submits
+twice.
+
+Not done here, and worth its own issue if it bites: detecting a dead
+session *before* spending a turn on it (#79 asks). It costs a probe on
+every submit to save a failure that now costs nothing but a click.

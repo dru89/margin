@@ -33,6 +33,7 @@ npm run test:workspace   # project-root derivation + its two guards (§63)
 npm run test:sidecar     # load, backfill, rename recovery, refusing a stranger's
 npm run test:tables      # GFM table formatting
 npm run test:git         # git is optional — runs with git off PATH (#145)
+npm run test:errors      # what a failed round says and whether it rolls back (§71)
 ```
 
 `scripts/lib/compile.mjs` does the esbuild-and-import; a new suite is
