@@ -139,6 +139,12 @@ export interface DocState {
   /** Project-scoped discussion (shared across all documents in the workspace). */
   discussion: DiscussionMessage[];
   workspaceRoot: string;
+  /**
+   * Whether a folder declared itself a project (spec §3). When false,
+   * `workspaceRoot` is the document's own folder standing in — nothing
+   * project-scoped belongs there until the author adopts it.
+   */
+  hasProject: boolean;
   /** True when the document lives inside a git repository. */
   inGitRepo: boolean;
 }

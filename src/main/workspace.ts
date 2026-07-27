@@ -4,6 +4,7 @@ import os from 'os';
 import path from 'path';
 import type { WorkspaceFile, WorkspaceState } from '@shared/types';
 import { loadProposals } from './proposalsStore';
+import { PROJECT_FILE } from './projectFile';
 import { loadProjectFile, projectName } from './projectFile';
 
 const SKIP_DIRS = new Set(['.git', 'node_modules', 'out', 'dist', '.obsidian']);
@@ -17,59 +18,69 @@ function git(cwd: string, args: string[]): Promise<string> {
   });
 }
 
-/** Workspace root = git repo root when present, else the file's directory. */
 /**
- * The project a document belongs to, in precedence order:
+ * The project a document belongs to, or null when nothing declares one
+ * (spec §3, #168).
  *
- *   1. the nearest ancestor holding a `.margin/` — the marker we own, and
- *      the only one the user can place deliberately. Nested markers mean
- *      deliberately nested projects; the nearest wins.
- *   2. the git toplevel — a decent guess when no marker exists yet, and
- *      what every project created before `.margin/` keying resolved to.
- *   3. the file's own directory.
+ * **Find a declaration; never invent one.** The walk looks for
+ * `margin.json`, then for a legacy `.margin/` — the two things that mean
+ * somebody said "this folder is a project". It does not fall back to the
+ * git toplevel or to the file's own directory, because both of those
+ * invent projects nobody asked for, and inventing one is what made
+ * `book/chapters/` and `book/notes/` two projects by accident.
  *
- *  Where both (1) and (2) apply, the *deeper* one wins. `.margin/` is
- *  created automatically at whatever root was in use, so a stray marker
- *  high up — open a loose `~/Writing/notes.md` once and `~/Writing/`
- *  has one — must not swallow every git repo beneath it.
+ * The nearest declaration wins, so nested projects are nested on purpose.
  *
- *  `.margin/` is written *at* whatever root (2) or (3) produced, so
- *  existing projects already carry the marker at their current root and
- *  keep it under this rule.
+ * This replaces the precedence rules in DECISIONS §63 — marker versus git
+ * toplevel, "the deeper of the two wins" — all of which existed to make
+ * *derivation* safe. There is no derivation left to make safe.
  *
- *  The walk stops before the home directory: opening a loose `~/notes.md`
- *  creates `~/.margin/`, and without this every file anywhere under home
- *  would then inherit home as its project. `~/notes.md` itself still
- *  resolves to home through (3).
+ * The home directory is still refused as a project root, and now for a
+ * sharper reason than before: `~/.margin/` was created by accident under
+ * the old rules, and treating that leftover as a declaration would hand
+ * every file under home to one enormous project.
  */
-export async function findWorkspaceRoot(filePath: string): Promise<string> {
-  const dir = path.dirname(filePath);
+export async function findProjectRoot(filePath: string): Promise<string | null> {
   const home = os.homedir();
-  let marker: string | null = null;
-  let cur = dir;
+  let cur = path.dirname(filePath);
   for (;;) {
     if (cur !== home) {
-      try {
-        if ((await fs.stat(path.join(cur, '.margin'))).isDirectory()) {
-          marker = cur;
-          break;
-        }
-      } catch {
-        /* no marker here — keep walking up */
-      }
+      if (await declaresProject(cur)) return cur;
     }
     const parent = path.dirname(cur);
-    if (parent === cur) break;
+    if (parent === cur) return null;
     cur = parent;
   }
-  let toplevel: string | null = null;
+}
+
+/** Does this folder say it is a project? */
+async function declaresProject(dir: string): Promise<boolean> {
   try {
-    toplevel = (await git(dir, ['rev-parse', '--show-toplevel'])).trim();
+    await fs.access(path.join(dir, PROJECT_FILE));
+    return true;
   } catch {
-    /* not a repo */
+    /* no margin.json — a legacy project may still declare itself */
   }
-  if (marker && toplevel) return toplevel.length > marker.length ? toplevel : marker;
-  return marker ?? toplevel ?? dir;
+  try {
+    return (await fs.stat(path.join(dir, '.margin'))).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The root to resolve paths against — the declared project, or the
+ * document's own folder when there is none.
+ *
+ * **A bridge, and deliberately temporary.** Everything downstream still
+ * assumes a workspace root exists, so this keeps one. The `dirname`
+ * fallback is *not* a declaration: `hasProject` is what says whether a
+ * project was found, and step 3 of the spec is where an undeclared file
+ * stops writing project state into that folder. Until then, the accident
+ * this spec removes is narrowed rather than gone — see the note in #168.
+ */
+export async function findWorkspaceRoot(filePath: string): Promise<string> {
+  return (await findProjectRoot(filePath)) ?? path.dirname(filePath);
 }
 
 export function isMarkdown(name: string): boolean {

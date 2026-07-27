@@ -1680,3 +1680,39 @@ gotcha), so the spawned CLI falls back to whatever is on disk.
 Not covered by either, and deliberately: whether the prompt produces good
 reviews. That is judgement, and a test asserting it would be asserting
 one model's mood.
+
+## 74. Find a declaration, never invent one (#168) — replaces §63
+
+§63 keyed the project root off `.margin/` rather than `.git/`, with the
+deeper of marker and repo winning and the walk stopping before the home
+directory. Both guards existed for one reason: **derivation had to be
+made safe**, because a root was computed from a file path whether or not
+anybody had said where the project was.
+
+The workspace-model spec removes derivation instead of guarding it. The
+walk now looks only for a declaration — `margin.json`, or a legacy
+`.margin/` — and returns **null** when it finds none. No git toplevel, no
+`dirname`, because both invent a project nobody asked for, and inventing
+one is what turned `book/chapters/` and `book/notes/` into two projects
+by accident.
+
+What that retires: the marker-versus-git precedence, "the deeper of the
+two wins", and git's role as a boundary at all. Git stays a feature —
+checkpoints and history — and stops deciding what a project is.
+
+**The home-directory guard survives, with a sharper reason.** Under the
+old rules `~/.margin/` was created by accident the first time a loose
+`~/notes.md` was opened. Treating that leftover as a declaration would
+now hand every file under home to one enormous project — worse than the
+behaviour the guard originally prevented.
+
+**Steps 2 and 3 of that spec are more coupled than the build order
+implies**, and this entry records the seam rather than pretending
+otherwise. Removing the fallbacks requires deciding what an undeclared
+file *does*, and that decision is step 3. Until it lands,
+`findWorkspaceRoot` bridges by returning the document's own folder, and
+`DocState.hasProject` carries the truth about whether anything was
+actually declared. The bridge is not a declaration, and the accident is
+narrowed rather than gone: a folder nobody declared no longer inherits a
+whole repository, but project state written into it still creates a
+`.margin/` that a later walk would find. Step 3 closes that.
