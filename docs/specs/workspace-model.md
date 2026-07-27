@@ -189,21 +189,34 @@ sent, and an agent did answer it or decline to. Every state derivation
 stays internally correct, and anchors, suggestions, decisions and rename
 adoption are round-independent.
 
-Three consequences, all of them real and none of them corruption:
+Three consequences, all real, none corrupting, in order of how much they
+actually matter:
 
+- **The other project can send, and then freeze, a draft.** The one with
+  teeth. A comment written in `book/` is editable until `chapter1/`
+  submits; afterwards its round is behind the counter and it goes
+  read-only (review-surface §8). Correct — it really was sent — but it
+  changes what the author *can do* with no action in the window they are
+  looking at, and nothing on screen explains why.
 - **The number is wrong per project, cosmetically.** The toolbar chip and
   the card stamps count the document's rounds, so `book/` can say
   "Round 7" having run one round itself.
-- **The other project can send, and then freeze, a draft.** A comment
-  written in `book/` is editable until `chapter1/` submits; afterwards
-  its round is behind the counter and it goes read-only (§8 of the
-  review-surface spec). Correct — it really was sent — but it happens
-  with no action in the window the author is looking at.
-- **The agent gets a slightly incoherent history.** In `book/` it sees
-  review items stamped with rounds whose discussion and notes live in
-  `chapter1/`, so it can reference work it has no record of. A reasoning
-  problem rather than a data one, and the most visible oddity of the
-  three.
+- **The agent's memory is thinner than it could be.** In `book/` it sees
+  review items stamped with rounds whose notes live in `chapter1/`.
+  Mild, for three reasons: every round is already a fresh session with no
+  resumption, so reading prior rounds it does not remember writing is the
+  everyday condition rather than an anomaly; the decision record that
+  matters — rejected suggestions and their `decisionComment` — lives in
+  the *sidecar*, which is the shared part, so it cannot re-propose
+  something already declined; and its write surfaces are notes and staged
+  proposals only, so thin memory costs a redundant suggestion, not a
+  change to the document.
+
+  What genuinely degrades is a *preference* learned in one project not
+  being applied in the other. Self-correcting the moment the author
+  repeats it. **If it ever bites, the fix is one sentence in the prompt**
+  — its notes cover this project while the review may span others — not
+  machinery.
 
 **Accepted.** Moving the counter into `.margin/` would make it
 per-project, but it would also break the self-contained sidecar — the
