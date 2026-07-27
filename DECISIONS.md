@@ -1630,3 +1630,53 @@ Behaviour is unchanged, which the suites are the evidence for: 256 unit
 assertions and 40 journeys pass across the move. The real Claude path is
 exercised separately — no test uses it — by calling `listModels()`
 through the built app and getting the live catalog back.
+
+## 73. Two tiers exercise the real agent; the free one runs in CI (§72, #131)
+
+Every journey runs the scripted agent, so nothing executed
+`agents/claude.ts` at all. A renamed SDK export, a rejected option, an
+invalid tool schema or a broken dynamic import would each have reached a
+user before a test. The obvious objection — real rounds need credentials
+CI cannot have and cost money — turns out to apply to only half of it.
+
+**An unauthenticated turn is free, fast, and proves the shape.** With no
+credentials the CLI answers in ~350ms for **zero tokens and zero
+dollars**, because it never reaches a model. Getting as far as an auth
+refusal is itself the assertion: the SDK loaded, our options were
+understood, the MCP tools were built. Anything malformed fails somewhere
+else, and does so specifically — breaking `settingSources` on purpose
+failed the review turn while the setup turn, which does not pass that
+option, stayed green.
+
+An offline runner reports `network` instead, which is the same proof, so
+the oracle accepts either and fails only on "no failure at all" or an
+unrecognized one.
+
+**That tier also pins a rule worth more than the shape check.** With no
+credentials the CLI returns a **successful** result whose text is "Not
+logged in · Please run /login", carrying `is_error`. A turn reading only
+`subtype` would post that into the project discussion as though it were
+review feedback and spend a round doing it — the first-run experience for
+every new user. The handling existed; nothing tested it.
+
+**The live tier is one real round, run by hand.** Cheapest model, a
+three-line document, a fraction of a cent. It skips rather than fails
+when unauthenticated — the same bargain the gdocs-sync live tier makes —
+and prints the cause, because "expired" and "never signed in" need
+different fixes. It is the only thing that can prove a real model
+actually *calls* Margin's tools: the scripted agent mutates the session
+directly and never produces an SDK message stream, so tool dispatch and
+`describeToolUse` have no other coverage.
+
+**The trap, which caught this work twice before it was a harness:** a
+Claude Code session exports `CLAUDE_CODE_*` variables that authenticate a
+child process on their own. Two hand-run "unauthenticated" probes passed
+for entirely the wrong reason. The contract tier therefore inherits
+nothing but `PATH` and gets a fresh `HOME`. For the same reason the live
+tier *skips* when run from inside a Claude Code session: `cleanEnv()`
+strips that session's token refresh deliberately (§ the CLAUDE.md
+gotcha), so the spawned CLI falls back to whatever is on disk.
+
+Not covered by either, and deliberately: whether the prompt produces good
+reviews. That is judgement, and a test asserting it would be asserting
+one model's mood.

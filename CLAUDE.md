@@ -34,10 +34,37 @@ npm run test:sidecar     # load, backfill, rename recovery, refusing a stranger'
 npm run test:tables      # GFM table formatting
 npm run test:git         # git is optional — runs with git off PATH (#145)
 npm run test:errors      # what a failed round says and whether it rolls back (§71)
+npm run test:contract    # the REAL agent, unauthenticated — free, fast, CI-safe (§73)
 ```
 
 `scripts/lib/compile.mjs` does the esbuild-and-import; a new suite is
 ~10 lines of setup plus assertions.
+
+**Two tiers exercise the real Claude agent**, because every journey runs
+the scripted one and nothing else executes `agents/claude.ts`:
+
+```bash
+npm run test:contract    # in `npm test`: no credentials, $0, ~0.4s
+npm run test:live        # by hand, before a release: one real round
+```
+
+`test:contract` runs a turn with **every credential removed** and asserts
+it reaches an auth refusal — which proves the SDK loaded, our options were
+accepted and the MCP tools were built, since anything malformed fails
+somewhere else. It also pins the rule that *not signed in is a failure,
+not a round*: the CLI reports that as a **successful** result carrying
+`is_error`, so a turn reading only `subtype` would post "Please run
+/login" into the discussion as review feedback and spend a round on it.
+
+`test:live` skips (exit 0, printing why) when unauthenticated. **Running
+it from inside a Claude Code session skips too** — `cleanEnv()` strips
+that session's token refresh on purpose, so the spawned CLI falls back to
+whatever is on disk. Run it from a plain terminal.
+
+Both use `scripts/lib/agentHarness.mjs`, which compiles `claude.ts` with
+the SDK left **external** and the output inside the repo — bundling the
+SDK inlines its binary loader, which then looks beside the bundle and
+fails with "Native CLI binary not found".
 
 **Journey tests** drive the built app through Playwright's Electron
 support — they have replaced the ad-hoc CDP scripts for anything worth

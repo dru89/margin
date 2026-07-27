@@ -53,10 +53,12 @@ export function classifyAgentError(raw: string): AgentFailure {
   if (AUTH.test(text)) {
     return {
       kind: 'auth',
-      // The fix is outside Margin, so the message has to name it. Margin
-      // has no way to sign in on the author's behalf.
+      // "Not signed in" rather than "expired": a first run has no login to
+      // expire, and that is the case an unauthenticated CLI actually
+      // reports ("Not logged in · Please run /login"). The action is the
+      // same either way, so one sentence covers both.
       message:
-        'Your Claude login has expired. Sign in again by running “claude /login” in a terminal, then try the round again.',
+        'Margin isn’t signed in to Claude. Sign in by running “claude /login” in a terminal, then try the round again.',
       retryable: true,
     };
   }
