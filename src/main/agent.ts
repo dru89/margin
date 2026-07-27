@@ -478,6 +478,8 @@ export async function runSetupTurn(
   pref: ModelPreference = {},
 ): Promise<SetupReply> {
   if (process.env.MARGIN_FAKE_AGENT) {
+    const fail = /^fail:(.*)$/s.exec(process.env.MARGIN_FAKE_AGENT);
+    if (fail) throw new Error(fail[1] || 'scripted failure');
     return runFakeSetupTurn(transcript);
   }
   const sdk = await loadSdk();

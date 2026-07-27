@@ -3,6 +3,7 @@ import { ModelPicker } from '@/components/ModelPicker';
 import type { ModelPreference } from '@shared/types';
 import type { ProjectProposal, SetupMessage } from '@shared/types';
 import { Md } from '@/components/Md';
+import { classifyAgentError } from '@shared/agentErrors';
 
 /**
  * The welcome-screen "start a new project" conversation. Each send runs one
@@ -43,24 +44,41 @@ export function ProjectSetup({ onBack }: { onBack: () => void }) {
     return () => window.margin.setSetupActive(false);
   }, []);
 
+  /**
+   * Send a transcript and append the reply.
+   *
+   * A failed turn leaves the transcript exactly as it was sent — the
+   * author's message stays in it, unanswered — so retrying is this same
+   * call with this same transcript. Nothing is duplicated and nothing has
+   * to be retyped, which is what #79 was missing: the message had already
+   * been added to the conversation, so "send it again" meant writing a
+   * second one.
+   */
+  const runTurn = async (t: SetupMessage[]) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await window.margin.setupMessage(t, pref);
+      setTranscript([...t, { author: 'agent', text: result.reply }]);
+      if (result.proposal) setProposal(result.proposal);
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      // IPC wraps the cause in its own sentence; the author only needs
+      // what went wrong, not which channel carried it.
+      setError(classifyAgentError(raw.replace(/^Error invoking remote method '[^']*':\s*/, '')).message);
+      setTranscript(t);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const send = async () => {
     const text = input.trim();
     if (!text || busy) return;
     const next: SetupMessage[] = [...transcript, { author: 'user', text }];
     setTranscript(next);
     setInput('');
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await window.margin.setupMessage(next, pref);
-      setTranscript([...next, { author: 'agent', text: result.reply }]);
-      if (result.proposal) setProposal(result.proposal);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setTranscript(next); // keep the user's message; they can retry
-    } finally {
-      setBusy(false);
-    }
+    await runTurn(next);
   };
 
   const create = async () => {
@@ -112,7 +130,16 @@ export function ProjectSetup({ onBack }: { onBack: () => void }) {
           </div>
         )}
         {busy && <div className="setup-busy">Claude is thinking…</div>}
-        {error && <p className="proposal-error">{error}</p>}
+        {error && (
+          <p className="proposal-error">
+            {error}{' '}
+            {/* The transcript still holds the unanswered message, so this
+                is the same send, not a new one. */}
+            <button className="linkish" disabled={busy} onClick={() => void runTurn(transcript)}>
+              Try again
+            </button>
+          </p>
+        )}
         <div ref={endRef} />
       </div>
       <div className="setup-compose">
