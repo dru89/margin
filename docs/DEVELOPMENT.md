@@ -72,7 +72,10 @@ macOS signing/notarization is optional until these repo secrets exist
 
 ```
 src/main/       Electron main process — windows, menu, sessions, git, agent
-  agent.ts      Agent SDK integration: review turns + MCP review tools
+  agents/       The review-agent port and its implementations (#160)
+    port.ts     What Margin needs from an agent; the only stable contract
+    claude.ts   Agent SDK: review turns, MCP review tools, model catalog
+    fake.ts     Scripted agent (MARGIN_FAKE_AGENT), incl. fail: mode
   session.ts    Per-window document session; review lifecycle + file watching
 src/preload/    contextBridge API (window.margin)
 src/renderer/   React UI — CodeMirror editor, review sidebar, discussion dock
