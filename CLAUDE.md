@@ -152,7 +152,7 @@ npx electron . --remote-debugging-port=9224 "path/to/doc.md" &   # background
 
 - **ESM-only deps in the main process.** The main bundle is CJS.
   `@anthropic-ai/claude-agent-sdk` is loaded via dynamic `import()` (see
-  `src/main/agent.ts` — Rollup preserves it). `nanoid` is inlined via
+  `src/main/agents/claude.ts` — Rollup preserves it). `nanoid` is inlined via
   `externalizeDepsPlugin({ exclude: ['nanoid'] })` in
   `electron.vite.config.ts`. Any new ESM-only dependency used from main must
   go on that exclude list (inline) or be dynamically imported.
@@ -168,7 +168,7 @@ npx electron . --remote-debugging-port=9224 "path/to/doc.md" &   # background
 - **Nested-session auth.** The spawned agent CLI inherits Margin's env; if
   Margin was launched from inside a Claude Code session, `CLAUDECODE`/
   `CLAUDE_CODE_*` vars make it refuse credentials. `cleanEnv()` in
-  `agent.ts` strips them — keep it.
+  `agents/claude.ts` strips them — keep it.
 - **`process.execPath` is Electron, not Node**, so agent turns set
   `executable: 'node'` (system Node must be on PATH).
 - **Window background color** in `src/main/windows.ts` must match the
@@ -232,7 +232,7 @@ npx electron . --remote-debugging-port=9224 "path/to/doc.md" &   # background
   are Margin-internal: the notes file (`.margin/agent-notes.md`, via
   `update_notes`) and staged file proposals (`.margin/proposed/` +
   `proposals.json`, via `propose_file` — materialized only by the user's
-  explicit Accept). All other agent tools (`src/main/agent.ts`) mutate the
+  explicit Accept). All other agent tools (`src/main/agents/claude.ts`) mutate the
   review sidecar only; text changes land exclusively through user-accepted
   suggestions. Keep `Write`/`Edit`/`Bash` in `disallowedTools`.
 - **Anything reachable from agent-authored text is an untrusted request.**

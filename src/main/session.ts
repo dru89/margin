@@ -15,7 +15,7 @@ import { loadReview, saveReview } from './reviewStore';
 import { loadDiscussion, saveDiscussion } from './discussionStore';
 import { findWorkspaceRoot } from './workspace';
 import { commitCheckpoint, isInRepo } from './git';
-import { runReviewTurn, type ActiveTurn } from './agent';
+import { getAgent, type ActiveTurn } from './agents';
 
 /**
  * One open document, owned by one window. The renderer owns content and
@@ -243,7 +243,7 @@ export class DocumentSession {
 
     this.setAgentStatus({ phase: 'running', detail: 'Starting review…' });
     try {
-      const turn = await runReviewTurn(
+      const turn = await getAgent().runReviewTurn(
         this,
         {
           onActivity: (detail) => {

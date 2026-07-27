@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { nanoid } from 'nanoid';
 import os from 'os';
 import type {
+  ModelChoice,
   ModelPreference,
   CommentThread,
   ProjectProposal,
@@ -12,8 +13,18 @@ import type {
 } from '@shared/types';
 import { resolveQuote, makeAnchor } from '@shared/anchors';
 import { validateInReplyTo } from '@shared/reviewState';
-import type { DocumentSession } from './session';
-import { addProposal, loadProposals, validateProposalPath } from './proposalsStore';
+import type { DocumentSession } from '../session';
+import { addProposal, loadProposals, validateProposalPath } from '../proposalsStore';
+import type { ActiveTurn, ReviewAgent, TurnCallbacks } from './port';
+
+/**
+ * The Claude implementation of the review agent port.
+ *
+ * Speaks Claude Code's dialect on purpose — project skills, the built-in
+ * Read/Grep/Glob, the tool denylist, the vendored model catalog. Those are
+ * the capabilities #160 records as *not* portable; there is no attempt
+ * here to pretend otherwise.
+ */
 
 /**
  * The Agent SDK ships ESM-only while our main bundle is CJS; a dynamic
@@ -25,20 +36,9 @@ function loadSdk(): Promise<AgentSdk> {
   sdkPromise ??= import('@anthropic-ai/claude-agent-sdk');
   return sdkPromise;
 }
-
-export interface ActiveTurn {
-  done: Promise<string>;
-  cancel: () => Promise<void>;
-}
-
-interface TurnCallbacks {
-  onActivity: (detail: string) => void;
-}
-
 function ok(text: string) {
   return { content: [{ type: 'text' as const, text }] };
 }
-
 function buildReviewServer(sdk: AgentSdk, session: DocumentSession) {
   const { tool, createSdkMcpServer } = sdk;
   return createSdkMcpServer({
@@ -262,98 +262,12 @@ function renderDiscussion(session: DocumentSession): string {
   });
   return `Project discussion so far (spans all documents in this workspace):\n${lines.join('\n\n')}`;
 }
-
-/**
- * Scripted review turn for dev/demo (`MARGIN_FAKE_AGENT=1`). Exercises the
- * same mutation, streaming, and checkpoint paths as a real round with no
- * credentials or token spend.
- */
-function runFakeReviewTurn(session: DocumentSession, callbacks: TurnCallbacks): ActiveTurn {
-  let cancelled = false;
-  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  const done = (async () => {
-    callbacks.onActivity('Reading the document… (fake agent)');
-    await sleep(600);
-    for (const thread of session.review.comments.filter((c) => c.status === 'open')) {
-      if (cancelled) return 'Fake review cancelled.';
-      callbacks.onActivity('Replying to a comment… (fake agent)');
-      await session.mutateReview(() => {
-        thread.replies.push({
-          id: nanoid(8),
-          author: 'agent',
-          text: `(fake agent) Acknowledged: “${thread.text.slice(0, 60)}”. A real round would respond substantively here.`,
-          createdAt: new Date().toISOString(),
-          round: session.review.round,
-        });
-      });
-      await sleep(400);
-    }
-    // Suggest an edit against the first reasonably long line.
-    const line = session.content.split('\n').find((l) => !l.startsWith('#') && l.trim().length > 40);
-    if (line && !cancelled) {
-      callbacks.onActivity('Suggesting an edit… (fake agent)');
-      const found = resolveQuote(session.content, line);
-      if (found) {
-        await session.mutateReview((r) =>
-          r.suggestions.push({
-            id: nanoid(8),
-            author: 'agent',
-            createdAt: new Date().toISOString(),
-            round: session.review.round,
-            anchor: makeAnchor(session.content, found.from, found.to),
-            replacement: `${line} (revised by fake agent)`,
-            note: 'Demonstration suggestion from MARGIN_FAKE_AGENT — accept or reject to exercise the flow.',
-            status: 'pending',
-          }),
-        );
-      }
-      await sleep(400);
-    }
-    const prior = await session.readAgentNotes();
-    await session.setAgentNotes(
-      `${prior.trimEnd()}${prior ? '\n' : ''}- (fake agent) notes path exercised ${new Date().toISOString()}`,
-    );
-    if (!cancelled) {
-      callbacks.onActivity('Proposing a new file… (fake agent)');
-      const check = await validateProposalPath(session.workspaceRoot, 'notes/fake-proposal.md');
-      if ('rel' in check) {
-        await addProposal(
-          session.workspaceRoot,
-          check.rel,
-          '# Fake proposal\n\nStaged by MARGIN_FAKE_AGENT to exercise the accept/reject flow.\n',
-          'Demonstration proposal from the fake agent — accept to materialize it, reject to record the decision.',
-        );
-      }
-    }
-    return 'Fake review round complete (MARGIN_FAKE_AGENT=1) — no model was consulted.';
-  })();
-  return {
-    done,
-    cancel: async () => {
-      cancelled = true;
-    },
-  };
-}
-
-export async function runReviewTurn(
+async function runReviewTurn(
   session: DocumentSession,
   callbacks: TurnCallbacks,
   model?: string,
   effort?: string,
 ): Promise<ActiveTurn> {
-  if (process.env.MARGIN_FAKE_AGENT) {
-    // `MARGIN_FAKE_AGENT=fail:<text>` makes the turn reject with that
-    // text, which is the only way to drive the recovery path (#79, #106)
-    // without unplugging a network or expiring a token by hand.
-    const fail = /^fail:(.*)$/s.exec(process.env.MARGIN_FAKE_AGENT);
-    if (fail) {
-      return {
-        done: Promise.reject(new Error(fail[1] || 'scripted failure')),
-        cancel: async () => {},
-      };
-    }
-    return runFakeReviewTurn(session, callbacks);
-  }
   const sdk = await loadSdk();
   const server = buildReviewServer(sdk, session);
   const dir = session.workspaceRoot;
@@ -458,7 +372,6 @@ export async function runReviewTurn(
     },
   };
 }
-
 const SETUP_SYSTEM_PROMPT = `You are helping an author start a new writing project in Margin, a markdown review app. This is a short setup conversation on the welcome screen: understand what they want to write, then propose a project.
 
 How to work:
@@ -473,15 +386,10 @@ How to work:
  * prompt. The propose_project tool only captures the card — the app
  * materializes it after the author confirms.
  */
-export async function runSetupTurn(
+async function runSetupTurn(
   transcript: SetupMessage[],
   pref: ModelPreference = {},
 ): Promise<SetupReply> {
-  if (process.env.MARGIN_FAKE_AGENT) {
-    const fail = /^fail:(.*)$/s.exec(process.env.MARGIN_FAKE_AGENT);
-    if (fail) throw new Error(fail[1] || 'scripted failure');
-    return runFakeSetupTurn(transcript);
-  }
   const sdk = await loadSdk();
   let proposal: ProjectProposal | undefined;
   const server = sdk.createSdkMcpServer({
@@ -548,34 +456,13 @@ export async function runSetupTurn(
   }
   return { reply, proposal };
 }
-
-/** Scripted setup turn for MARGIN_FAKE_AGENT — proposes on the first message. */
-function runFakeSetupTurn(transcript: SetupMessage[]): SetupReply {
-  const first = transcript.find((m) => m.author === 'user')?.text ?? 'a demo project';
-  return {
-    reply:
-      '(fake agent) Here is a starter project based on what you described — confirm the card to create it, or tell me what to change.',
-    proposal: {
-      folderName: 'fake-project',
-      title: 'Fake Project',
-      description: `Scripted proposal from MARGIN_FAKE_AGENT (asked for: ${first.slice(0, 60)})`,
-      files: [
-        {
-          path: 'Fake Project.md',
-          content: `# Fake Project\n\nSeeded by the fake agent to exercise the new-project flow.\n\n## Outline\n\n- Opening\n- Middle\n- End\n`,
-        },
-      ],
-    },
-  };
-}
-
 /**
  * Strip Claude-Code-session markers from the child environment. If Margin is
  * launched from inside a Claude Code session (e.g. `npm run dev` in an agent
  * terminal), the spawned CLI would otherwise detect a nested session and
  * refuse to use the stored credentials.
  */
-export function cleanEnv(): Record<string, string | undefined> {
+function cleanEnv(): Record<string, string | undefined> {
   const env: Record<string, string | undefined> = { ...process.env };
   for (const key of Object.keys(env)) {
     if (key === 'CLAUDECODE' || key.startsWith('CLAUDE_CODE_') || key.startsWith('CLAUDE_AGENT_')) {
@@ -615,3 +502,51 @@ function describeToolUse(name: string, input: unknown): string {
 function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
+
+/**
+ * The model catalog, read from the SDK's vendored CLI (#93/#86).
+ *
+ * That binary decides which models exist — see the CLAUDE.md gotcha — so
+ * this list is never hardcoded and picking up new models is a dependency
+ * bump rather than a code change. Cached for the process lifetime: the
+ * spawn costs a second or two and the catalog cannot change while the app
+ * runs.
+ */
+let cachedModels: Promise<ModelChoice[]> | null = null;
+
+async function loadModels(): Promise<ModelChoice[]> {
+  const { query } = await loadSdk();
+  const q = query({
+    prompt: 'noop',
+    options: { executable: 'node', env: cleanEnv(), maxTurns: 1 },
+  });
+  try {
+    const models = await q.supportedModels();
+    return models.map((m) => ({
+      value: m.value,
+      label: m.displayName,
+      // `description` leads with the version ("Opus 5 · Best for …");
+      // keep the whole string — the version is the part users want.
+      description: m.description ?? '',
+      resolvedModel: m.resolvedModel,
+      effortLevels: m.supportedEffortLevels ?? [],
+    }));
+  } finally {
+    try {
+      await q.interrupt?.();
+    } catch {
+      /* the throwaway session may already be gone */
+    }
+  }
+}
+
+function listModels(): Promise<ModelChoice[]> {
+  cachedModels ??= loadModels().catch((err) => {
+    cachedModels = null; // a failed probe must not poison the cache
+    throw err;
+  });
+  return cachedModels;
+}
+
+export const claudeAgent: ReviewAgent = { runReviewTurn, runSetupTurn, listModels };
+

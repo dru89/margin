@@ -14,9 +14,8 @@ import { findSessionByPath, getSession, setSetupActive } from './session';
 import { attachDocument, createWindow, openFile } from './windows';
 import { showOpenDialog, showOpenFolderDialog } from './menu';
 import { commitCheckpoint, fileLog, initProjectRepo, initRepo, isInRepo, restoreFromCommit } from './git';
-import { runSetupTurn } from './agent';
+import { getAgent } from './agents';
 import { getSettings, updateSettings } from './settings';
-import { listModels } from './models';
 import { loadProjectSettings, saveProjectSettings } from './projectSettings';
 import { saveDiscussion } from './discussionStore';
 import { getWorkspace, resolveInsideWorkspace } from './workspace';
@@ -202,7 +201,7 @@ export function registerIpcHandlers(): void {
   );
 
   // The catalog comes from the SDK's vendored CLI (DECISIONS §59).
-  ipcMain.handle(IPC.listModels, () => listModels());
+  ipcMain.handle(IPC.listModels, () => getAgent().listModels());
 
   /**
    * The effective preference for this window: the project's own choice
@@ -243,7 +242,7 @@ export function registerIpcHandlers(): void {
   });
 
   ipcMain.handle(IPC.setupMessage, (_event, transcript: SetupMessage[], pref?: ModelPreference) =>
-    runSetupTurn(transcript, pref),
+    getAgent().runSetupTurn(transcript, pref),
   );
 
   // One confirm materializes the whole project: folder, seed files, git

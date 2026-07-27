@@ -11,7 +11,7 @@
 │ session.ts   DocumentSession — one per window/document      │
 │ reviewStore  sidecar load/save (+ re-anchoring on load)     │
 │ git.ts       execFile('git') — checkpoints, status, log     │
-│ agent.ts     Agent SDK review turns + MCP review tools      │
+│ agents/      Review-agent port + Claude and scripted impls  │
 └──────────────┬──────────────────────────────────────────────┘
                │ contextBridge: window.margin (preload/index.ts)
 ┌─ Renderer (React) ──────────────────────────────────────────┐
@@ -53,7 +53,7 @@ user edits/comments  (renderer owns state; autosave via IPC)
         ▼
 save doc + sidecar → round += 1 → git commit "Review round N: submitted"
         ▼
-agent.ts runReviewTurn(): Agent SDK query()
+agents/claude.ts runReviewTurn(): Agent SDK query()
   cwd = document folder    settingSources: []    executable: 'node'
   MCP server "review": read_document, list_review_state,
                        reply_to_comment, add_comment, suggest_edit

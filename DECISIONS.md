@@ -1585,3 +1585,48 @@ twice.
 Not done here, and worth its own issue if it bites: detecting a dead
 session *before* spending a turn on it (#79 asks). It costs a probe on
 every submit to save a failure that now costs nothing but a click.
+
+## 72. The review agent is a port with two implementations (#160)
+
+Prompted by asking what a different agent SDK would cost. The measured
+answer: only two files imported it, using four calls, so the *call shape*
+was never the expensive part. What is expensive is everything Claude
+Code's harness supplies — project skills and `CLAUDE.md` via
+`settingSources`, the built-in `Read`/`Grep`/`Glob` the agent reads the
+project with, the vendored model catalog, and `disallowedTools`, which is
+the entire enforcement of "the agent never writes the real file tree" in
+one line. #160 records that inventory.
+
+So this is **a port, not an abstraction layer**. `ReviewAgent` states the
+four things Margin asks of an agent — run a review turn, run a setup
+turn, list models, cancel — and nothing below it pretends to be
+provider-neutral. No neutral tool schema, no wrapper around the streamed
+message types. Those would be speculative generality against a provider
+nobody has named.
+
+**The argument for doing it now is not portability.** It is that the
+scripted agent already *was* a second implementation, living as
+`if (process.env.MARGIN_FAKE_AGENT)` inside the module that talks to the
+SDK — in three branches by the end, counting the `fail:` mode. Naming
+the interface turned a disguise into a type: `claude.ts` no longer
+mentions the fake agent, `fake.ts` no longer imports the SDK, and one
+function decides which is in use.
+
+What the port bought immediately:
+
+- The capability surface is readable in one file, so the cost of a swap
+  stays known instead of being rediscovered.
+- The test seam stops running through an env-var branch in production
+  code. The scripted agent is a peer of the real one, not a hole in it.
+- `cleanEnv` and the model cache became private to the Claude
+  implementation, where they belong — the catalog is a property of the
+  vendored CLI (§59), not of "agents" generally.
+
+A scripted agent has no catalog, so `fakeAgent.listModels()` returns an
+empty list rather than inventing one; the picker then shows the app
+default and nothing misleading.
+
+Behaviour is unchanged, which the suites are the evidence for: 256 unit
+assertions and 40 journeys pass across the move. The real Claude path is
+exercised separately — no test uses it — by calling `listModels()`
+through the built app and getting the live catalog back.
