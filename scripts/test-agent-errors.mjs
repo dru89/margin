@@ -26,6 +26,18 @@ t('is recognised as an auth problem', kind(oauth), 'auth');
 t('and says how to fix it', /claude \/login/.test(classifyAgentError(oauth).message), true);
 t('and is worth retrying afterwards', classifyAgentError(oauth).retryable, true);
 
+head('never signed in at all');
+// The verbatim text an unauthenticated CLI returns — captured from a real
+// run with a scrubbed environment, and the first thing a new user meets.
+// It arrives as a *successful* result carrying `is_error`, not as a
+// thrown transport error, which is why the contract tier exists.
+const fresh = 'Not logged in · Please run /login';
+t('is an auth problem too', kind(fresh), 'auth');
+// "Expired" would be wrong here: there was never a login to expire.
+t('the message does not claim a login expired',
+  /expired/i.test(classifyAgentError(fresh).message), false);
+t('and still says what to do', /claude \/login/.test(classifyAgentError(fresh).message), true);
+
 head('losing the network (#106)');
 for (const raw of [
   'request to https://api.anthropic.com failed, reason: getaddrinfo ENOTFOUND api.anthropic.com',

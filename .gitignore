@@ -10,3 +10,6 @@ dist/
 test-results/
 playwright-report/
 .fixtures/
+
+# Compiled agent module used by the contract/live tiers (scripts/lib/agentHarness.mjs)
+.tmp/

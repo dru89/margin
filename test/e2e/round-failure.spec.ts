@@ -86,7 +86,7 @@ test.describe('a round that fails', () => {
     await m.page.getByRole('button', { name: /send round/i }).click();
 
     // The author is told what happened in their own terms, and what to do.
-    await expect(m.page.getByText(/Claude login has expired/i)).toBeVisible({ timeout: 60_000 });
+    await expect(m.page.getByText(/isn’t signed in to Claude/i)).toBeVisible({ timeout: 60_000 });
     await expect(m.page.getByText(/claude \/login/)).toBeVisible();
 
     // Nothing was spent: the counter is back at zero and the message is
@@ -130,7 +130,7 @@ test.describe('a round that fails', () => {
     await m.page.getByRole('button', { name: /send round/i }).click();
 
     await expect(m.page.getByText(/could not reach Claude/i)).toBeVisible({ timeout: 60_000 });
-    await expect(m.page.getByText(/login has expired/i)).toHaveCount(0);
+    await expect(m.page.getByText(/isn’t signed in/i)).toHaveCount(0);
   });
 });
 
@@ -147,7 +147,7 @@ test.describe('a setup turn that fails', () => {
     await m.page.locator('.setup-input').fill('A proposal about rollout risk.');
     await m.page.getByRole('button', { name: 'Send', exact: true }).click();
 
-    await expect(m.page.getByText(/Claude login has expired/i)).toBeVisible({ timeout: 60_000 });
+    await expect(m.page.getByText(/isn’t signed in to Claude/i)).toBeVisible({ timeout: 60_000 });
     // Not the SDK's sentence, and not the IPC channel's either.
     await expect(m.page.getByText(/invoking remote method/i)).toHaveCount(0);
 
@@ -156,7 +156,7 @@ test.describe('a setup turn that fails', () => {
     await expect(m.page.locator('.setup-msg-user')).toContainText('rollout risk');
 
     await m.page.getByRole('button', { name: /try again/i }).click();
-    await expect(m.page.getByText(/Claude login has expired/i)).toBeVisible({ timeout: 60_000 });
+    await expect(m.page.getByText(/isn’t signed in to Claude/i)).toBeVisible({ timeout: 60_000 });
     // Retrying re-sends; it does not append a second copy of the message.
     await expect(m.page.locator('.setup-msg-user')).toHaveCount(1);
   });
