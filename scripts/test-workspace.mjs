@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * Project-root derivation (DECISIONS §63).
+ * Finding the project a document belongs to (spec §3, #168).
  *
- * Which folder a document belongs to decides which `.margin/` its
- * discussion, model preference, notes and proposals live in. Get it wrong
- * and a project silently changes shape underneath the author (#123), so
- * the precedence and both its guards are asserted here.
+ * The rule replaced DECISIONS §63 wholesale: **find a declaration, never
+ * invent one.** Every case below that used to assert a *derivation* — the
+ * git toplevel, the file's own folder, and the precedence between them —
+ * now asserts that no project is found, because inventing one is what
+ * made sibling folders into separate projects by accident.
  *
  *   node scripts/test-workspace.mjs
  */
@@ -16,7 +17,7 @@ import path from 'path';
 import { load, reporter } from './lib/compile.mjs';
 
 const { mod, dir: build } = await load('src/main/workspace.ts');
-const { findWorkspaceRoot, resolveInsideWorkspace } = mod;
+const { findProjectRoot, findWorkspaceRoot, resolveInsideWorkspace } = mod;
 const { t, head, done } = reporter();
 
 const base = mkdtempSync(path.join(tmpdir(), 'margin-roots-'));
@@ -34,44 +35,58 @@ const doc = (dir, name = 'd.md') => {
 };
 const rootOf = async (file) => path.relative(base, await findWorkspaceRoot(file)) || '.';
 
-head('precedence: marker, then git, then the file’s own folder');
-const plain = make('plain');
-t('no marker, no repo', await rootOf(doc(plain)), 'plain');
+const marginJson = (dir) => {
+  writeFileSync(path.join(dir, 'margin.json'), JSON.stringify({ version: 1 }));
+  return dir;
+};
+const projectOf = async (file) => {
+  const found = await findProjectRoot(file);
+  return found === null ? null : path.relative(base, found) || '.';
+};
 
-const repo = make('repo', { git: true });
-const repoDocs = make('repo/docs');
-t('a repo with no marker uses its toplevel', await rootOf(doc(repoDocs)), 'repo');
+head('a declaration is found');
+t('margin.json in the file’s own folder', await projectOf(doc(marginJson(make('declared')))), 'declared');
+t('margin.json above it', await projectOf(doc(make('above/sub'), 'n.md')) , null); // nothing declared yet
+marginJson(make('above'));
+t('...once the ancestor declares', await projectOf(doc(make('above/sub'), 'n.md')), 'above');
+// Every project that exists today is this one.
+t('a legacy .margin/ still declares', await projectOf(doc(make('legacy', { marker: true }))), 'legacy');
 
-const marked = make('marked', { marker: true });
-const markedSub = make('marked/sub');
-t('a marker claims files beneath it', await rootOf(doc(markedSub)), 'marked');
+head('nothing is invented');
+// These four replace the old precedence rules. Each used to resolve to
+// something; a folder nobody declared is now simply not a project.
+t('a plain folder', await projectOf(doc(make('plain'))), null);
+t('a git repo with no declaration', await projectOf(doc(make('bare-repo', { git: true }))), null);
+t('a file deep inside an undeclared repo',
+  await projectOf(doc(make('bare-repo/docs/deep'), 'n.md')), null);
+t('a sibling of a declared project is not in it',
+  await projectOf(doc(make('declared-sibling'))), null);
 
-head('nested markers are deliberately nested projects');
-make('outer', { marker: true });
-const inner = make('outer/inner', { marker: true });
-t('the nearest marker wins', await rootOf(doc(inner)), path.join('outer', 'inner'));
+head('the nearest declaration wins');
+marginJson(make('outer2'));
+marginJson(make('outer2/inner2'));
+t('nested declarations are nested on purpose',
+  await projectOf(doc(make('outer2/inner2'), 'n.md')), path.join('outer2', 'inner2'));
+// The old "deeper of marker and git wins" rule is gone with derivation:
+// a repo below a declaration is just a folder inside it.
+marginJson(make('declared-parent'));
+make('declared-parent/repo', { git: true });
+t('a git repo below a declaration belongs to it',
+  await projectOf(doc(make('declared-parent/repo'), 'n.md')), 'declared-parent');
 
-head('guard: the deeper of marker and repo wins');
-// `.margin/` is created automatically, so a stray marker high up is expected.
-// Without this guard it would swallow every repo beneath it.
-make('stray', { marker: true });
-const strayRepo = make('stray/repo', { git: true });
-t('a repo below a stray marker keeps its own root', await rootOf(doc(strayRepo)), path.join('stray', 'repo'));
-const bothAt = make('both', { git: true, marker: true });
-const bothDocs = make('both/docs');
-t('marker and repo at the same place agree', await rootOf(doc(bothDocs)), 'both');
+head('guard: the home directory is refused');
+// `~/.margin/` was created by accident under the old rules, and treating
+// that leftover as a declaration would hand every file under home to one
+// enormous project.
+t('a file directly in home has no project',
+  await findProjectRoot(path.join(homedir(), '__margin_probe_does_not_exist.md')), null);
 
-head('guard: the walk skips the home directory itself');
-// A loose ~/notes.md creates ~/.margin; without this, every file anywhere
-// under home would inherit home as its project.
-t('a file directly in home resolves to home',
-  await findWorkspaceRoot(path.join(homedir(), '__margin_probe_does_not_exist.md')), homedir());
-
-head('#123: a nested file does not narrow an established project');
-const proj = make('proj', { marker: true });
-const projSub = make('proj/sub');
-doc(proj, 'alpha.md');
-t('opening a nested file keeps the project', await rootOf(doc(projSub, 'nested.md')), 'proj');
+head('the working root, until step 3 lands');
+// findWorkspaceRoot still returns somewhere, because everything
+// downstream assumes a root. The fallback is not a declaration.
+t('a declared project', path.relative(base, await findWorkspaceRoot(doc(marginJson(make('wr-declared'))))), 'wr-declared');
+t('an undeclared folder falls back to the document’s own',
+  path.relative(base, await findWorkspaceRoot(doc(make('wr-plain')))), 'wr-plain');
 
 head('opening a file: nothing outside the project (#90)');
 // A chip's path comes from comment text and the agent writes comment

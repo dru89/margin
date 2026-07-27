@@ -13,7 +13,7 @@ import { classifyAgentError, reviewOutputSize } from '@shared/agentErrors';
 import { IPC } from '@shared/ipc';
 import { loadReview, saveReview } from './reviewStore';
 import { loadDiscussion, saveDiscussion } from './discussionStore';
-import { findWorkspaceRoot } from './workspace';
+import { findProjectRoot } from './workspace';
 import { commitCheckpoint, isInRepo } from './git';
 import { getAgent, type ActiveTurn } from './agents';
 
@@ -39,16 +39,25 @@ export class DocumentSession {
     public discussion: DiscussionData,
     public inGitRepo: boolean,
     private readonly win: BrowserWindow,
+    /**
+     * Whether a folder actually declared itself a project (spec §3).
+     * False means `workspaceRoot` is the document's folder standing in,
+     * not somewhere anything project-scoped should be written.
+     */
+    public readonly hasProject: boolean = true,
   ) {}
 
   static async open(filePath: string, win: BrowserWindow): Promise<DocumentSession> {
     const content = await fs.readFile(filePath, 'utf8');
     const review = await loadReview(filePath, content);
     const inRepo = await isInRepo(filePath);
-    const root = await findWorkspaceRoot(filePath);
+    const declared = await findProjectRoot(filePath);
+    // The declared project, or the document's own folder as a working
+    // root. `hasProject` is what tells the truth about which (spec §3).
+    const root = declared ?? path.dirname(filePath);
     // Migrate any legacy per-doc discussion into the project-scoped store.
     const discussion = await loadDiscussion(root, review.discussion);
-    const session = new DocumentSession(filePath, root, content, review, discussion, inRepo, win);
+    const session = new DocumentSession(filePath, root, content, review, discussion, inRepo, win, declared !== null);
     session.startWatching();
     return session;
   }
@@ -138,6 +147,7 @@ export class DocumentSession {
       review: this.review,
       discussion: this.discussion.messages,
       workspaceRoot: this.workspaceRoot,
+      hasProject: this.hasProject,
       inGitRepo: this.inGitRepo,
     };
   }
