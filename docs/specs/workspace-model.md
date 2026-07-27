@@ -174,38 +174,72 @@ belong to whichever project is open. The same document reviewed from
 `book/` and from `chapter1/` gets different context — which is the point
 of having chosen a folder.
 
-### The cost, named rather than discovered
+### The shared round counter, and what it actually costs
 
 **`ReviewData.round` is per document, but the discussion is per
 project.** Under derivation those were one-to-one. Under adoption they
 are many-to-one: many projects, one document, one counter.
 
-So a round submitted from `chapter1/` advances a counter that `book/`'s
-threads derive their state from. Threads left in `book/` can start
-reading as *awaiting reply* for a round they took no part in, and round
-stamps stop corresponding between projects.
+**Nothing breaks.** The counter describes the *document*, and the sidecar
+is the truth about the document. A round submitted from `chapter1/`
+genuinely does send `book/`'s pending comments, because the agent's
+`list_review_state` returns the whole sidecar — so a thread that starts
+reading *awaiting reply* after someone else's round is not lying. It was
+sent, and an agent did answer it or decline to. Every state derivation
+stays internally correct, and anchors, suggestions, decisions and rename
+adoption are round-independent.
+
+Three consequences, all of them real and none of them corruption:
+
+- **The number is wrong per project, cosmetically.** The toolbar chip and
+  the card stamps count the document's rounds, so `book/` can say
+  "Round 7" having run one round itself.
+- **The other project can send, and then freeze, a draft.** A comment
+  written in `book/` is editable until `chapter1/` submits; afterwards
+  its round is behind the counter and it goes read-only (§8 of the
+  review-surface spec). Correct — it really was sent — but it happens
+  with no action in the window the author is looking at.
+- **The agent gets a slightly incoherent history.** In `book/` it sees
+  review items stamped with rounds whose discussion and notes live in
+  `chapter1/`, so it can reference work it has no record of. A reasoning
+  problem rather than a data one, and the most visible oddity of the
+  three.
 
 **Accepted.** Moving the counter into `.margin/` would make it
 per-project, but it would also break the self-contained sidecar — the
 property rename adoption (§64) depends on. Overlapping adoption is
 deliberate and rare; a sidecar that travels intact is neither.
 
-Worth revisiting only if overlapping projects turn out to be common.
+Worth revisiting only if overlapping projects turn out to be common, or
+if the third consequence above proves to matter more than it reads.
 
-## 7. The round lock keys on the document
-
-**The one thing here that can corrupt data rather than confuse someone.**
+## 7. The round lock keys on the document's real path
 
 Today the guard is `if (this.activeTurn)` on the `DocumentSession` — per
-window. It does not stop two windows, and under §6 it does not stop two
-*projects*, so two agent turns can mutate one sidecar concurrently.
+window. Two agent turns mutating one sidecar would be the one failure
+here that corrupts rather than confuses.
 
-The lock must be held against the **document**, in the main process, for
-the life of a turn. Not the window (two windows on one project is a
-feature, §8) and not the project (two projects can share a document, §6).
+**It is mostly unreachable already, and the spec should say so rather
+than justify work with a threat that is not real.** `openFile` dedupes on
+the resolved path, so a document is only ever open in one window, and
+`submitReview` runs against the *open* document of the window that called
+it. Two projects cannot both submit on `foo.md`, because only one of them
+can have it open.
 
-A second submit on a document already under review is refused with a
-message naming where it is running, not queued.
+The reachable case is narrower: **`path.resolve` does not resolve
+symlinks.** A chapter symlinked into another folder — which overlapping
+projects make more likely — gives two distinct paths for one file,
+defeating the dedupe and allowing two windows and two concurrent rounds
+against one sidecar.
+
+So: hold the lock against the document's **real path**, in the main
+process, for the life of a turn. Not the window (two windows on one
+project is a feature, §8) and not the project (two projects can share a
+document, §6). A second submit on a document already under review is
+refused with a message naming where it is running, rather than queued.
+
+Hardening rather than an emergency, and it does not need to gate the
+multi-window work.
 
 ## 8. Windows
 
@@ -302,14 +336,15 @@ Journeys, not coverage. Each is here because it protects a decision above.
 10. `book`'s explorer lists `chapter1/foo.md`; `chapter1`'s explorer does
     not list anything from `chapter2/`.
 11. A round submitted from `chapter1` advances the round counter that
-    `book` reads — asserted so the known cost in §6 is pinned rather than
-    rediscovered as a bug.
+    `book` reads, *and* a comment left pending in `book` is answered by
+    that round — the pair that shows the shared counter is describing the
+    document truthfully rather than drifting (§6).
 
 **The round lock**
 
-12. With `book` and `chapter1` both open, submitting on the same document
-    from both refuses the second rather than running two turns against
-    one sidecar.
+12. Two paths reaching one document through a symlink — the case the
+    resolved-path dedupe misses — cannot run two turns against one
+    sidecar; the second submit is refused.
 13. Two windows on one project, submitting on *different* documents, both
     run.
 
@@ -329,8 +364,9 @@ Journeys, not coverage. Each is here because it protects a decision above.
 2. Find-only resolution (§3), retiring §63. Scenarios 3, 4, 6.
 3. Adopt a folder — the open-folder path and the confirmation (§5).
    Scenarios 1, 2, 5.
-4. The document-scoped round lock (§7). Scenarios 12, 13. **Before** any
-   multi-window work, since that is what makes concurrency reachable.
+4. The document-scoped round lock (§7), keyed on real path. Scenarios
+   12, 13. Cheap and independent — it does not gate the multi-window
+   work, since the path dedupe already prevents the common case.
 5. Overlapping projects (§6) — mostly assertions rather than code, since
    §1 makes it fall out. Scenarios 7-11.
 6. Multiple windows per project: sidecar watching, project-scoped agent
