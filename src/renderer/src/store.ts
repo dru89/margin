@@ -145,6 +145,16 @@ interface MarginState {
   closeProposal: () => void;
   acceptProposal: (id: string) => Promise<void>;
   rejectProposal: (id: string, comment?: string) => Promise<void>;
+  /**
+   * The adoption prompt (spec §5), and what the author was doing when it
+   * appeared — so confirming carries on with it rather than making them
+   * click the same button twice.
+   */
+  adoptPrompt: { then: 'submit' | null } | null;
+  adoptError: string | null;
+  askToAdopt: (then?: 'submit' | null) => void;
+  cancelAdopt: () => void;
+  adopt: (root: string) => Promise<void>;
   submit: () => Promise<void>;
   cancelReview: () => Promise<void>;
   /** Settings overlay (menu Settings… / Cmd-,). */
@@ -806,9 +816,43 @@ export const useStore = create<MarginState>((set, get) => {
       void window.margin.updateDiscussion(discussion);
     },
 
+    adoptPrompt: null,
+    adoptError: null,
+    askToAdopt: (then = null) => set({ adoptPrompt: { then }, adoptError: null }),
+    cancelAdopt: () => set({ adoptPrompt: null, adoptError: null }),
+
+    adopt: async (root) => {
+      const { doc, adoptPrompt, modelPref } = get();
+      if (!doc) return;
+      let adopted;
+      try {
+        adopted = await window.margin.adoptProject(root);
+      } catch (err) {
+        // The refusals are main's (home, a folder that doesn't hold this
+        // document), so its wording is the honest one to show.
+        set({ adoptError: err instanceof Error ? err.message : String(err) });
+        return;
+      }
+      // Merged rather than reloaded: the document has not changed, and a
+      // reload would take the composer draft and undo history with it.
+      set({ doc: { ...doc, ...adopted }, adoptPrompt: null, adoptError: null });
+      // A model picked before there was anywhere to write it down.
+      if (modelPref.model || modelPref.effort) void window.margin.setProjectSettings(modelPref);
+      await get().loadWorkspace();
+      void get().refreshGdocsSync();
+      if (adoptPrompt?.then === 'submit') await get().submit();
+    },
+
     submit: async () => {
       const { doc, content, review, modelPref } = get();
       if (!doc || !review) return;
+      // A round writes agent notes and can stage proposals, so this is
+      // where the app asks for a project (spec §4). Confirming comes
+      // straight back here.
+      if (!doc.hasProject) {
+        get().askToAdopt('submit');
+        return;
+      }
       if (saveTimer) {
         clearTimeout(saveTimer);
         saveTimer = null;

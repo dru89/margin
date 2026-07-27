@@ -13,7 +13,8 @@ import { classifyAgentError, reviewOutputSize } from '@shared/agentErrors';
 import { IPC } from '@shared/ipc';
 import { loadReview, saveReview } from './reviewStore';
 import { loadDiscussion, saveDiscussion } from './discussionStore';
-import { findProjectRoot } from './workspace';
+import { declaresProject, findProjectRoot, isInside } from './workspace';
+import { saveProjectFile } from './projectFile';
 import { commitCheckpoint, isInRepo } from './git';
 import { getAgent, type ActiveTurn } from './agents';
 
@@ -33,7 +34,7 @@ export class DocumentSession {
 
   private constructor(
     public readonly filePath: string,
-    public readonly workspaceRoot: string,
+    public workspaceRoot: string,
     public content: string,
     public review: ReviewData,
     public discussion: DiscussionData,
@@ -44,22 +45,70 @@ export class DocumentSession {
      * False means `workspaceRoot` is the document's folder standing in,
      * not somewhere anything project-scoped should be written.
      */
-    public readonly hasProject: boolean = true,
+    public hasProject: boolean = true,
   ) {}
 
-  static async open(filePath: string, win: BrowserWindow): Promise<DocumentSession> {
+  /**
+   * `explicitRoot` is the project this *window* is scoped to — set when
+   * the author opened a folder, and carried along when the explorer
+   * switches documents. It is what makes `book/` stay `book/` while
+   * showing `chapter1/foo.md`, rather than the walk quietly re-rooting
+   * the window on the nearer declaration (spec §1).
+   *
+   * It is verified rather than trusted: a root that does not declare
+   * itself, or does not contain the document, falls back to the walk.
+   */
+  static async open(
+    filePath: string,
+    win: BrowserWindow,
+    explicitRoot?: string,
+  ): Promise<DocumentSession> {
     const content = await fs.readFile(filePath, 'utf8');
     const review = await loadReview(filePath, content);
     const inRepo = await isInRepo(filePath);
-    const declared = await findProjectRoot(filePath);
+    const scoped =
+      explicitRoot &&
+      isInside(explicitRoot, path.dirname(filePath)) &&
+      (await declaresProject(explicitRoot))
+        ? explicitRoot
+        : null;
+    const declared = scoped ?? (await findProjectRoot(filePath));
     // The declared project, or the document's own folder as a working
     // root. `hasProject` is what tells the truth about which (spec §3).
     const root = declared ?? path.dirname(filePath);
     // Migrate any legacy per-doc discussion into the project-scoped store.
-    const discussion = await loadDiscussion(root, review.discussion);
+    // With no project there is nowhere to migrate *to*, and the legacy
+    // messages stay in the sidecar until one exists.
+    const discussion =
+      declared !== null
+        ? await loadDiscussion(root, review.discussion)
+        : { version: 1 as const, messages: [] };
     const session = new DocumentSession(filePath, root, content, review, discussion, inRepo, win, declared !== null);
     session.startWatching();
     return session;
+  }
+
+  /**
+   * Adopt `root` as this document's project: write `margin.json` and
+   * re-scope the window to it (spec §5).
+   *
+   * **The act and the record are the same thing** — there is no adoption
+   * that did not write the file, and no file written without adopting.
+   *
+   * Done in place rather than by reloading the document, because the
+   * author is mid-something when they are asked: adoption is triggered by
+   * submitting a round, and a reload would take the composer draft and
+   * the editor's undo history with it.
+   */
+  async adopt(root: string): Promise<void> {
+    await saveProjectFile(root, {});
+    this.workspaceRoot = root;
+    this.hasProject = true;
+    this.discussion = await loadDiscussion(root, this.review.discussion);
+    // The old watcher was pointed at a `.margin/` that was never going to
+    // exist; the new root has one now.
+    this.restartWatching();
+    this.sendToRenderer(IPC.discussionUpdated, this.discussion.messages);
   }
 
   /**
@@ -95,6 +144,12 @@ export class DocumentSession {
     for (const w of this.watchers) w.close();
     this.watchers = [];
     if (this.watchDebounce) clearTimeout(this.watchDebounce);
+  }
+
+  private restartWatching(): void {
+    for (const w of this.watchers) w.close();
+    this.watchers = [];
+    this.startWatching();
   }
 
   private onExternalChange(): void {
@@ -164,18 +219,40 @@ export class DocumentSession {
     }
   }
 
+  /**
+   * The last gate before project state reaches disk (spec §4, #169).
+   *
+   * Without a declaration `workspaceRoot` is the document's own folder,
+   * and writing into it would create the `.margin/` that a later walk
+   * reads back as a project — the accident this spec removes, arriving by
+   * a different door. So the write is refused rather than redirected.
+   *
+   * It throws because by the time anything gets here the UI has already
+   * failed: every affordance that would reach these is *unavailable*
+   * without a project, since silently swallowing a queued message the
+   * author watched appear would be worse than the accident.
+   */
+  private requireProject(what: string): void {
+    if (!this.hasProject) {
+      throw new Error(`${what} needs a project. Choose a folder for this document first.`);
+    }
+  }
+
   /** The agent's persistent working memory — its single write surface. */
   async setAgentNotes(content: string): Promise<void> {
+    this.requireProject('The agent’s notes');
     await fs.mkdir(path.dirname(this.agentNotesPath), { recursive: true });
     await fs.writeFile(this.agentNotesPath, content.endsWith('\n') ? content : `${content}\n`, 'utf8');
   }
 
   async setDiscussion(messages: DiscussionMessage[]): Promise<void> {
+    this.requireProject('The discussion');
     this.discussion.messages = messages;
     await saveDiscussion(this.workspaceRoot, this.discussion);
   }
 
   async mutateDiscussion(fn: (d: DiscussionData) => void): Promise<void> {
+    this.requireProject('The discussion');
     fn(this.discussion);
     await saveDiscussion(this.workspaceRoot, this.discussion);
     this.sendToRenderer(IPC.discussionUpdated, this.discussion.messages);
@@ -217,6 +294,11 @@ export class DocumentSession {
     effort?: string,
   ): Promise<void> {
     if (this.activeTurn) throw new Error('A review is already running');
+    // A round writes agent notes and can stage proposals, so it is the
+    // moment the app asks for a project (spec §4). The renderer asks
+    // before calling this; the guard is what makes that a rule rather
+    // than a convention.
+    this.requireProject('A review round');
     await this.saveContent(content);
     await this.setReview(review);
 

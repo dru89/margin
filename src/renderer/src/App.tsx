@@ -10,6 +10,7 @@ import { AgentBar } from '@/components/AgentBar';
 import { ConflictBar } from '@/components/ConflictBar';
 import { ProposalView } from '@/components/ProposalView';
 import { Settings } from '@/components/Settings';
+import { AdoptProject } from '@/components/AdoptProject';
 
 export function App() {
   const doc = useStore((s) => s.doc);
@@ -65,6 +66,7 @@ export function App() {
       </div>
       <AgentBar />
       <Settings />
+      <AdoptProject />
     </div>
   );
 }

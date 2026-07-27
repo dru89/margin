@@ -25,6 +25,23 @@ export async function initRepo(filePath: string): Promise<void> {
 }
 
 /**
+ * The repository root above a file, or null when there isn't one.
+ *
+ * Only the adoption prompt asks (spec §5): a repo boundary is the most
+ * likely intended project boundary, so it is worth *offering*. It stopped
+ * being a project root on its own when DECISIONS §63 was retired — git is
+ * a feature again, not a locator.
+ */
+export async function repoToplevel(filePath: string): Promise<string | null> {
+  try {
+    const out = await git(path.dirname(filePath), ['rev-parse', '--show-toplevel']);
+    return out.trim() || null;
+  } catch {
+    return null; // no repo, or no git on PATH — both mean "nothing to offer"
+  }
+}
+
+/**
  * git init + first commit of everything in a freshly created project dir.
  *
  * Every step is optional (#145). A project without a repo is a working

@@ -32,6 +32,7 @@ export function Explorer() {
   const doc = useStore((s) => s.doc);
   const explorerOpen = useStore((s) => s.explorerOpen);
   const loadWorkspace = useStore((s) => s.loadWorkspace);
+  const askToAdopt = useStore((s) => s.askToAdopt);
 
   // Refresh badges when the window regains focus (files change outside).
   useEffect(() => {
@@ -55,7 +56,20 @@ export function Explorer() {
   return (
     <nav className="explorer">
       <div className="explorer-head" title={workspace.root}>
-        {workspace.rootName}
+        <span className="explorer-root-name">{workspace.rootName}</span>
+        {/* The answer to "why isn't this folder my project?" is that
+            nothing declared it — which is something a person can act on
+            (spec §3). This is the only place the pre-adoption state says
+            so unprompted. */}
+        {doc && !doc.hasProject && (
+          <button
+            className="explorer-adopt"
+            title="Nothing has declared this folder a project. Click to choose one."
+            onClick={() => askToAdopt()}
+          >
+            Not a project
+          </button>
+        )}
       </div>
       {groups.map(([dir, files]) => (
         <div key={dir || '.'} className="explorer-group">

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { launch, doc, windows, waitForWindows, showing, pageShowing, type Margin } from './margin';
+import { launch, projectDoc, windows, waitForWindows, showing, pageShowing, type Margin } from './margin';
 
 /**
  * Journey 2 — window routing (#136, DECISIONS §62).
@@ -19,7 +19,7 @@ test.describe('window routing', () => {
 
   test('opening from Welcome replaces that window', async () => {
     m = await launch();
-    const alpha = doc(m.dir, 'proj/alpha.md', '# Alpha\n\nFirst.\n');
+    const alpha = projectDoc(m.dir, 'proj/alpha.md', '# Alpha\n\nFirst.\n');
     expect(await windows(m.app)).toEqual(['welcome']);
 
     await m.first.evaluate((f) => window.margin.openPath(f), alpha);
@@ -29,8 +29,8 @@ test.describe('window routing', () => {
 
   test('opening a second document from an editor gets its own window', async () => {
     m = await launch();
-    const alpha = doc(m.dir, 'proj/alpha.md', '# Alpha\n\nFirst.\n');
-    const other = doc(m.dir, 'other/other.md', '# Other\n\nElsewhere.\n');
+    const alpha = projectDoc(m.dir, 'proj/alpha.md', '# Alpha\n\nFirst.\n');
+    const other = projectDoc(m.dir, 'other/other.md', '# Other\n\nElsewhere.\n');
     await m.first.evaluate((f) => window.margin.openPath(f), alpha);
     await waitForWindows(m.app, 1);
     await m.first.evaluate((f) => window.margin.openPath(f), other);
@@ -43,8 +43,8 @@ test.describe('window routing', () => {
     // project already open switches that window rather than starting a rival
     // one over the same .margin/.
     m = await launch();
-    const alpha = doc(m.dir, 'proj/alpha.md', '# Alpha\n\nFirst.\n');
-    const beta = doc(m.dir, 'proj/beta.md', '# Beta\n\nSecond.\n');
+    const alpha = projectDoc(m.dir, 'proj/alpha.md', '# Alpha\n\nFirst.\n');
+    const beta = projectDoc(m.dir, 'proj/beta.md', '# Beta\n\nSecond.\n');
 
     await m.first.evaluate((f) => window.margin.openPath(f), alpha);
     await waitForWindows(m.app, 1);
@@ -55,8 +55,8 @@ test.describe('window routing', () => {
 
   test('reopening an already-open document does not duplicate it', async () => {
     m = await launch();
-    const alpha = doc(m.dir, 'proj/alpha.md', '# Alpha\n\nFirst.\n');
-    const other = doc(m.dir, 'other/other.md', '# Other\n\nElsewhere.\n');
+    const alpha = projectDoc(m.dir, 'proj/alpha.md', '# Alpha\n\nFirst.\n');
+    const other = projectDoc(m.dir, 'other/other.md', '# Other\n\nElsewhere.\n');
 
     await m.first.evaluate((f) => window.margin.openPath(f), alpha);
     await waitForWindows(m.app, 1);
@@ -74,7 +74,7 @@ test.describe('window routing', () => {
     // It is a destination the author navigated to, not a landing screen —
     // even before anything has been typed into it (#82, #119).
     m = await launch();
-    const alpha = doc(m.dir, 'proj/alpha.md', '# Alpha\n\nFirst.\n');
+    const alpha = projectDoc(m.dir, 'proj/alpha.md', '# Alpha\n\nFirst.\n');
     const w = m.first;
     await w.getByRole('button', { name: /start a new project/i }).click();
     await expect.poll(() => showing(w)).toBe('new project');

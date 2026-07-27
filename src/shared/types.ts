@@ -241,6 +241,17 @@ export interface SetupMessage {
   text: string;
 }
 
+/**
+ * The folders offered when asking which one to adopt (spec §5). Either
+ * may be null: `parent` when the document sits directly in the home
+ * folder, `gitRoot` when there is no repository above it or it is the
+ * same folder. With both null, browsing is the only way through.
+ */
+export interface AdoptionOptions {
+  parent: string | null;
+  gitRoot: string | null;
+}
+
 export interface RecentFile {
   path: string;
   name: string;
@@ -306,7 +317,6 @@ export interface ModelPreference {
   effort?: string;
 }
 
-/** `<workspaceRoot>/.margin/project.json` — travels with the project. */
 /**
  * `margin.json` — what the author states about a project (spec §2).
  *

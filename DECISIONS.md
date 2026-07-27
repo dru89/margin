@@ -1716,3 +1716,62 @@ actually declared. The bridge is not a declaration, and the accident is
 narrowed rather than gone: a folder nobody declared no longer inherits a
 whole repository, but project state written into it still creates a
 `.margin/` that a later walk would find. Step 3 closes that.
+
+## 75. Adoption is a declaration, and the record is the act (#169)
+
+Step 3 of the workspace-model spec, and the half of §74 that was left
+open. Two rules, and the second is what closes the accident.
+
+**Opening a folder declares it.** Not a walk up from the folder, not a
+search for something nearby: the folder that was chosen is the project,
+and `margin.json` is written into it there and then. There is no
+adoption that did not write the file and no file written without
+adopting, which means the question "is this a project?" has exactly one
+answer on disk that a person can look at. Opening `book/chapter1/`
+therefore scopes the window to `chapter1` whatever `book/` says about
+itself — the VSCode model, and the reason overlapping projects fall out
+of the design rather than needing a mechanism.
+
+**A window keeps the project it was opened as.** The corollary, and the
+part that is easy to miss: resolution used to run on every document, so
+browsing from `book/` into `chapter1/foo.md` would have re-rooted the
+window on the nearer declaration and silently swapped the discussion,
+the agent notes and the model preference. The root is now a property of
+what was *opened* and travels with the window; the explorer scans from
+it rather than from the open file. `DocumentSession.open` still verifies
+the root it is handed — it must declare itself and contain the document
+— and falls back to the walk otherwise, so an explicit root is a
+preference, never a bypass.
+
+**Without a declaration, nothing project-scoped reaches disk.** Five
+write paths are gated on `hasProject`: agent notes, the discussion, the
+project file, staged file proposals, and the Google Docs link. That is
+what makes §74's `dirname` fallback safe to keep — it is a place to read
+from, never a place to write to, so an undeclared folder never acquires
+the `.margin/` a later walk would read back as a project. The accident
+is now closed at both ends.
+
+**The affordances are unavailable, not inert.** Gating the writes
+silently would be worse than the accident it prevents: a discussion
+message the author watched appear and that then vanished is a bug, not a
+boundary. So the dock says the discussion belongs to a project and
+offers to make one, the Docs menu says the same about a link, and the
+explorer header carries a *Not a project* chip — which is also the
+answer to "why isn't this folder my project?", now that the answer is
+"because nothing declared it". The main-process guards still throw,
+because the renderer declining is presentation and the boundary has to
+live where the write does.
+
+**A review round is the moment we ask**, since a round writes notes and
+can stage proposals. Reviewing your own writing stays free — the sidecar
+is a sibling of the document — and a comment written before adoption is
+pending rather than wasted, which falls out of that and is not a feature
+to build. The prompt offers the document's folder and, when it differs,
+the repository above it; browsing is the escape. Not a bare OS picker:
+that asks the author to think about paths at the moment they are
+thinking about writing, and lets them choose `/`. Home is never a
+candidate, because §74 refuses to *find* a project there and a
+`margin.json` nothing would honor is worse than no offer at all.
+
+Confirming carries straight on with whatever asked, so a round is not
+two clicks of the same button.

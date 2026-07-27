@@ -8,7 +8,7 @@ import {
   hasActiveSetup,
   setSession,
 } from './session';
-import { findWorkspaceRoot } from './workspace';
+import { findProjectRoot } from './workspace';
 // (Menu import above is used by the context-menu handler.)
 import { addRecentFile } from './recents';
 
@@ -36,7 +36,7 @@ function nextWindowBounds(): { x?: number; y?: number; width: number; height: nu
   }
 }
 
-export function createWindow(filePath?: string): BrowserWindow {
+export function createWindow(filePath?: string, root?: string): BrowserWindow {
   const bounds = nextWindowBounds();
   const win = new BrowserWindow({
     ...bounds,
@@ -114,13 +114,17 @@ export function createWindow(filePath?: string): BrowserWindow {
   }
 
   if (filePath) {
-    void attachDocument(win, filePath);
+    void attachDocument(win, filePath, root);
   }
   return win;
 }
 
-export async function attachDocument(win: BrowserWindow, filePath: string): Promise<void> {
-  const session = await DocumentSession.open(filePath, win);
+export async function attachDocument(
+  win: BrowserWindow,
+  filePath: string,
+  root?: string,
+): Promise<void> {
+  const session = await DocumentSession.open(filePath, win, root);
   setSession(win.webContents.id, session);
   win.setTitle(session.fileName);
   await addRecentFile(filePath, session.workspaceRoot);
@@ -144,7 +148,11 @@ function reveal(win: BrowserWindow): void {
  * - `preferWindow` (e.g. a welcome window the user acted in) -> load it there
  * - otherwise -> new cascaded window
  */
-export async function openFile(filePath: string, preferWindow?: BrowserWindow): Promise<void> {
+export async function openFile(
+  filePath: string,
+  preferWindow?: BrowserWindow,
+  explicitRoot?: string,
+): Promise<void> {
   const resolved = path.resolve(filePath);
   for (const win of BrowserWindow.getAllWindows()) {
     if (getSession(win.webContents.id)?.filePath === resolved) {
@@ -156,12 +164,19 @@ export async function openFile(filePath: string, preferWindow?: BrowserWindow): 
   // from a project that's already open switches that window rather than
   // starting a rival window over the same `.margin/` (issue #119 follow-up).
   // This is what the file explorer already does from inside the window.
-  const root = await findWorkspaceRoot(resolved);
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (getSession(win.webContents.id)?.workspaceRoot === root) {
-      await attachDocument(win, resolved);
-      reveal(win);
-      return;
+  //
+  // Only a *declared* project claims a window this way. A document that
+  // belongs to no project has no project to share, so two of them sitting
+  // in one folder open separately rather than pretending the folder
+  // joined them (spec §3).
+  const root = explicitRoot ?? (await findProjectRoot(resolved));
+  if (root) {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (getSession(win.webContents.id)?.workspaceRoot === root) {
+        await attachDocument(win, resolved, root);
+        reveal(win);
+        return;
+      }
     }
   }
   // Reuse the acting window only when it holds nothing the user would
@@ -172,9 +187,9 @@ export async function openFile(filePath: string, preferWindow?: BrowserWindow): 
     !getSession(preferWindow.webContents.id) &&
     !hasActiveSetup(preferWindow.webContents.id)
   ) {
-    await attachDocument(preferWindow, resolved);
+    await attachDocument(preferWindow, resolved, explicitRoot);
     reveal(preferWindow);
     return;
   }
-  createWindow(resolved);
+  createWindow(resolved, explicitRoot);
 }

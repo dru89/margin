@@ -1,8 +1,10 @@
 import { app, BrowserWindow, dialog, Menu, type MenuItemConstructorOptions, shell } from 'electron';
+import path from 'path';
 import { IPC } from '@shared/ipc';
 import { clearRecentFiles, getRecentFiles, setRecentsChangedListener } from './recents';
 import { createWindow, openFile } from './windows';
-import { firstMarkdownIn } from './workspace';
+import { declaresProject, firstMarkdownIn } from './workspace';
+import { saveProjectFile } from './projectFile';
 
 const isMac = process.platform === 'darwin';
 
@@ -32,15 +34,31 @@ export async function showOpenDialog(win?: BrowserWindow): Promise<void> {
   await openFile(result.filePaths[0], win);
 }
 
-/** Open a folder: the workspace explorer shows the whole tree, so we open
- * the folder's first markdown file to seed the window. */
+/**
+ * Open a folder — which is how a project is declared (spec §1, §5).
+ *
+ * **The unit of selection is the folder, and selecting it is the
+ * statement of intent.** There is no walk up from here: opening
+ * `book/chapter1/` scopes the window to `chapter1`, whatever `book/` says
+ * about itself, which is what makes overlapping projects fall out of the
+ * model instead of needing a mechanism.
+ *
+ * A folder that already declares itself is simply opened. One that does
+ * not is asked about first, because confirming is what writes
+ * `margin.json` into somebody's folder — the one moment Margin adds a
+ * file the author did not create.
+ *
+ * The explorer shows the whole tree, so the window is seeded with the
+ * folder's first markdown file.
+ */
 export async function showOpenFolderDialog(win?: BrowserWindow): Promise<void> {
   const result = await dialog.showOpenDialog({
     title: 'Open Folder',
     properties: ['openDirectory'],
   });
   if (result.canceled || result.filePaths.length === 0) return;
-  const first = await firstMarkdownIn(result.filePaths[0]);
+  const dir = result.filePaths[0];
+  const first = await firstMarkdownIn(dir);
   if (!first) {
     dialog.showMessageBox({
       type: 'info',
@@ -49,7 +67,20 @@ export async function showOpenFolderDialog(win?: BrowserWindow): Promise<void> {
     });
     return;
   }
-  await openFile(first, win);
+  if (!(await declaresProject(dir))) {
+    const { response } = await dialog.showMessageBox({
+      type: 'question',
+      buttons: ['Open as Project', 'Cancel'],
+      defaultId: 0,
+      cancelId: 1,
+      message: `Open “${path.basename(dir)}” as a Margin project?`,
+      detail:
+        'Margin will create a margin.json file here to remember it. Your discussion with Claude, its notes and its memory of this work live with the project.',
+    });
+    if (response !== 0) return;
+    await saveProjectFile(dir, {});
+  }
+  await openFile(first, win, dir);
 }
 
 export async function rebuildMenu(): Promise<void> {

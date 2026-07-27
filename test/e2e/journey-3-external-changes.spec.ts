@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync, writeFileSync, renameSync, existsSync } from 'fs';
 import path from 'path';
-import { launch, doc, showing, type Margin } from './margin';
+import { launch, projectDoc, showing, type Margin } from './margin';
 
 /**
  * Journey 3: the document changes underneath you (#135, from #131).
@@ -41,7 +41,7 @@ const sidecarOf = (file: string) => {
 
 /** Seed a document with one comment anchored to QUOTE. */
 function seed(dir: string, name = 'notes.md'): string {
-  const file = doc(dir, `p/${name}`, DOC);
+  const file = projectDoc(dir, `p/${name}`, DOC);
   const from = DOC.indexOf(QUOTE);
   writeFileSync(`${file}.review.json`, JSON.stringify({
     version: 1, document: name, round: 1,
