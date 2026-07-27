@@ -32,6 +32,7 @@ npm run test:paths       # agent-supplied path validation (the untrusted boundar
 npm run test:workspace   # project-root derivation + its two guards (§63)
 npm run test:sidecar     # load, backfill, rename recovery, refusing a stranger's
 npm run test:tables      # GFM table formatting
+npm run test:git         # git is optional — runs with git off PATH (#145)
 ```
 
 `scripts/lib/compile.mjs` does the esbuild-and-import; a new suite is

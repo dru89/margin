@@ -83,7 +83,15 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.gitInit, async (event) => {
     const session = requireSession(event.sender.id);
-    await initRepo(session.filePath);
+    // Unlike project creation (#145) this is an explicit request, so it is
+    // allowed to fail — but it has to fail *visibly*. Rejecting made the
+    // button do nothing at all when git was missing, which is the same
+    // silence with none of the honesty. The caller reads the outcome.
+    try {
+      await initRepo(session.filePath);
+    } catch {
+      /* reported by returning the unchanged state below */
+    }
     const inRepo = await isInRepo(session.filePath);
     session.inGitRepo = inRepo;
     const win = BrowserWindow.fromWebContents(event.sender);
