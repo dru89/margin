@@ -134,6 +134,34 @@ test.describe('a round that fails', () => {
   });
 });
 
+test.describe('a setup turn that fails', () => {
+  let m: Awaited<ReturnType<typeof launchFailing>>;
+  test.afterEach(async () => m?.close());
+
+  test('keeps the message and offers to send it again', async () => {
+    // The path #79 was actually reported on. The transcript keeps the
+    // unanswered message, so "try again" is the same send — where before
+    // the only way forward was writing a second message.
+    m = await launchFailing('Failed to authenticate: OAuth session expired and could not be refreshed');
+    await m.page.getByRole('button', { name: /start a new project/i }).click();
+    await m.page.locator('.setup-input').fill('A proposal about rollout risk.');
+    await m.page.getByRole('button', { name: 'Send', exact: true }).click();
+
+    await expect(m.page.getByText(/Claude login has expired/i)).toBeVisible({ timeout: 60_000 });
+    // Not the SDK's sentence, and not the IPC channel's either.
+    await expect(m.page.getByText(/invoking remote method/i)).toHaveCount(0);
+
+    // Said once, still there, ready to send.
+    await expect(m.page.locator('.setup-msg-user')).toHaveCount(1);
+    await expect(m.page.locator('.setup-msg-user')).toContainText('rollout risk');
+
+    await m.page.getByRole('button', { name: /try again/i }).click();
+    await expect(m.page.getByText(/Claude login has expired/i)).toBeVisible({ timeout: 60_000 });
+    // Retrying re-sends; it does not append a second copy of the message.
+    await expect(m.page.locator('.setup-msg-user')).toHaveCount(1);
+  });
+});
+
 test.describe('a round that succeeds', () => {
   test('still spends the round and the queued message', async () => {
     // The mirror of the above: a rollback must not fire when the turn
