@@ -50,15 +50,37 @@ npm run test:e2e     # builds, then runs test/e2e/
 seeded `projectsDir`, so a test never touches real settings, recents, or
 `~/Documents/Margin`. `MARGIN_FAKE_AGENT=1` is always set. Assert on what
 the user ends up with — which window holds what, sidecar contents, file
-contents — never on markup, or a restyle breaks the suite. Journeys 1 and
-3 are still to come (#134, #135).
+contents — never on markup, or a restyle breaks the suite. Journey 3 is
+still to come (#135); 1, 2 and 4 are in place.
 
-Two traps this suite already hit: `electron.launch()` resolves before any
-window exists (await `firstWindow()`), and clicking a link that
-`will-navigate` blocks needs `click({ noWaitAfter: true })`, since the
-navigation Playwright waits for is precisely the one that must never
-happen. Stub `shell.openExternal` via `app.evaluate` or the run opens a
-real browser.
+**Journey 1 is the one to read first** — `journey-1-review-round.spec.ts`
+walks a whole round and crosses the four seams that have produced the
+most bugs: review-state ownership handing off to main and back, the
+agent tool surface, anchor remapping through an accepted edit, and
+sidecar persistence holding all of it.
+
+Traps this suite has already hit:
+
+- `electron.launch()` resolves before any window exists — await
+  `firstWindow()`.
+- Clicking a link that `will-navigate` blocks needs
+  `click({ noWaitAfter: true })`, since the navigation Playwright waits
+  for is precisely the one that must never happen. Stub
+  `shell.openExternal` via `app.evaluate` or the run opens a real browser.
+- **Read the sidecar through a try/catch that returns null.**
+  `expect.poll` retries a failed assertion but *propagates a thrown
+  error*, so a read landing before the first autosave ends the run with
+  ENOENT instead of waiting.
+- **Select text by counting from the start of the document**, not by
+  clicking a line and pressing Home. A `.cm-line` click lands at the
+  centre of its box — the end of a visual row on a wrapped line — and
+  `Home` with line wrapping goes to that row's start, not the logical
+  line's. The arrows then walk off the end and leave no selection, which
+  surfaces as a disabled `+ Comment` and nothing else.
+- **Wait for the round to *finish*, not for its first results.** The
+  agent keeps working after the visible output lands, and the editor
+  stays read-only for all of it — correctly. Typing into that window
+  silently does nothing.
 
 **When a change needs a test:**
 
