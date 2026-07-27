@@ -45,6 +45,36 @@ const withoutGit = async (fn) => {
   }
 };
 
+/**
+ * Run `fn` with a committer identity supplied through the environment.
+ *
+ * Not optional: `initProjectRepo` runs `git init` itself, so there is no
+ * window to configure the new repo beforehand, and a machine without a
+ * global identity — every CI runner — would otherwise land in the
+ * *unconfigured* case while claiming to test the configured one. The
+ * first version of this file relied on the developer's own git config
+ * and passed locally while failing on CI, which is the whole reason to
+ * name the environment rather than inherit it.
+ */
+const withIdentity = async (fn) => {
+  const vars = {
+    GIT_AUTHOR_NAME: 'Margin Test',
+    GIT_AUTHOR_EMAIL: 'test@margin.invalid',
+    GIT_COMMITTER_NAME: 'Margin Test',
+    GIT_COMMITTER_EMAIL: 'test@margin.invalid',
+  };
+  const before = Object.fromEntries(Object.keys(vars).map((k) => [k, process.env[k]]));
+  Object.assign(process.env, vars);
+  try {
+    return await fn();
+  } finally {
+    for (const [k, v] of Object.entries(before)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+};
+
 const threw = async (fn) => {
   try {
     await fn();
@@ -65,7 +95,7 @@ t('which the app can tell', await withoutGit(() => isInRepo(path.join(bare, 'doc
 
 head('creating a project with git');
 const repo = project('with-git');
-t('does not throw', await threw(() => initProjectRepo(repo, 'Initial')), false);
+t('does not throw', await withIdentity(() => threw(() => initProjectRepo(repo, 'Initial'))), false);
 t('a repo exists', existsSync(path.join(repo, '.git')), true);
 t('the app can tell', await isInRepo(path.join(repo, 'doc.md')), true);
 t('the seed files are committed',
@@ -75,7 +105,8 @@ t('the seed files are committed',
 head('git present but with no identity configured');
 // The failure the original code *did* anticipate: the repo is created and
 // the commit fails. Still not fatal, and still not a reason to lose the
-// project. (`-c user.email=` empties it, which git refuses to commit with.)
+// project. An empty ident is one git refuses to commit with, and no
+// GIT_AUTHOR_* is set here, so nothing can override it back.
 const unnamed = project('no-identity');
 execFileSync('git', ['init', '-q'], { cwd: unnamed });
 execFileSync('git', ['config', 'user.email', ''], { cwd: unnamed });
