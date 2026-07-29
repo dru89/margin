@@ -15,6 +15,7 @@ import { loadReview, saveReview } from './reviewStore';
 import { loadDiscussion, saveDiscussion } from './discussionStore';
 import { declaresProject, findProjectRoot, isInside } from './workspace';
 import { saveProjectFile } from './projectFile';
+import { acquireRoundLock } from './roundLock';
 import { commitCheckpoint, isInRepo } from './git';
 import { getAgent, type ActiveTurn } from './agents';
 
@@ -293,12 +294,30 @@ export class DocumentSession {
     model?: string,
     effort?: string,
   ): Promise<void> {
-    if (this.activeTurn) throw new Error('A review is already running');
     // A round writes agent notes and can stage proposals, so it is the
     // moment the app asks for a project (spec §4). The renderer asks
     // before calling this; the guard is what makes that a rule rather
     // than a convention.
     this.requireProject('A review round');
+    // Held against the *document*, so two windows reaching one file
+    // through different paths cannot run two turns against one sidecar
+    // (spec §7). Taken before anything is written, so a refusal costs
+    // nothing — and released in the finally below however the turn ends.
+    const lease = await acquireRoundLock(this.filePath);
+    try {
+      await this.runRound(content, review, model, effort);
+    } finally {
+      lease.release();
+      this.activeTurn = null;
+    }
+  }
+
+  private async runRound(
+    content: string,
+    review: ReviewData,
+    model?: string,
+    effort?: string,
+  ): Promise<void> {
     await this.saveContent(content);
     await this.setReview(review);
 
@@ -402,9 +421,9 @@ export class DocumentSession {
       // The raw text is still worth having when the message above turns
       // out to be the wrong guess about what happened.
       this.sendToRenderer(IPC.agentActivity, `Round failed: ${raw}`);
-    } finally {
-      this.activeTurn = null;
     }
+    // `activeTurn` and the document lock are both cleared by the caller's
+    // finally, so an exception thrown outside this try still releases.
   }
 
   async cancelReview(): Promise<void> {

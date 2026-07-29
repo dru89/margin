@@ -36,6 +36,7 @@ npm run test:git         # git is optional — runs with git off PATH (#145)
 npm run test:errors      # what a failed round says and whether it rolls back (§71)
 npm run test:project     # margin.json: the legacy fallback and the name
 npm run test:policy      # when an update may interrupt (§76)
+npm run test:lock        # one round per document, keyed on real path (§7)
 npm run test:contract    # the REAL agent, unauthenticated — free, fast, CI-safe (§73)
 ```
 
