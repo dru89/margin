@@ -7,17 +7,29 @@ function FileRow({ file, active }: { file: WorkspaceFile; active: boolean }) {
   const locked = useLocked();
   const attention = file.openComments + file.pendingSuggestions;
   const isMd = file.kind === 'markdown';
+  // Clicking a document open elsewhere focuses that window rather than
+  // opening a second one (spec §8). Saying so beforehand is the whole of
+  // "how do we stop it feeling clunky" — the jump becomes the expected
+  // outcome of the click instead of a jolt.
+  const elsewhere = isMd && !active && file.openElsewhere;
   return (
     <button
-      className={`explorer-file${active ? ' on' : ''}${isMd ? '' : ' explorer-file-other'}`}
+      className={`explorer-file${active ? ' on' : ''}${isMd ? '' : ' explorer-file-other'}${elsewhere ? ' explorer-file-elsewhere' : ''}`}
       disabled={locked}
-      title={isMd ? file.rel : `${file.rel} — opens in its default app`}
+      title={
+        elsewhere
+          ? `${file.rel} — open in another window; clicking brings it forward`
+          : isMd
+            ? file.rel
+            : `${file.rel} — opens in its default app`
+      }
       onClick={() =>
         void (isMd ? switchToFile(file.path) : window.margin.openExternal(file.path))
       }
     >
       {file.modified ? <span className="explorer-dot" title="Modified since last commit" /> : <span className="explorer-dot-spacer" />}
       <span className="explorer-name">{file.name}</span>
+      {elsewhere && <span className="explorer-elsewhere" aria-label="Open in another window">⧉</span>}
       {attention > 0 && (
         <span className="explorer-badge" title={`${file.openComments} open comments, ${file.pendingSuggestions} pending suggestions`}>
           {attention}

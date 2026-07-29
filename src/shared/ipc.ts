@@ -70,4 +70,8 @@ export const IPC = {
   gdocsAuthChanged: 'gdocs:auth-changed',
   gdocsSyncChanged: 'gdocs:sync-changed',
   updateStateChanged: 'update:state-changed',
+  /** A round is running in another window on this project (§8). */
+  peerRound: 'project:peer-round',
+  /** Committed project state moved in another window — refresh. */
+  projectChanged: 'project:changed',
 } as const;

@@ -8,6 +8,7 @@ import type {
   DocState,
   GdocsSyncState,
   ModelPreference,
+  PeerRound,
   ReviewData,
   UpdateState,
   WorkspaceState,
@@ -165,6 +166,14 @@ interface MarginState {
   gdocsSync: GdocsSyncState | null;
   refreshGdocsSync: () => Promise<void>;
   /**
+   * A round running in another window on this project (spec §8).
+   *
+   * Separate from `agent` on purpose: `agent` is this window's own round
+   * and drives `useLocked`, and a peer's round has no claim on this
+   * document. Telling the author is right; freezing their editor is not.
+   */
+  peerRound: PeerRound | null;
+  /**
    * Whether an app update is waiting (#180). App-level rather than
    * document-level: every window shows the same chip, and main pushes to
    * all of them.
@@ -236,6 +245,7 @@ export const useStore = create<MarginState>((set, get) => {
     settingsOpen: false,
     gdocsSync: null,
     update: { status: 'idle' },
+    peerRound: null,
 
     loadWorkspace: async () => {
       const workspace = await window.margin.getWorkspace();
@@ -375,6 +385,11 @@ export const useStore = create<MarginState>((set, get) => {
       window.margin.onGdocsSyncChanged((gdocsSync) => set({ gdocsSync }));
       void window.margin.getUpdateState().then((update) => set({ update }));
       window.margin.onUpdateStateChanged((update) => set({ update }));
+      window.margin.onPeerRound((peerRound) => set({ peerRound }));
+      // Committed state moved in a sibling window: the explorer's counts
+      // are what this window can actually show, since one document is
+      // only ever open in one window (spec §8).
+      window.margin.onProjectChanged(() => void get().loadWorkspace());
       // Fallback for when the page has focus and no native menu fires
       // (Linux without a menubar); open-only, so a menu-consumed
       // accelerator never double-toggles.

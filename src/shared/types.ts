@@ -149,6 +149,19 @@ export interface DocState {
   inGitRepo: boolean;
 }
 
+/**
+ * A round running in *another* window on this project (spec §8).
+ *
+ * Deliberately not `AgentStatus`: that is what locks a window, and the
+ * round owns only its own document's review. A peer window is editing a
+ * different document the turn never touches, so it is told, not frozen.
+ */
+export interface PeerRound {
+  running: boolean;
+  /** Basename of the document under review. */
+  document: string;
+}
+
 export type AgentPhase = 'idle' | 'running' | 'done' | 'error';
 
 export interface AgentStatus {
@@ -176,6 +189,12 @@ export interface WorkspaceFile {
   pendingSuggestions: number;
   /** Differs from HEAD (git status), including untracked. */
   modified: boolean;
+  /**
+   * Open in another window (spec §8, scenario 15). Clicking it focuses
+   * that window rather than opening a second one, so saying so first is
+   * what turns the jump from a jolt into the expected outcome.
+   */
+  openElsewhere?: boolean;
 }
 
 export interface WorkspaceState {

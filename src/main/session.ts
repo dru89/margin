@@ -267,6 +267,10 @@ export class DocumentSession {
   async setReview(review: ReviewData): Promise<void> {
     this.review = review;
     await saveReview(this.filePath, review);
+    // Committed, so the project's other windows should show it — as a
+    // count in their explorer, since one document is only ever open in
+    // one window (spec §8).
+    this.notifyPeersOfWrite();
   }
 
   /** Mutate review state from the main process (agent tools) and notify the renderer. */
@@ -274,6 +278,7 @@ export class DocumentSession {
     fn(this.review);
     await saveReview(this.filePath, this.review);
     this.sendToRenderer(IPC.reviewUpdated, this.review);
+    this.notifyPeersOfWrite();
   }
 
   sendToRenderer(channel: string, ...args: unknown[]): void {
@@ -282,6 +287,34 @@ export class DocumentSession {
 
   private setAgentStatus(status: AgentStatus): void {
     this.sendToRenderer(IPC.agentStatus, status);
+    // The other windows on this project are told a round is happening,
+    // but through a *different* channel (spec §8, scenario 18).
+    //
+    // Not through `agentStatus`, which is what locks a window: the round
+    // owns the review of *its* document, and a peer window is editing a
+    // different one that the turn never touches. Locking it would be a
+    // broader claim than the round actually makes, and the author would
+    // watch an unrelated document go read-only for a minute.
+    this.notifyPeers({
+      running: status.phase === 'running',
+      document: this.fileName,
+    });
+  }
+
+  private notifyPeers(round: { running: boolean; document: string }): void {
+    for (const peer of projectPeers(this)) peer.sendToRenderer(IPC.peerRound, round);
+  }
+
+  /**
+   * Tell the project's other windows that committed state moved.
+   *
+   * An in-process nudge rather than a filesystem watcher on every
+   * sidecar in the project: the writes that matter all originate here,
+   * and a watcher per document would scale with the folder rather than
+   * with what is actually open.
+   */
+  private notifyPeersOfWrite(): void {
+    for (const peer of projectPeers(this)) peer.sendToRenderer(IPC.projectChanged);
   }
 
   /**
@@ -457,15 +490,58 @@ export function getSession(webContentsId: number): DocumentSession | undefined {
 export function setSession(webContentsId: number, session: DocumentSession): void {
   sessions.get(webContentsId)?.dispose(); // switching documents replaces the session
   sessions.set(webContentsId, session);
+  notifyOtherWindows(session);
 }
 
 export function dropSession(webContentsId: number): void {
   sessions.get(webContentsId)?.dispose();
   sessions.delete(webContentsId);
   activeSetups.delete(webContentsId);
+  notifyOtherWindows(undefined);
+}
+
+/**
+ * Tell every other window that the set of open documents changed.
+ *
+ * The explorer's "open elsewhere" marker is derived from live sessions
+ * rather than from disk, so opening, switching or closing a document is
+ * exactly the event that makes a sibling's explorer stale — and nothing
+ * on the filesystem moves to announce it. Sent to *all* other windows,
+ * not just the project's peers: two projects can share a document (§6),
+ * so the marker crosses projects even though committed state does not.
+ */
+function notifyOtherWindows(except: DocumentSession | undefined): void {
+  for (const s of sessions.values()) {
+    if (s !== except) s.sendToRenderer(IPC.projectChanged);
+  }
 }
 
 export function findSessionByPath(filePath: string): DocumentSession | undefined {
   for (const s of sessions.values()) if (s.filePath === filePath) return s;
   return undefined;
+}
+
+/** Every open document, across every window. */
+export function allSessions(): DocumentSession[] {
+  return [...sessions.values()];
+}
+
+/**
+ * The other windows on the same project (spec §8).
+ *
+ * A project's windows are peers: committed state reaches all of them,
+ * and a round running in one is worth saying in the others. Keyed on the
+ * workspace root, which is the window's own declared project — not the
+ * document's, since a document can belong to several (§6).
+ */
+export function projectPeers(of: DocumentSession): DocumentSession[] {
+  if (!of.hasProject) return []; // nothing declared, so nothing to be a peer of
+  return [...sessions.values()].filter((s) => s !== of && s.hasProject && s.workspaceRoot === of.workspaceRoot);
+}
+
+/** Paths held by windows other than this one — the explorer's marker. */
+export function pathsOpenElsewhere(than: DocumentSession | undefined): Set<string> {
+  const paths = new Set<string>();
+  for (const s of sessions.values()) if (s !== than) paths.add(s.filePath);
+  return paths;
 }

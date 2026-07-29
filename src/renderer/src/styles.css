@@ -2095,3 +2095,27 @@ button.status-chip:active { transform: translateY(1px); }
   top: 14px;
   right: 16px;
 }
+
+/* ——— open in another window (spec §8) ——— */
+
+/* Two classes so it beats `.explorer-file` on specificity rather than on
+   source order. Quiet: the document is fine, it is just not here. */
+.explorer-file.explorer-file-elsewhere .explorer-name {
+  color: var(--ink-faint);
+  font-style: italic;
+}
+.explorer-elsewhere {
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--ink-faint);
+  margin-left: 4px;
+}
+
+/* A round running in a sibling window. Same vocabulary as the bar's own
+   running state, but it never locks this window — the turn owns its
+   document's review, not this one's. */
+.agent-bar.agent-peer {
+  background: var(--paper-inset);
+  color: var(--ink-soft);
+}

@@ -12,7 +12,12 @@ import type {
 } from '@shared/types';
 import { IPC } from '@shared/ipc';
 import { classifyAgentError } from '@shared/agentErrors';
-import { findSessionByPath, getSession, setSetupActive } from './session';
+import {
+  findSessionByPath,
+  getSession,
+  pathsOpenElsewhere,
+  setSetupActive,
+} from './session';
 import { attachDocument, createWindow, openFile } from './windows';
 import { showOpenDialog, showOpenFolderDialog } from './menu';
 import {
@@ -173,7 +178,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.getWorkspace, async (event) => {
     const session = getSession(event.sender.id);
     if (!session) return null;
-    return getWorkspace(session.workspaceRoot);
+    // "Elsewhere" is relative to the window asking, so the set is built
+    // per request rather than cached (spec §8, scenario 15).
+    return getWorkspace(session.workspaceRoot, pathsOpenElsewhere(session));
   });
 
   // Switch the sender window to another document. If that document is open
