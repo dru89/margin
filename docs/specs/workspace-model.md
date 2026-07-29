@@ -1,8 +1,8 @@
 # Workspace model — design spec
 
-**Status:** settled with Drew (2026-07-27). Build order steps 1-3 are in
-(#167, #168, #169); §1-§5 describe what the app does. Steps 4-7 (§6-§8)
-are not built.
+**Status:** settled with Drew (2026-07-27). Build order steps 1-4 are in
+(#167, #168, #169, #170); §1-§5 and §7 describe what the app does.
+Steps 5-7 are not built.
 **Covers:** #124, #6, #107, and the window half of #2. Retires DECISIONS §63.
 
 ## The problem
@@ -385,6 +385,9 @@ Journeys, not coverage. Each is here because it protects a decision above.
 4. The document-scoped round lock (§7), keyed on real path. Scenarios
    12, 13. Cheap and independent — it does not gate the multi-window
    work, since the path dedupe already prevents the common case.
+   **Done** (#170). Lives in `src/main/roundLock.ts`: single-writer is a
+   guarantee this host offers, so it stays out of `src/shared/`
+   (DECISIONS §77).
 5. Overlapping projects (§6) — mostly assertions rather than code, since
    §1 makes it fall out. Scenarios 7-11.
 6. Multiple windows per project: sidecar watching, project-scoped agent
