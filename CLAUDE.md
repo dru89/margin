@@ -193,33 +193,57 @@ it.
 Use it when working on the review surface — an empty document hides
 every problem worth seeing.
 
-## Verifying changes (CDP smoke pattern)
+## Verifying changes (screenshots and smoke tests)
+
+**Default to a virtual display.** Electron has no headless mode, so
+anything that launches the app takes over the screen and the keyboard
+focus of whoever is sitting at it. `xvfb-run` removes that cost
+entirely, and nothing is given up: fonts resolve identically, layout is
+identical, and forcing the backing scale makes screenshots *sharper*
+than a real fractional-scaled display.
 
 ```bash
-npm run build
-npx electron . --remote-debugging-port=9224 "path/to/doc.md" &   # background
-# drive it with puppeteer-core (devDependency; connects, no browser download):
-#   puppeteer.connect({ browserURL: 'http://127.0.0.1:9224' })
-#   page.evaluate(...), page.screenshot(...)
+npm run test:e2e:quiet    # the journey suite, on a virtual display
+```
+
+For a screenshot, drive the built app from Playwright under the same
+wrapper — it passes `env` explicitly, which a backgrounded `npx electron`
+may not (see below):
+
+```bash
+xvfb-run -a -s "-screen 0 1920x1080x24" node scripts/shot.mjs --file .fixtures/review-surface/self-evaluation.md --name surface
+```
+
+`scripts/shot.mjs` takes both themes, uses an isolated `--user-data-dir`,
+and forces a 2x backing scale — without that the capture is 1x and
+noticeably soft. Pass `--selector .toolbar` to crop to one region when
+the change is local, and `--name` to control the output basename
+(`<name>-light.png` / `<name>-dark.png` under `.fixtures/shots/`).
+
+**The CDP route still exists** for poking at an app that is already
+running, and it is the only way to inspect a session started by hand:
+
+```bash
+npx electron . --remote-debugging-port=9224 "path/to/doc.md" &
+# puppeteer.connect({ browserURL: 'http://127.0.0.1:9224' }) — puppeteer-core
+# is a devDependency, so this connects without downloading a browser.
 ```
 
 - Scripts using puppeteer-core must run **from the repo root** (ESM resolution).
 - Kill the app with `pkill -x electron`. **Never `pkill -f electron`** — the
   pattern matches your own wrapper shell's command line and kills your shell
   (exit 144).
-- Take screenshots in both themes: `page.emulateMediaFeatures([{ name:
-  'prefers-color-scheme', value: 'light' | 'dark' }])`.
 - A real agent round needs a logged-in `claude` CLI (`claude -p "ok"` must
   work in a plain terminal). Otherwise use `MARGIN_FAKE_AGENT=1`, which
   exercises the entire round pipeline with a scripted turn.
 - **Env vars may not survive backgrounding.** Some agent harnesses scrub
   the environment of detached processes, so `VAR=x npx electron . &`
   silently starts the app *without* `VAR`, and the feature under test
-  looks broken. Drive the app from Playwright instead — it passes `env`
-  explicitly, which is why `MARGIN_FAKE_AGENT` works there. Verify the
-  harness with a plain `sleep`, **not** with Electron: Chromium scrubs
-  its helper processes' `environ`, so `/proc/<pid>/environ` reads back
-  as NULs and every variable looks absent whether it is or not.
+  looks broken. This is the main reason to prefer Playwright, which
+  passes `env` explicitly. Verify the harness with a plain `sleep`,
+  **not** with Electron: Chromium scrubs its helper processes' `environ`,
+  so `/proc/<pid>/environ` reads back as NULs and every variable looks
+  absent whether it is or not.
 
 ## Gotchas that will bite you
 
