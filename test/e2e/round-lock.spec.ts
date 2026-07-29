@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'fs';
 import path from 'path';
-import { launch, projectDoc, type Margin } from './margin';
+import { launch, projectDoc, windowFor, type Margin } from './margin';
 
 /**
  * One review round per document (spec §7 scenarios 12 and 13, #170).
@@ -29,35 +29,10 @@ const sidecarOf = (file: string) => {
   }
 };
 
-/**
- * The window showing exactly this path.
- *
- * Identified by `filePath`, not by the title: the symlink case puts two
- * *different* documents on screen with the same basename, and matching
- * on the name silently returns the same window twice — which makes the
- * test pass against a build with no lock at all.
- */
-async function windowFor(m: Margin, file: string) {
-  for (let i = 0; i < 60; i++) {
-    for (const page of m.app.windows()) {
-      if (!page.url().includes('index.html')) continue;
-      const open = await page
-        .evaluate(() => window.margin.getDoc().then((d) => d?.filePath ?? null))
-        .catch(() => null);
-      if (open === file) {
-        await page.waitForSelector('.cm-content');
-        return page;
-      }
-    }
-    await new Promise((r) => setTimeout(r, 250));
-  }
-  throw new Error(`no window is showing ${file}`);
-}
-
 /** Open a path in a window of its own, then hand that window back. */
 async function openInNewWindow(m: Margin, file: string) {
   await m.first.evaluate((f) => window.margin.openPath(f), file);
-  return windowFor(m, file);
+  return windowFor(m.app, file);
 }
 
 const submit = async (page: Awaited<ReturnType<typeof windowFor>>) => {
@@ -124,7 +99,7 @@ test.describe('the round lock', () => {
       .toBeGreaterThan(1);
     const fresh = m.app.windows().filter((p) => p.url().includes('index.html')).pop()!;
     await fresh.evaluate((f) => window.margin.openInWindow(f), beta);
-    const two = await windowFor(m, beta);
+    const two = await windowFor(m.app, beta);
     expect(two).not.toBe(one);
 
     await submit(one);

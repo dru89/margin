@@ -108,6 +108,41 @@ export async function waitForWindows(app: ElectronApplication, want: number): Pr
   }
 }
 
+/**
+ * The window showing exactly this path, waiting for it to appear.
+ *
+ * Matches on `filePath` rather than on the title, because overlapping
+ * projects routinely put two *different* documents on screen with the
+ * same basename (`chapter1/one.md` and a symlink to it, or `one.md` in
+ * two chapters). Matching by name silently returns the same window twice
+ * and makes a multi-window test pass against a build that never opened
+ * the second one.
+ */
+export async function windowFor(app: ElectronApplication, filePath: string): Promise<Page> {
+  for (let i = 0; i < 60; i++) {
+    for (const page of app.windows()) {
+      if (!page.url().includes('index.html')) continue;
+      const open = await page
+        .evaluate(() => window.margin.getDoc().then((d) => d?.filePath ?? null))
+        .catch(() => null);
+      if (open === filePath) {
+        await page.waitForSelector('.cm-content');
+        return page;
+      }
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new Error(`no window is showing ${filePath}`);
+}
+
+/** What project a window believes it is in. */
+export function projectOf(page: Page): Promise<{ root: string; hasProject: boolean } | null> {
+  return page.evaluate(async () => {
+    const d = await window.margin.getDoc();
+    return d ? { root: d.workspaceRoot, hasProject: d.hasProject } : null;
+  });
+}
+
 /** The window currently showing a given document, if any. */
 export function pageShowing(app: ElectronApplication, name: string): Promise<Page | undefined> {
   const pages = app.windows().filter((p) => p.url().includes('index.html'));
