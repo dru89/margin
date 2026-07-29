@@ -614,9 +614,34 @@ kbd {
   text-transform: uppercase;
   color: var(--ink-faint);
   padding: 2px 8px 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.explorer-root-name {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* States what is true — nothing declared this folder — and is the way to
+   change it. Muted: the pre-adoption state is not a warning. */
+.explorer-adopt {
+  flex-shrink: 0;
+  font-family: inherit;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  background: var(--paper-inset);
+  border: 1px dashed var(--rule);
+  border-radius: 999px;
+  padding: 1px 7px;
+  cursor: pointer;
+}
+.explorer-adopt:hover {
+  color: var(--ink-soft);
+  border-color: var(--ink-faint);
 }
 
 .explorer-dir {
@@ -1403,6 +1428,20 @@ button.status-chip:active { transform: translateY(1px); }
 .dock-composer textarea { min-height: 34px; margin: 0; }
 .dock-composer .btn { padding: 6px 12px; }
 
+/* Two classes, so it wins over `.dock-composer` on specificity rather
+   than on where it sits in the file. */
+.dock-composer.dock-no-project {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+.dock-composer.dock-no-project p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
 /* ——— submit popover manifest ——— */
 
 .popover-manifest-head { margin: 12px 0 8px; }
@@ -1941,3 +1980,63 @@ button.status-chip:active { transform: translateY(1px); }
 
 .settings-row-stack { flex-direction: column; align-items: stretch; gap: 8px; }
 
+
+/* ——— the adoption prompt (spec §5) ——— */
+
+.adopt-modal { width: min(520px, calc(100vw - 48px)); }
+
+.adopt-lede {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.adopt-options { display: grid; gap: 8px; }
+
+.adopt-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper-inset);
+  cursor: pointer;
+}
+/* Two classes so the selected state beats the base rule on specificity. */
+.adopt-option.on {
+  border-color: var(--user);
+  background: color-mix(in srgb, var(--user) 8%, var(--paper-inset));
+}
+.adopt-option input { margin-top: 3px; accent-color: var(--user); }
+
+.adopt-option-text { display: grid; gap: 2px; min-width: 0; }
+.adopt-name { font-size: 13px; font-weight: 600; }
+.adopt-note { font-size: 12px; color: var(--ink-soft); }
+.adopt-path {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  overflow-wrap: anywhere;
+}
+
+/* Two classes: `.btn-ghost` strips the border, which left this reading as
+   a sentence rather than a control. */
+.btn.adopt-browse {
+  margin-top: 10px;
+  padding: 4px 0;
+  color: var(--user);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.btn.adopt-browse:hover { color: var(--user); text-decoration-thickness: 2px; }
+
+.adopt-error {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.adopt-footnote { margin-top: 12px; }
+.adopt-modal .card-actions { margin-top: 16px; }

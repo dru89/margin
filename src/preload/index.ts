@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type {
+  AdoptionOptions,
   AgentStatus,
   AppSettingsState,
   DiscussionMessage,
@@ -77,6 +78,10 @@ const api = {
     ipcRenderer.invoke(IPC.getProjectSettings, migrateModel),
   setProjectSettings: (pref: ModelPreference): Promise<void> =>
     ipcRenderer.invoke(IPC.setProjectSettings, pref),
+  adoptionOptions: (): Promise<AdoptionOptions> => ipcRenderer.invoke(IPC.adoptionOptions),
+  adoptProject: (root: string): Promise<{ workspaceRoot: string; hasProject: boolean }> =>
+    ipcRenderer.invoke(IPC.adoptProject, root),
+  chooseProjectFolder: (): Promise<string | null> => ipcRenderer.invoke(IPC.chooseProjectFolder),
   chooseProjectsDir: (): Promise<AppSettingsState> => ipcRenderer.invoke(IPC.chooseProjectsDir),
   gdocsStatus: (): Promise<GdocsAuthStatus> => ipcRenderer.invoke(IPC.gdocsStatus),
   gdocsConnect: (): Promise<void> => ipcRenderer.invoke(IPC.gdocsConnect),

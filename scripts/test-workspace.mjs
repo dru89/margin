@@ -17,7 +17,8 @@ import path from 'path';
 import { load, reporter } from './lib/compile.mjs';
 
 const { mod, dir: build } = await load('src/main/workspace.ts');
-const { findProjectRoot, findWorkspaceRoot, resolveInsideWorkspace } = mod;
+const { adoptionChoices, adoptionRefusal, findProjectRoot, findWorkspaceRoot, isInside, resolveInsideWorkspace } =
+  mod;
 const { t, head, done } = reporter();
 
 const base = mkdtempSync(path.join(tmpdir(), 'margin-roots-'));
@@ -81,12 +82,60 @@ head('guard: the home directory is refused');
 t('a file directly in home has no project',
   await findProjectRoot(path.join(homedir(), '__margin_probe_does_not_exist.md')), null);
 
-head('the working root, until step 3 lands');
+head('the working root');
 // findWorkspaceRoot still returns somewhere, because everything
-// downstream assumes a root. The fallback is not a declaration.
+// downstream needs a place to resolve paths against. The fallback is a
+// place to read from, never a place to write to — `hasProject` gates
+// every write (spec §4, #169).
 t('a declared project', path.relative(base, await findWorkspaceRoot(doc(marginJson(make('wr-declared'))))), 'wr-declared');
 t('an undeclared folder falls back to the document’s own',
   path.relative(base, await findWorkspaceRoot(doc(make('wr-plain')))), 'wr-plain');
+
+head('what the adoption prompt offers (spec §5, #169)');
+// Two candidates and an escape, rather than a bare folder picker. The
+// git answer is an argument so the rules are testable without a repo.
+const home = '/home/someone';
+const choices = (file, git) => {
+  const c = adoptionChoices(file, git, home);
+  return `${c.parent ?? '—'} + ${c.gitRoot ?? '—'}`;
+};
+t('the document’s own folder is the default',
+  choices('/home/someone/book/ch1.md', null), '/home/someone/book + —');
+// The repository is where somebody already drew a boundary around this
+// work, which makes it the most likely intended project.
+t('a repo above it is offered too',
+  choices('/home/someone/repo/docs/ch1.md', '/home/someone/repo'),
+  '/home/someone/repo/docs + /home/someone/repo');
+// One folder, offered once — the same path twice would read as a choice
+// that isn't one.
+t('a repo that *is* the folder is not offered twice',
+  choices('/home/someone/repo/ch1.md', '/home/someone/repo'), '/home/someone/repo + —');
+// `findProjectRoot` refuses to find a project in home, so adopting it
+// would write a margin.json nothing would ever honor.
+t('home is never a candidate, as parent',
+  choices('/home/someone/loose.md', null), '— + —');
+t('home is never a candidate, as the repo above',
+  choices('/home/someone/notes/x.md', '/home/someone'), '/home/someone/notes + —');
+// Nothing to offer is a real state: browsing is the only way through,
+// and the prompt has to be able to say so rather than preselect junk.
+t('a document directly in home has no offer at all',
+  adoptionChoices('/home/someone/x.md', null, home).parent, null);
+
+head('what adoption refuses');
+// Adoption arrives over IPC with a path the renderer chose, so the rules
+// are checked in main rather than trusted.
+const refusal = (root, file) => adoptionRefusal(root, file, home) === null;
+t('the document’s folder', refusal('/home/someone/book', '/home/someone/book/ch1.md'), true);
+t('an ancestor of it', refusal('/home/someone', '/home/someone/book/ch1.md'), false); // home
+t('a plain ancestor', refusal('/data/work', '/data/work/book/ch1.md'), true);
+t('home itself', refusal('/home/someone', '/home/someone/x.md'), false);
+// A project that doesn't contain the open document would leave the
+// window showing a file its own explorer cannot list.
+t('a folder that does not hold the document', refusal('/data/other', '/data/work/ch1.md'), false);
+// The prefix test has to be on path segments: `/data/work2` is not
+// inside `/data/work`.
+t('a sibling whose name starts the same', isInside('/data/work', '/data/work2'), false);
+t('the folder itself counts as inside', isInside('/data/work', '/data/work'), true);
 
 head('opening a file: nothing outside the project (#90)');
 // A chip's path comes from comment text and the agent writes comment

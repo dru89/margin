@@ -63,6 +63,9 @@ async function seed(m: Awaited<ReturnType<typeof launchFailing>>) {
   const file = path.join(m.dir, 'p', 'plan.md');
   mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(file, DOC);
+  // Declared, because this is about what a failed *round* leaves behind —
+  // and a round asks for a project first (workspace spec §4).
+  writeFileSync(path.join(path.dirname(file), 'margin.json'), `${JSON.stringify({ version: 1 })}\n`);
   await m.page.evaluate((f) => window.margin.openPath(f), file);
   await expect.poll(() => m.page.evaluate(() => !!document.querySelector('.cm-content'))).toBe(true);
   return file;
@@ -182,6 +185,9 @@ test.describe('a round that succeeds', () => {
     const file = path.join(dir, 'p', 'plan.md');
     mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(file, DOC);
+    // Declared: the discussion is project-scoped, so without one there is
+    // no composer to queue into (workspace spec §4).
+    writeFileSync(path.join(path.dirname(file), 'margin.json'), `${JSON.stringify({ version: 1 })}\n`);
     await page.evaluate((f) => window.margin.openPath(f), file);
     await expect.poll(() => page.evaluate(() => !!document.querySelector('.cm-content'))).toBe(true);
 

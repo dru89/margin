@@ -42,6 +42,12 @@ function QueuedEditor({
  */
 export function DiscussionDock() {
   const messages = useStore((s) => s.discussion);
+  // The discussion is project-scoped, so without a project there is
+  // nowhere to keep it. Unavailable rather than inert: queueing a message
+  // the author watched appear and then silently dropping it would be
+  // worse than the accident this rule exists to stop (spec §4).
+  const hasProject = useStore((s) => s.doc?.hasProject ?? true);
+  const askToAdopt = useStore((s) => s.askToAdopt);
   const open = useStore((s) => s.dockOpen);
   const toggleDock = useStore((s) => s.toggleDock);
   const addDiscussionMessage = useStore((s) => s.addDiscussionMessage);
@@ -163,17 +169,34 @@ export function DiscussionDock() {
         </div>
       )}
 
-      <div className="dock-composer">
-        <MentionTextarea
-          value={text}
-          placeholder="Message for the next round…"
-          onChange={setText}
-          onSubmit={send}
-        />
-        <button className="btn" disabled={!text.trim()} onClick={send} title="Queue (Cmd/Ctrl+Enter)">
-          Queue
-        </button>
-      </div>
+      {!hasProject ? (
+        <div className="dock-composer dock-no-project">
+          <p>
+            The discussion is shared across a project’s documents — choose a folder to start
+            one.
+          </p>
+          <button className="btn" onClick={() => askToAdopt()}>
+            Choose a folder…
+          </button>
+        </div>
+      ) : (
+        <div className="dock-composer">
+          <MentionTextarea
+            value={text}
+            placeholder="Message for the next round…"
+            onChange={setText}
+            onSubmit={send}
+          />
+          <button
+            className="btn"
+            disabled={!text.trim()}
+            onClick={send}
+            title="Queue (Cmd/Ctrl+Enter)"
+          >
+            Queue
+          </button>
+        </div>
+      )}
     </div>
   );
 }

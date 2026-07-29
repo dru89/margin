@@ -11,6 +11,10 @@ export function GdocsMenu() {
   const sync = useStore((s) => s.gdocsSync);
   const save = useStore((s) => s.save);
   const openSettings = useStore((s) => s.setSettingsOpen);
+  // The link record lives in the project's `.margin/`, so sharing needs
+  // one (spec §4).
+  const hasProject = useStore((s) => s.doc?.hasProject ?? true);
+  const askToAdopt = useStore((s) => s.askToAdopt);
   const locked = useLocked();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +86,23 @@ export function GdocsMenu() {
       </button>
       {open && (
         <div className="popover gdocs-popover">
-          {!sync.connected ? (
+          {!hasProject ? (
+            <>
+              <p className="gdocs-note">
+                A linked Google Doc is remembered with the project, so this document needs a
+                folder first.
+              </p>
+              <button
+                className="btn"
+                onClick={() => {
+                  setOpen(false);
+                  askToAdopt();
+                }}
+              >
+                Choose a folder…
+              </button>
+            </>
+          ) : !sync.connected ? (
             <>
               <p className="gdocs-note">
                 Connect a Google account in Settings to share documents to Google Docs.

@@ -24,6 +24,13 @@ const { makeAnchor, resolveQuote } = await import(pathToFileURL(anchorsMod).href
 const target = path.resolve(process.argv[2] ?? '.fixtures/review-surface');
 rmSync(target, { recursive: true, force: true });
 mkdirSync(path.join(target, '.margin'), { recursive: true });
+// `margin.json` declares, `.margin/` stores (workspace spec §2). Without
+// the declaration the fixture would open in the pre-adoption state and
+// hide the discussion it exists to show.
+writeFileSync(
+  path.join(target, 'margin.json'),
+  `${JSON.stringify({ version: 1, name: '2026 Self-Evaluation' }, null, 2)}\n`,
+);
 
 const DOC = `# 2026 Self-Evaluation
 

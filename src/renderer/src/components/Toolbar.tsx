@@ -158,6 +158,14 @@ export function Toolbar() {
               {modifiedDocs.length === 0 && queued.length === 0 && (
                 <p className="manifest-files">Comments and review state for {doc.fileName}.</p>
               )}
+              {/* Said before the button rather than after it: a round is
+                  where Margin asks for a folder (spec §4), and being
+                  asked is less jarring than being surprised. */}
+              {!doc.hasProject && (
+                <p className="manifest-unfinished">
+                  Claude works in a project — you’ll pick a folder for this one first.
+                </p>
+              )}
               {/* Submission is never blocked by an open draft (spec §8): a
                   disabled primary action would have to explain itself, and
                   this list already exists to say what travels. */}

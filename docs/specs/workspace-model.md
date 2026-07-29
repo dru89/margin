@@ -1,6 +1,8 @@
 # Workspace model — design spec
 
-**Status:** settled with Drew (2026-07-27). Nothing here is built.
+**Status:** settled with Drew (2026-07-27). Build order steps 1-3 are in
+(#167, #168, #169); §1-§5 describe what the app does. Steps 4-7 (§6-§8)
+are not built.
 **Covers:** #124, #6, #107, and the window half of #2. Retires DECISIONS §63.
 
 ## The problem
@@ -373,10 +375,13 @@ Journeys, not coverage. Each is here because it protects a decision above.
 ## 10. Build order
 
 1. `margin.json`: read, write, and the `.margin/project.json` fallback.
-   Nothing visible changes.
+   Nothing visible changes. **Done** (#167).
 2. Find-only resolution (§3), retiring §63. Scenarios 3, 4, 6.
+   **Done** (#168, DECISIONS §74).
 3. Adopt a folder — the open-folder path and the confirmation (§5).
-   Scenarios 1, 2, 5.
+   Scenarios 1, 2, 5. **Done** (#169, DECISIONS §75). Scenario 4 is
+   covered here too, since the write gates are what make it true, and
+   the window carrying its own root (§1) landed with it.
 4. The document-scoped round lock (§7), keyed on real path. Scenarios
    12, 13. Cheap and independent — it does not gate the multi-window
    work, since the path dedupe already prevents the common case.

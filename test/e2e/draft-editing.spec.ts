@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
-import { launch, doc, type Margin } from './margin';
+import { launch, projectDoc, type Margin } from './margin';
 
 /**
  * Drafting: the composer's anchor, and rewriting what hasn't been sent
@@ -51,7 +51,7 @@ test.describe('drafting a comment', () => {
 
   test('a composer holding text keeps its anchor when you select elsewhere', async () => {
     m = await launch();
-    const file = doc(m.dir, 'p/doc.md', DOC);
+    const file = projectDoc(m.dir, 'p/doc.md', DOC);
     await open(m, file);
 
     await select(m, 'Alpha paragraph', 5);
@@ -71,7 +71,7 @@ test.describe('drafting a comment', () => {
 
   test('a draft whose text is deleted commits as orphaned, not onto its neighbours', async () => {
     m = await launch();
-    const file = doc(m.dir, 'p/doc.md', DOC);
+    const file = projectDoc(m.dir, 'p/doc.md', DOC);
     await open(m, file);
 
     await select(m, 'Alpha paragraph', 5);
@@ -90,7 +90,7 @@ test.describe('drafting a comment', () => {
 
   test('an empty composer re-targets freely', async () => {
     m = await launch();
-    const file = doc(m.dir, 'p/doc.md', DOC);
+    const file = projectDoc(m.dir, 'p/doc.md', DOC);
     await open(m, file);
 
     await select(m, 'Alpha paragraph', 5);
@@ -120,7 +120,7 @@ test.describe('editing what has not been sent', () => {
 
   test('a draft comment can be rewritten in place', async () => {
     m = await launch();
-    const file = doc(m.dir, 'p/doc.md', DOC);
+    const file = projectDoc(m.dir, 'p/doc.md', DOC);
     await draftComment(file);
 
     await m.first.locator('.card-comment').first()
@@ -135,7 +135,7 @@ test.describe('editing what has not been sent', () => {
 
   test('a draft comment can be taken back', async () => {
     m = await launch();
-    const file = doc(m.dir, 'p/doc.md', DOC);
+    const file = projectDoc(m.dir, 'p/doc.md', DOC);
     await draftComment(file);
 
     await m.first.locator('.card-comment').first()
@@ -148,7 +148,7 @@ test.describe('editing what has not been sent', () => {
     // than commit text the author never confirmed. What it must not do is
     // send half a rewrite — the popover says so before it happens.
     m = await launch();
-    const file = doc(m.dir, 'p/doc.md', DOC);
+    const file = projectDoc(m.dir, 'p/doc.md', DOC);
     await draftComment(file);
 
     await m.first.locator('.card-comment').first()
@@ -165,7 +165,7 @@ test.describe('editing what has not been sent', () => {
 
   test('once submitted, a comment is a record and stops being editable', async () => {
     m = await launch();
-    const file = doc(m.dir, 'p/doc.md', DOC);
+    const file = projectDoc(m.dir, 'p/doc.md', DOC);
     await draftComment(file);
 
     await m.first.getByRole('button', { name: /submit for review/i }).click();

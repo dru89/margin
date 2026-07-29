@@ -3,6 +3,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { nanoid } from 'nanoid';
 import type {
+  AdoptionOptions,
   DiscussionMessage,
   ModelPreference,
   ProjectProposal,
@@ -10,15 +11,30 @@ import type {
   SetupMessage,
 } from '@shared/types';
 import { IPC } from '@shared/ipc';
+import { classifyAgentError } from '@shared/agentErrors';
 import { findSessionByPath, getSession, setSetupActive } from './session';
 import { attachDocument, createWindow, openFile } from './windows';
 import { showOpenDialog, showOpenFolderDialog } from './menu';
-import { commitCheckpoint, fileLog, initProjectRepo, initRepo, isInRepo, restoreFromCommit } from './git';
+import {
+  commitCheckpoint,
+  fileLog,
+  initProjectRepo,
+  initRepo,
+  isInRepo,
+  repoToplevel,
+  restoreFromCommit,
+} from './git';
 import { getAgent } from './agents';
 import { getSettings, updateSettings } from './settings';
 import { loadProjectFile, saveProjectFile } from './projectFile';
 import { saveDiscussion } from './discussionStore';
-import { getWorkspace, resolveInsideWorkspace } from './workspace';
+import {
+  adoptionChoices,
+  adoptionRefusal,
+  getWorkspace,
+  isInside,
+  resolveInsideWorkspace,
+} from './workspace';
 import { getRecentFiles } from './recents';
 import {
   acceptProposal,
@@ -54,7 +70,20 @@ export function registerIpcHandlers(): void {
     IPC.submitReview,
     async (event, content: string, review: ReviewData, model?: string, effort?: string) => {
       // Fire-and-return: progress flows back through agentStatus events.
-      void requireSession(event.sender.id).submitReview(content, review, model, effort);
+      const session = requireSession(event.sender.id);
+      void session.submitReview(content, review, model, effort).catch((err: unknown) => {
+        // The turn reports its own failures. What lands here is a refusal
+        // *before* the turn — a round already running, or no project yet —
+        // which would otherwise be an unhandled rejection in main and a
+        // renderer stuck on "running" with nothing to tell it otherwise.
+        const message = err instanceof Error ? err.message : String(err);
+        session.sendToRenderer(IPC.agentStatus, {
+          phase: 'error',
+          detail: message,
+          // Nothing ran, so nothing needed putting back (§71).
+          failure: { ...classifyAgentError(message), rolledBack: true },
+        });
+      });
     },
   );
 
@@ -144,7 +173,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.getWorkspace, async (event) => {
     const session = getSession(event.sender.id);
     if (!session) return null;
-    return getWorkspace(session.filePath);
+    return getWorkspace(session.workspaceRoot);
   });
 
   // Switch the sender window to another document. If that document is open
@@ -160,7 +189,15 @@ export function registerIpcHandlers(): void {
       await openFile(resolved); // focuses the existing window
       return;
     }
-    await attachDocument(win, resolved);
+    // The window keeps its project. Clicking `chapter1/foo.md` in `book`'s
+    // explorer is browsing within `book`, not a request to switch to the
+    // `chapter1` project — and under a plain walk that is exactly what it
+    // would do, silently swapping the discussion and notes (spec §1, §6).
+    const keep =
+      current?.hasProject && isInside(current.workspaceRoot, path.dirname(resolved))
+        ? current.workspaceRoot
+        : undefined;
+    await attachDocument(win, resolved, keep);
   });
 
   ipcMain.on(IPC.setupActive, (event, active: boolean) => {
@@ -213,6 +250,13 @@ export function registerIpcHandlers(): void {
     async (event, migrateModel?: string): Promise<ModelPreference> => {
       const session = getSession(event.sender.id);
       if (!session) return {};
+      // Nothing has stated a preference because nothing has stated a
+      // project. The app default still applies — it just has nowhere to
+      // be written down yet (spec §4).
+      if (!session.hasProject) {
+        const app = await getSettings();
+        return { model: app.defaultModel, effort: app.defaultEffort };
+      }
       const project = await loadProjectFile(session.workspaceRoot);
       if (project.model) return { model: project.model, effort: project.effort };
       if (migrateModel) {
@@ -227,7 +271,45 @@ export function registerIpcHandlers(): void {
   // Changing the model at turn time sticks to the project (Drew's cascade).
   ipcMain.handle(IPC.setProjectSettings, async (event, pref: ModelPreference) => {
     const session = requireSession(event.sender.id);
+    // Chosen before there is a project to remember it: the round still
+    // runs with it (the renderer passes it to submitReview), and adopting
+    // writes it down. Refusing the choice outright would disable the
+    // picker in the popover that is about to ask for a folder anyway.
+    if (!session.hasProject) return;
     await saveProjectFile(session.workspaceRoot, pref);
+  });
+
+  // Which folders to offer for adoption (spec §5).
+  ipcMain.handle(IPC.adoptionOptions, async (event): Promise<AdoptionOptions> => {
+    const session = requireSession(event.sender.id);
+    return adoptionChoices(session.filePath, await repoToplevel(session.filePath));
+  });
+
+  /**
+   * Adopt a folder as this document's project — the confirm at the end of
+   * the prompt, and the only path that writes `margin.json` for an
+   * already-open document.
+   */
+  ipcMain.handle(IPC.adoptProject, async (event, root: string) => {
+    const session = requireSession(event.sender.id);
+    if (session.hasProject) return { workspaceRoot: session.workspaceRoot, hasProject: true };
+    const resolved = path.resolve(root);
+    const refusal = adoptionRefusal(resolved, session.filePath);
+    if (refusal) throw new Error(refusal);
+    await session.adopt(resolved);
+    return { workspaceRoot: session.workspaceRoot, hasProject: true };
+  });
+
+  // The escape hatch in the prompt: somewhere other than the two offers.
+  ipcMain.handle(IPC.chooseProjectFolder, async (event): Promise<string | null> => {
+    const session = requireSession(event.sender.id);
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showOpenDialog(win!, {
+      title: 'Choose Project Folder',
+      defaultPath: path.dirname(session.filePath),
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0];
   });
 
   // Folder picker for the projects directory; returns the updated settings.
@@ -291,9 +373,12 @@ export function registerIpcHandlers(): void {
         createdAt: new Date().toISOString(),
       }));
       await saveDiscussion(target, { version: 1, messages });
-      // The model chosen during setup becomes the project's default
-      // for every later round (DECISIONS §61).
-      if (pref?.model || pref?.effort) await saveProjectFile(target, pref);
+      // A project Margin creates declares itself like any other (spec
+      // §2), and takes the title from the conversation that made it —
+      // which is the reason `name` exists at all. The model chosen during
+      // setup becomes the project's default for every later round
+      // (DECISIONS §61).
+      await saveProjectFile(target, { name: proposal.title, ...pref });
       await initProjectRepo(target, `New project: ${proposal.title}`);
 
       if (!firstMd) throw new Error('The proposal contained no markdown file to open.');

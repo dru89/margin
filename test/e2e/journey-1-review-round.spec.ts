@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
-import { launch, doc, type Margin } from './margin';
+import { launch, projectDoc, type Margin } from './margin';
 
 /**
  * Journey 1: a review round, end to end (#134, from #131).
@@ -83,7 +83,7 @@ test.describe('journey 1: a review round', () => {
 
   test('comment, submit, accept the edit, resolve — and nothing loses its place', async () => {
     m = await launch();
-    const file = doc(m.dir, 'p/plan.md', DOC);
+    const file = projectDoc(m.dir, 'p/plan.md', DOC);
     await m.first.evaluate((f) => window.margin.openPath(f), file);
     await expect.poll(() => m.first.evaluate(() => !!document.querySelector('.cm-content'))).toBe(true);
 
@@ -173,7 +173,7 @@ test.describe('journey 1: a review round', () => {
     // Rounds accumulate: the counter keeps climbing, earlier work keeps
     // its stamp, and a reply to the new round does not disturb the old.
     m = await launch();
-    const file = doc(m.dir, 'p/plan.md', DOC);
+    const file = projectDoc(m.dir, 'p/plan.md', DOC);
     await m.first.evaluate((f) => window.margin.openPath(f), file);
     await expect.poll(() => m.first.evaluate(() => !!document.querySelector('.cm-content'))).toBe(true);
 

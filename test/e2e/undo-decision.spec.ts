@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
-import { launch, doc, type Margin } from './margin';
+import { launch, projectDoc, type Margin } from './margin';
 
 /**
  * Accepting a suggestion is a decision, not a text edit (#128).
@@ -43,7 +43,7 @@ test.describe('deciding on a suggestion', () => {
 
   test('undo after accepting keeps the document and the review together', async () => {
     m = await launch();
-    const file = doc(m.dir, 'p/doc.md', DOC);
+    const file = projectDoc(m.dir, 'p/doc.md', DOC);
     await roundWithSuggestion(m, file);
 
     await m.first.locator('.card-suggestion').first()
@@ -67,7 +67,7 @@ test.describe('deciding on a suggestion', () => {
 
   test('Undo on a decided suggestion restores the text and reopens it', async () => {
     m = await launch();
-    const file = doc(m.dir, 'p/doc.md', DOC);
+    const file = projectDoc(m.dir, 'p/doc.md', DOC);
     await roundWithSuggestion(m, file);
 
     await m.first.locator('.card-suggestion').first()
@@ -86,7 +86,7 @@ test.describe('deciding on a suggestion', () => {
     // The applied range is remapped with every edit, so a decision does not
     // become unundoable just because the document moved on.
     m = await launch();
-    const file = doc(m.dir, 'p/doc.md', DOC);
+    const file = projectDoc(m.dir, 'p/doc.md', DOC);
     await roundWithSuggestion(m, file);
     await m.first.locator('.card-suggestion').first()
       .getByRole('button', { name: 'Accept', exact: true }).click();

@@ -233,6 +233,12 @@ export function registerGdocsSyncIpc(): void {
   ipcMain.handle(IPC.gdocsShareCreate, async (event): Promise<{ error?: string }> => {
     const session = getSession(event.sender.id);
     if (!session) return { error: 'No document open' };
+    // The link record lives in `.margin/gdocs.json`, so creating one is a
+    // project write (spec §4). Every other Docs action needs an existing
+    // link, which makes this the only door.
+    if (!session.hasProject) {
+      return { error: 'Linking to Google Docs needs a project — choose a folder for this document first.' };
+    }
     const busyKey = `create:${session.filePath}`;
     if (busyDocs.has(busyKey)) return {};
     busyDocs.add(busyKey);

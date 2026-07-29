@@ -54,7 +54,7 @@ export async function findProjectRoot(filePath: string): Promise<string | null> 
 }
 
 /** Does this folder say it is a project? */
-async function declaresProject(dir: string): Promise<boolean> {
+export async function declaresProject(dir: string): Promise<boolean> {
   try {
     await fs.access(path.join(dir, PROJECT_FILE));
     return true;
@@ -72,12 +72,13 @@ async function declaresProject(dir: string): Promise<boolean> {
  * The root to resolve paths against — the declared project, or the
  * document's own folder when there is none.
  *
- * **A bridge, and deliberately temporary.** Everything downstream still
- * assumes a workspace root exists, so this keeps one. The `dirname`
- * fallback is *not* a declaration: `hasProject` is what says whether a
- * project was found, and step 3 of the spec is where an undeclared file
- * stops writing project state into that folder. Until then, the accident
- * this spec removes is narrowed rather than gone — see the note in #168.
+ * **The `dirname` fallback is a place to read from, never a place to
+ * write to.** Everything downstream needs somewhere to resolve paths
+ * against — the explorer's file scan, an `@path` chip, the agent's cwd —
+ * and for an undeclared document that is its own folder. What used to
+ * follow, and no longer does, is that project state could land there:
+ * `DocumentSession.hasProject` gates every write, so an undeclared folder
+ * is read but never written (spec §4, #169).
  */
 export async function findWorkspaceRoot(filePath: string): Promise<string> {
   return (await findProjectRoot(filePath)) ?? path.dirname(filePath);
@@ -85,6 +86,58 @@ export async function findWorkspaceRoot(filePath: string): Promise<string> {
 
 export function isMarkdown(name: string): boolean {
   return /\.(md|markdown|mdx)$/i.test(name);
+}
+
+/** Is `child` the directory `dir` itself, or somewhere beneath it? */
+export function isInside(dir: string, child: string): boolean {
+  return child === dir || child.startsWith(dir.endsWith(path.sep) ? dir : dir + path.sep);
+}
+
+/**
+ * What to offer when asking which folder to adopt (spec §5).
+ *
+ * Two candidates at most, because a bare OS folder picker at this moment
+ * asks the author to think about paths while they are thinking about
+ * writing — and lets them choose `/`. The document's own folder is the
+ * default; the repository above it is offered when it differs, since that
+ * is the most likely intended boundary for a document already under
+ * version control.
+ *
+ * Home is never a candidate. `findProjectRoot` refuses to *find* a project
+ * there, so adopting it would write a `margin.json` that nothing would
+ * ever honor — a dead file and a confusing one.
+ *
+ * Pure, and takes the git answer as an argument, so the rules can be
+ * tested without a repository.
+ */
+export function adoptionChoices(
+  filePath: string,
+  gitToplevel: string | null,
+  home: string = os.homedir(),
+): { parent: string | null; gitRoot: string | null } {
+  const parent = path.dirname(filePath);
+  const gitRoot =
+    gitToplevel && gitToplevel !== parent && gitToplevel !== home && isInside(gitToplevel, parent)
+      ? gitToplevel
+      : null;
+  return { parent: parent === home ? null : parent, gitRoot };
+}
+
+/**
+ * Why this folder cannot be adopted for this document, or null when it
+ * can. Adoption arrives over IPC with a path the renderer chose, so the
+ * rules are checked here rather than trusted.
+ */
+export function adoptionRefusal(
+  root: string,
+  filePath: string,
+  home: string = os.homedir(),
+): string | null {
+  if (root === home) return 'Your home folder is too broad to be a project.';
+  // A project that does not contain the open document would leave the
+  // window showing a file its own explorer cannot list.
+  if (!isInside(root, path.dirname(filePath))) return 'That folder does not contain this document.';
+  return null;
 }
 
 /**
@@ -202,8 +255,16 @@ async function listProjectSkills(root: string): Promise<string[]> {
   }
 }
 
-export async function getWorkspace(filePath: string): Promise<WorkspaceState> {
-  const root = await findWorkspaceRoot(filePath);
+/**
+ * Everything the explorer shows, scanned from `root`.
+ *
+ * Takes the root rather than a document, because the window's project is
+ * a property of what was opened and not of the file being shown (spec
+ * §1). Deriving it here again would have `book`'s explorer silently
+ * become `chapter1`'s the moment the author clicked into the nested
+ * folder — the session would say one thing and the sidebar another.
+ */
+export async function getWorkspace(root: string): Promise<WorkspaceState> {
   const [allFiles, modified, skills, proposalsData, project] = await Promise.all([
     walkFiles(root),
     modifiedSet(root),

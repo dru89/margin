@@ -82,6 +82,12 @@ the user ends up with — which window holds what, sidecar contents, file
 contents — never on markup, or a restyle breaks the suite. All four
 critical journeys are in place (#134, #135 and the two before them).
 
+**Use `projectDoc()`, not `doc()`, for anything that submits a round.** A
+project is declared and never derived (DECISIONS §75), so a document
+written into a bare folder belongs to nothing and a round stops to ask
+for one. `doc()` is for when the *absence* of a project is the point —
+`adoption.spec.ts` is the only current caller.
+
 **Journey 1 is the one to read first** — `journey-1-review-round.spec.ts`
 walks a whole round and crosses the four seams that have produced the
 most bugs: review-state ownership handing off to main and back, the
@@ -115,6 +121,16 @@ Traps this suite has already hit:
   exactly. Assert the marked range's own text
   (`.anchor[data-anchor-id=…]`), not the absence of a warning. Journey 3
   passed a never-orphan mutant until it did.
+- **Native dialogs are stubbed on the app object**, not the page:
+  `app.evaluate(({ dialog }) => { dialog.showOpenDialog = … })`. Both
+  `showOpenDialog` and `showMessageBox` need answering to drive the
+  Open Folder path.
+- **"Open Folder" seeds the window with the *first* markdown file under
+  it, sorted.** A fixture whose intended starting document does not sort
+  first opens somewhere else, and any later "switch to another document"
+  step becomes a no-op that passes for the wrong reason — which is
+  exactly how the adoption suite's window-scoping case first passed
+  against a build with the behaviour removed.
 
 **When a change needs a test:**
 
@@ -244,6 +260,14 @@ npx electron . --remote-debugging-port=9224 "path/to/doc.md" &   # background
 - IPC channel names live in `src/shared/ipc.ts`; payload types in
   `src/shared/types.ts`. Preload exposes everything as `window.margin`
   (typed via `src/preload/index.d.ts`). Add new channels in all three places.
+- **A project is declared, never derived** (`margin.json`; DECISIONS
+  §74-75). The window's root is a property of what was *opened* and is
+  carried through `attachDocument(win, file, root)` — don't re-derive it
+  per document. `DocumentSession.hasProject` is false when nothing
+  declared one, and **every write of project state is gated on it**:
+  agent notes, the discussion, the project file, staged proposals, the
+  Google Docs link. New project-scoped state goes on that list, and its
+  UI affordance has to be *unavailable* rather than inert.
 - **Discussion is project-scoped** (`<workspaceRoot>/.margin/discussion.json`,
   shared across documents); review threads/suggestions are per-document
   sidecars. Review turns run with cwd = workspace root and

@@ -57,6 +57,26 @@ export function doc(dir: string, rel: string, body: string): string {
 }
 
 /**
+ * The same, in a folder that declares itself a project.
+ *
+ * A project is declared and never derived (workspace spec §1), so a
+ * document dropped in a bare folder belongs to nothing — it can be read,
+ * edited and commented on, but a review round asks for a folder first.
+ * Every journey about *rounds* wants a project already in place, and says
+ * so here rather than clicking through the prompt each time.
+ *
+ * Use plain `doc()` when the absence of a project is the point.
+ */
+export function projectDoc(dir: string, rel: string, body: string): string {
+  const abs = doc(dir, rel, body);
+  writeFileSync(
+    path.join(path.dirname(abs), 'margin.json'),
+    `${JSON.stringify({ version: 1 }, null, 2)}\n`,
+  );
+  return abs;
+}
+
+/**
  * What a window is showing, named the way a user would name it — the
  * assertions read against this rather than against markup, so a restyle
  * doesn't break them.
