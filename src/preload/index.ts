@@ -10,6 +10,7 @@ import type {
   GdocsSyncState,
   ModelChoice,
   ModelPreference,
+  PeerRound,
   ProjectProposal,
   RecentFile,
   ReviewData,
@@ -125,6 +126,8 @@ const api = {
   onGdocsAuthChanged: (cb: (status: GdocsAuthStatus) => void) => on(IPC.gdocsAuthChanged, cb),
   onGdocsSyncChanged: (cb: (state: GdocsSyncState) => void) => on(IPC.gdocsSyncChanged, cb),
   onUpdateStateChanged: (cb: (state: UpdateState) => void) => on(IPC.updateStateChanged, cb),
+  onPeerRound: (cb: (round: PeerRound) => void) => on(IPC.peerRound, cb),
+  onProjectChanged: (cb: () => void) => on(IPC.projectChanged, cb),
 };
 
 export type MarginApi = typeof api;

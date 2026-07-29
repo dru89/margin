@@ -4,6 +4,7 @@ import { useStore } from '@/store';
 /** 32px status strip: one chip states the round's state, detail line beside it. */
 export function AgentBar() {
   const agent = useStore((s) => s.agent);
+  const peerRound = useStore((s) => s.peerRound);
   const round = useStore((s) => s.review?.round ?? 0);
   const activity = useStore((s) => s.activity);
   const cancelReview = useStore((s) => s.cancelReview);
@@ -29,7 +30,23 @@ export function AgentBar() {
     if (atBottom) el.scrollTop = el.scrollHeight;
   }, [activity, showLog]);
 
-  if (agent.phase === 'idle') return null;
+  // A round in another window on this project. Shown, never locking:
+  // that turn owns its own document's review, not this one's (spec §8).
+  if (agent.phase === 'idle') {
+    if (!peerRound?.running) return null;
+    return (
+      <footer className="agent-bar agent-peer">
+        <div className="agent-line">
+          <span className="status-chip status-agent">
+            <span className="spinner" /> Working
+          </span>
+          <span className="agent-detail">
+            Claude is reviewing {peerRound.document} in another window.
+          </span>
+        </div>
+      </footer>
+    );
+  }
   if ((agent.phase === 'done' || agent.phase === 'error') && dismissed) return null;
 
   return (

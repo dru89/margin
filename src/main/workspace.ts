@@ -264,7 +264,10 @@ async function listProjectSkills(root: string): Promise<string[]> {
  * become `chapter1`'s the moment the author clicked into the nested
  * folder — the session would say one thing and the sidebar another.
  */
-export async function getWorkspace(root: string): Promise<WorkspaceState> {
+export async function getWorkspace(
+  root: string,
+  openElsewhere: Set<string> = new Set(),
+): Promise<WorkspaceState> {
   const [allFiles, modified, skills, proposalsData, project] = await Promise.all([
     walkFiles(root),
     modifiedSet(root),
@@ -286,6 +289,7 @@ export async function getWorkspace(root: string): Promise<WorkspaceState> {
         openComments: counts.comments,
         pendingSuggestions: counts.suggestions,
         modified: modified.has(rel),
+        openElsewhere: openElsewhere.has(p),
       };
     }),
   );

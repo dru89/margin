@@ -1,8 +1,7 @@
 # Workspace model — design spec
 
-**Status:** settled with Drew (2026-07-27). Build order steps 1-5 are in
-(#167, #168, #169, #170, #171); §1-§7 describe what the app does.
-Steps 6-7 are not built.
+**Status:** settled with Drew (2026-07-27). Build order steps 1-6 are in
+(#167-#172); §1-§8 describe what the app does. Step 7 is not built.
 **Covers:** #124, #6, #107, and the window half of #2. Retires DECISIONS §63.
 
 ## The problem
@@ -370,6 +369,11 @@ Journeys, not coverage. Each is here because it protects a decision above.
 15. The explorer marks a document that is open in another window.
 16. A committed comment made in one window appears in the other.
 17. A draft comment in one window does not appear in the other.
+
+    *(As built, #172: one document is only ever open in one window, so
+    "appears in the other" is the explorer's count for that document
+    rather than a second editor over the same file. Written before
+    "one window per document" was settled; read that way now.)*
 18. A round submitted in one window shows as running in the other.
 
 ## 10. Build order
@@ -397,6 +401,13 @@ Journeys, not coverage. Each is here because it protects a decision above.
    document, which is the only arrangement that tells the two apart.
 6. Multiple windows per project: sidecar watching, project-scoped agent
    status, the explorer's open-elsewhere marker. Scenarios 14-18.
+   **Done** (#172), with two departures from the sketch above. Committed
+   writes reach peers by an in-process notification rather than a
+   filesystem watcher per sidecar — the writes all originate in main, and
+   a watcher would scale with the folder instead of with what is open.
+   And a peer round is announced without locking: `agentStatus` is what
+   freezes a window, and the round owns only its own document's review,
+   so a sibling editing a different document is told rather than frozen.
 7. Recents become projects rather than files, which reshapes Welcome.
 
 ## Settled with Drew (2026-07-27)
