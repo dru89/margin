@@ -1883,11 +1883,43 @@ discovers. Which is why executable resolution, spawn, `cleanEnv`, and
 everything else about *how a turn gets a process* stays out of the
 engine. The §72 port is the seam; keep it one.
 
-**Extraction is deliberate work for later, not a drift to start now.**
-The package boundary should be cut once, after the workspace model
-(#170–#173) settles — the project/root model is part of the engine's
-API surface, and a seam cut before it stabilizes gets cut twice. Until
-then the whole cost of keeping this option open is discipline the repo
-already has: `src/shared/` stays Electron-free, project state flows
-through the sidecar and the port, and host guarantees never leak into
-shared logic as assumptions.
+**Extraction is an option kept open, not scheduled work.** The whole
+cost of holding it open is discipline the repo already has:
+`src/shared/` stays Electron-free, project state flows through the
+sidecar and the port, and host guarantees never leak into shared logic
+as assumptions. That much is worth doing whether or not a second host
+ever exists, because it is ordinary layering.
+
+Cutting the package is a different commitment, and **the gate is a
+second consumer that actually exists, not a position in the queue.** A
+package with one consumer is a folder with extra ceremony — a separate
+build, a separate test invocation, version skew, and any change that
+crosses the boundary becoming two PRs. §42 earned that cost because the
+second consumer was concrete and already written (the gpush/gfetch
+CLIs). Here it is a plugin nobody has committed to building, and an API
+designed against an imagined caller is designed against the most
+accommodating caller there is. The usual ending is that the real host
+wants a different shape, the boundary gets recut, and the ceremony was
+paid in between.
+
+Waiting for the workspace model to settle is still right — the
+project/root model is part of the engine's API surface — but it is a
+precondition, not a trigger.
+
+**The trigger is a spike, and the spike is measuring the right risk.**
+The claim above, that without a single-writer host "orphaning becomes
+routine", is the load-bearing assumption and it is currently untested.
+Inside Margin anchors remap *exactly*, through every ChangeDesc. In a
+vault every edit is external, so every anchor goes through
+quote-and-context matching instead — which is good, but degrades
+specifically on repeated text and on edits that touch the anchored
+range. The review surface assumes anchors mostly hold; if a meaningful
+fraction orphan per session, the result is not a degraded Margin but a
+materially weaker product.
+
+So before any boundary is cut: load a document and its sidecar, apply a
+realistic editing session the way an outside editor would, and report
+what fraction of anchors survive. A couple of hundred lines, no
+packaging, no plugin. If anchors hold, the plan is sound *and* there is
+a real caller to design the API against. If they do not, that is worth
+knowing before building a seam rather than after.
