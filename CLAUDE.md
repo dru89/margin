@@ -73,8 +73,19 @@ support — they have replaced the ad-hoc CDP scripts for anything worth
 keeping:
 
 ```bash
-npm run test:e2e     # builds, then runs test/e2e/
+npm run test:e2e         # builds, then runs test/e2e/
+npm run test:e2e:quiet   # the same, on a virtual display (Linux)
 ```
+
+**`test:e2e:quiet` is the one to use while working.** Electron has no
+headless mode, so a normal run maps real windows and takes focus —
+stopping whatever else you were typing into for the ~90s the suite
+lasts. `xvfb-run` gives it an X server with its own root window, focus
+model and cursor, unconnected to the session compositor, so the journeys
+still exercise a real mapped window on a screen nobody is attached to.
+Needs `xorg-server-xvfb` (Arch) or `xvfb` (Debian); CI has always run
+this way. The screen size is pinned because Xvfb defaults to 640x480,
+which is smaller than the app window.
 
 `test/e2e/margin.ts` launches with an isolated `--user-data-dir` and a
 seeded `projectsDir`, so a test never touches real settings, recents, or
@@ -204,8 +215,11 @@ npx electron . --remote-debugging-port=9224 "path/to/doc.md" &   # background
 - **Env vars may not survive backgrounding.** Some agent harnesses scrub
   the environment of detached processes, so `VAR=x npx electron . &`
   silently starts the app *without* `VAR`, and the feature under test
-  looks broken. Check with `tr '\0' '\n' < /proc/<pid>/environ`, or
-  drive the app from Playwright instead — it passes `env` explicitly.
+  looks broken. Drive the app from Playwright instead — it passes `env`
+  explicitly, which is why `MARGIN_FAKE_AGENT` works there. Verify the
+  harness with a plain `sleep`, **not** with Electron: Chromium scrubs
+  its helper processes' `environ`, so `/proc/<pid>/environ` reads back
+  as NULs and every variable looks absent whether it is or not.
 
 ## Gotchas that will bite you
 

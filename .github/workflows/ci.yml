@@ -34,7 +34,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: xvfb-run -a npx playwright test
+      # Screen size pinned to match `npm run test:e2e:quiet` locally —
+      # Xvfb defaults to 640x480, smaller than the app window.
+      - run: xvfb-run -a -s "-screen 0 1920x1080x24" npx playwright test
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

@@ -35,6 +35,7 @@
     "test:contract": "node scripts/test-agent-contract.mjs",
     "test:live": "node scripts/test-live-round.mjs",
     "test:e2e": "npm run build && npx playwright test",
+    "test:e2e:quiet": "npm run build && xvfb-run -a -s \"-screen 0 1920x1080x24\" npx playwright test",
     "fixture": "node scripts/make-fixture.mjs",
     "test:worddiff": "node scripts/test-worddiff.mjs"
   },
