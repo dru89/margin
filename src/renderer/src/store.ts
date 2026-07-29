@@ -9,6 +9,7 @@ import type {
   GdocsSyncState,
   ModelPreference,
   ReviewData,
+  UpdateState,
   WorkspaceState,
 } from '@shared/types';
 import { makeAnchor, reanchor, resolveQuote } from '@shared/anchors';
@@ -163,6 +164,12 @@ interface MarginState {
   /** Google Docs link/push state for the open document. */
   gdocsSync: GdocsSyncState | null;
   refreshGdocsSync: () => Promise<void>;
+  /**
+   * Whether an app update is waiting (#180). App-level rather than
+   * document-level: every window shows the same chip, and main pushes to
+   * all of them.
+   */
+  update: UpdateState;
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -228,6 +235,7 @@ export const useStore = create<MarginState>((set, get) => {
     explorerOpen: true,
     settingsOpen: false,
     gdocsSync: null,
+    update: { status: 'idle' },
 
     loadWorkspace: async () => {
       const workspace = await window.margin.getWorkspace();
@@ -365,6 +373,8 @@ export const useStore = create<MarginState>((set, get) => {
       );
       window.margin.onMenuOpenSettings(() => set({ settingsOpen: true }));
       window.margin.onGdocsSyncChanged((gdocsSync) => set({ gdocsSync }));
+      void window.margin.getUpdateState().then((update) => set({ update }));
+      window.margin.onUpdateStateChanged((update) => set({ update }));
       // Fallback for when the page has focus and no native menu fires
       // (Linux without a menubar); open-only, so a menu-consumed
       // accelerator never double-toggles.

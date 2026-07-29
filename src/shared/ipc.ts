@@ -47,6 +47,8 @@ export const IPC = {
   gdocsReplyOnDoc: 'gdocs:reply-on-doc',
   gdocsResolveOnDoc: 'gdocs:resolve-on-doc',
   openUrl: 'app:open-url',
+  getUpdateState: 'update:get-state',
+  updateAction: 'update:action',
 
   // renderer -> main (send)
   caretContext: 'doc:caret-context',
@@ -67,4 +69,5 @@ export const IPC = {
   menuOpenSettings: 'menu:open-settings',
   gdocsAuthChanged: 'gdocs:auth-changed',
   gdocsSyncChanged: 'gdocs:sync-changed',
+  updateStateChanged: 'update:state-changed',
 } as const;

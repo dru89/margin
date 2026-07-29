@@ -1775,3 +1775,53 @@ candidate, because §74 refuses to *find* a project there and a
 
 Confirming carries straight on with whatever asked, so a round is not
 two clicks of the same button.
+
+## 76. Checking for updates is periodic; interrupting is not (#180)
+
+Updates were checked once, at launch. An app left running for a week
+never learned a release had happened — which is the normal condition for
+anyone who rarely quits anything.
+
+The obvious fix is a timer around the existing check, and it is worse
+than the bug. `update-available` re-fires on every check, so a timer
+wired to the existing dialog interrupts on a loop; and the interruption
+is a modal taking focus in the middle of somebody's writing. **So the
+timer moves state, and never a dialog.**
+
+**The dialog is an interruption; the chip is a status.** That split is
+what lets the two coexist. A quiet chip in the toolbar says an update
+exists and opens the dialog when clicked. "Remind Me Later" silences the
+interruption and leaves the chip, because deferring says something about
+this moment and nothing about whether an update exists. "Skip This
+Version" removes both, because that is a decision about the release.
+Nothing pops on its own; Help → Check for Updates… is how you ask.
+
+**A deferral must never become an install.** `autoInstallOnAppQuit`
+stays false. Installing a downloaded update on the next quit was
+proposed and rejected: someone may be staying on a working version
+deliberately, and a global flag would infer consent from a button that
+never asked for it. What was actually wrong there is narrower — a
+declined restart left the update downloaded with nothing saying so, so
+the app ran the old version indefinitely with no way to act short of
+relaunching. The `ready` chip is that missing surface. If installing on
+quit is ever wanted it needs its own button beside "Later", opt-in and
+never inferred.
+
+**"Remind Me Later" is a duration, not a calendar day.** The old pref
+stored `YYYY-MM-DD`, so clicking it at 23:50 deferred for ten minutes.
+Harmless while checks only happened at launch, and an annoyance the
+moment they happen every six hours. Now a timestamp plus 24 hours; the
+legacy field is still read so an existing deferral is honored, never
+written. An unparseable value fails *open* — the alternative is an
+update that can never announce itself again.
+
+**A manual check always answers**, including "you are up to date", and
+overrides an earlier deferral. Asking is not deferring, and a menu item
+that silently does nothing is the same failure as the git button in
+§70/#145.
+
+`MARGIN_FAKE_UPDATE` stands in for a release. It is checked *before*
+`app.isPackaged`, not inside a dev-only branch: Playwright's Electron
+reports `isPackaged === true`, so a fake reachable only in dev is a fake
+no journey can use — which is how the first version of this shipped
+untested.

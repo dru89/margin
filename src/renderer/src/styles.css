@@ -1145,6 +1145,8 @@ textarea::placeholder { color: var(--ink-faint); }
   height: 100%;
   display: grid;
   place-items: center;
+  /* Anchors the update chip, which has no toolbar to sit in here. */
+  position: relative;
   background:
     radial-gradient(ellipse 70% 50% at 50% -10%, var(--user-wash), transparent),
     var(--paper);
@@ -2040,3 +2042,56 @@ button.status-chip:active { transform: translateY(1px); }
 
 .adopt-footnote { margin-top: 12px; }
 .adopt-modal .card-actions { margin-top: 16px; }
+
+/* ——— the update chip (#180) ——— */
+
+/* Quiet on purpose: an available update is not a problem, and this is
+   the thing that replaced a dialog interrupting the writing. Two classes
+   so it wins over `.status-chip` without depending on source order. */
+.status-chip.update-chip {
+  color: var(--ink-soft);
+  background: var(--paper-inset);
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+.status-chip.update-chip:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--rule);
+}
+.status-chip.update-chip:disabled {
+  cursor: default;
+  /* The download's own progress, rather than a second element for it.
+     At 0% the fill is invisible, which is the right place to start. */
+  background: linear-gradient(
+    to right,
+    var(--user-wash) 0 var(--update-progress, 0%),
+    var(--paper-inset) var(--update-progress, 0%) 100%
+  );
+}
+
+/* The dot carries "new" so the label doesn't have to shout it. */
+.update-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--user);
+  flex-shrink: 0;
+}
+
+/* Downloaded and waiting on a restart — the one state that is actually
+   asking for something, so it reads a step louder than availability. */
+.status-chip.update-chip.update-ready {
+  color: color-mix(in srgb, var(--user) 70%, var(--ink));
+  background: var(--user-wash);
+}
+.status-chip.update-chip.update-ready:hover {
+  border-color: color-mix(in srgb, var(--user) 40%, transparent);
+}
+
+/* The welcome screen has no toolbar to hang it from. */
+.welcome-update {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+}

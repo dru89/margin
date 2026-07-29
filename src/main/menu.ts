@@ -5,6 +5,7 @@ import { clearRecentFiles, getRecentFiles, setRecentsChangedListener } from './r
 import { createWindow, openFile } from './windows';
 import { declaresProject, firstMarkdownIn } from './workspace';
 import { saveProjectFile } from './projectFile';
+import { checkForUpdatesManually } from './updater';
 
 const isMac = process.platform === 'darwin';
 
@@ -105,6 +106,9 @@ export async function rebuildMenu(): Promise<void> {
             label: app.name,
             submenu: [
               { role: 'about' },
+              // macOS puts this under the app menu, beside About; every
+              // other platform expects it under Help.
+              { label: 'Check for Updates…', click: () => void checkForUpdatesManually() },
               { type: 'separator' },
               {
                 label: 'Settings…',
@@ -207,6 +211,15 @@ export async function rebuildMenu(): Promise<void> {
     {
       role: 'help',
       submenu: [
+        // The escape hatch for "am I current?" — and the only way to ask,
+        // now that an available update waits quietly rather than
+        // announcing itself (#180). On macOS it lives in the app menu.
+        ...(isMac
+          ? []
+          : ([
+              { label: 'Check for Updates…', click: () => void checkForUpdatesManually() },
+              { type: 'separator' },
+            ] as MenuItemConstructorOptions[])),
         {
           label: 'Report an Issue',
           click: () => void shell.openExternal('https://github.com/Dru89/margin/issues'),

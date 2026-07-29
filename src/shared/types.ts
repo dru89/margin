@@ -271,6 +271,20 @@ export function emptyReview(documentName: string): ReviewData {
   };
 }
 
+/**
+ * What the toolbar's update chip shows (#180).
+ *
+ * `ready` is the state that had no surface at all before: the update is
+ * downloaded and waiting, and declining the restart left the app running
+ * the old version with nothing saying otherwise.
+ */
+export interface UpdateState {
+  status: 'idle' | 'available' | 'downloading' | 'ready';
+  version?: string;
+  /** 0-100 while downloading. */
+  percent?: number;
+}
+
 /** Google Docs auth state shown in Settings (mirrors gdocs-sync's AuthStatus). */
 export interface GdocsAuthStatus {
   /** Where the OAuth client comes from: an imported file, the app's built-in default, or nowhere. */
