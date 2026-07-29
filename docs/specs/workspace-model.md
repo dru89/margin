@@ -1,8 +1,8 @@
 # Workspace model — design spec
 
-**Status:** settled with Drew (2026-07-27). Build order steps 1-4 are in
-(#167, #168, #169, #170); §1-§5 and §7 describe what the app does.
-Steps 5-7 are not built.
+**Status:** settled with Drew (2026-07-27). Build order steps 1-5 are in
+(#167, #168, #169, #170, #171); §1-§7 describe what the app does.
+Steps 6-7 are not built.
 **Covers:** #124, #6, #107, and the window half of #2. Retires DECISIONS §63.
 
 ## The problem
@@ -390,6 +390,11 @@ Journeys, not coverage. Each is here because it protects a decision above.
    (DECISIONS §77).
 5. Overlapping projects (§6) — mostly assertions rather than code, since
    §1 makes it fall out. Scenarios 7-11.
+   **Done** (#171), and the honest note: with all three folders declared,
+   a walk-up and a carried root agree in most arrangements, so scenarios
+   7 and 11 are characterization rather than discrimination. Scenarios
+   8, 9 and 10 each put the *outer* project on the *inner* project's
+   document, which is the only arrangement that tells the two apart.
 6. Multiple windows per project: sidecar watching, project-scoped agent
    status, the explorer's open-elsewhere marker. Scenarios 14-18.
 7. Recents become projects rather than files, which reshapes Welcome.
