@@ -15,6 +15,7 @@ import type {
   ReviewData,
   SetupMessage,
   SetupReply,
+  UpdateState,
   WorkspaceState,
 } from '@shared/types';
 import { IPC } from '@shared/ipc';
@@ -104,6 +105,9 @@ const api = {
   gdocsResolveOnDoc: (driveCommentId: string): Promise<{ error?: string }> =>
     ipcRenderer.invoke(IPC.gdocsResolveOnDoc, driveCommentId),
   openUrl: (url: string): Promise<void> => ipcRenderer.invoke(IPC.openUrl, url),
+  getUpdateState: (): Promise<UpdateState> => ipcRenderer.invoke(IPC.getUpdateState),
+  /** Continue whatever the current update state is about (opens a dialog). */
+  updateAction: (): Promise<void> => ipcRenderer.invoke(IPC.updateAction),
 
   onDocLoaded: (cb: (doc: DocState) => void) => on(IPC.docLoaded, cb),
   onReviewUpdated: (cb: (review: ReviewData) => void) => on(IPC.reviewUpdated, cb),
@@ -120,6 +124,7 @@ const api = {
   onMenuOpenSettings: (cb: () => void) => on(IPC.menuOpenSettings, cb),
   onGdocsAuthChanged: (cb: (status: GdocsAuthStatus) => void) => on(IPC.gdocsAuthChanged, cb),
   onGdocsSyncChanged: (cb: (state: GdocsSyncState) => void) => on(IPC.gdocsSyncChanged, cb),
+  onUpdateStateChanged: (cb: (state: UpdateState) => void) => on(IPC.updateStateChanged, cb),
 };
 
 export type MarginApi = typeof api;

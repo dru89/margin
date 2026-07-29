@@ -5,7 +5,7 @@ import { createWindow, openFile } from './windows';
 import { initMenu } from './menu';
 import { registerIpcHandlers } from './ipc';
 import { registerGdocsIpc, registerGdocsSyncIpc } from './gdocs';
-import { initUpdater } from './updater';
+import { initUpdater, registerUpdaterIpc } from './updater';
 import { firstMarkdownIn } from './workspace';
 
 // One app process for all windows.
@@ -79,6 +79,7 @@ if (!gotLock) {
     registerIpcHandlers();
     registerGdocsIpc();
     registerGdocsSyncIpc();
+    registerUpdaterIpc();
 
     const target = pendingFile ?? targetFromArgv(process.argv);
     if (target) void openTarget(path.resolve(target));

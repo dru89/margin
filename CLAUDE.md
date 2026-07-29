@@ -35,6 +35,7 @@ npm run test:tables      # GFM table formatting
 npm run test:git         # git is optional — runs with git off PATH (#145)
 npm run test:errors      # what a failed round says and whether it rolls back (§71)
 npm run test:project     # margin.json: the legacy fallback and the name
+npm run test:policy      # when an update may interrupt (§76)
 npm run test:contract    # the REAL agent, unauthenticated — free, fast, CI-safe (§73)
 ```
 
@@ -125,6 +126,10 @@ Traps this suite has already hit:
   `app.evaluate(({ dialog }) => { dialog.showOpenDialog = … })`. Both
   `showOpenDialog` and `showMessageBox` need answering to drive the
   Open Folder path.
+- **`app.isPackaged` is `true` under Playwright's Electron.** Anything
+  behind a `!app.isPackaged` branch is unreachable from a journey, so a
+  test affordance has to be gated on its own env var *before* that check
+  — `MARGIN_FAKE_UPDATE` shipped broken once for exactly this reason.
 - **"Open Folder" seeds the window with the *first* markdown file under
   it, sorted.** A fixture whose intended starting document does not sort
   first opens somewhere else, and any later "switch to another document"
@@ -196,6 +201,11 @@ npx electron . --remote-debugging-port=9224 "path/to/doc.md" &   # background
 - A real agent round needs a logged-in `claude` CLI (`claude -p "ok"` must
   work in a plain terminal). Otherwise use `MARGIN_FAKE_AGENT=1`, which
   exercises the entire round pipeline with a scripted turn.
+- **Env vars may not survive backgrounding.** Some agent harnesses scrub
+  the environment of detached processes, so `VAR=x npx electron . &`
+  silently starts the app *without* `VAR`, and the feature under test
+  looks broken. Check with `tr '\0' '\n' < /proc/<pid>/environ`, or
+  drive the app from Playwright instead — it passes `env` explicitly.
 
 ## Gotchas that will bite you
 

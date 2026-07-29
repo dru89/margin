@@ -4,6 +4,7 @@ import { draftHasContent } from '@shared/composer';
 import { History } from '@/components/History';
 import { ModelPicker } from '@/components/ModelPicker';
 import { GdocsMenu } from '@/components/GdocsMenu';
+import { UpdateChip } from '@/components/UpdateChip';
 
 const ellipsize = (text: string, max: number): string =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text;
@@ -124,6 +125,7 @@ export function Toolbar() {
             {gitUnavailable ? 'Git not available' : 'No repo · Initialize'}
           </button>
         )}
+        <UpdateChip />
         <span className="tb-divider" />
         <div className="submit-wrap">
           <button

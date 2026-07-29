@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { RecentFile } from '@shared/types';
 import { ProjectSetup } from '@/components/ProjectSetup';
+import { UpdateChip } from '@/components/UpdateChip';
 
 /** Recents deduped to their project folders — the unit is the project, not the file. */
 interface RecentProject {
@@ -43,6 +44,12 @@ export function Welcome() {
 
   return (
     <div className="welcome">
+      {/* A window with no document has no toolbar, so the chip needs a
+          home here too — otherwise the one surface a long-idle window is
+          likely to be showing is the one that can't mention an update. */}
+      <div className="welcome-update">
+        <UpdateChip />
+      </div>
       <div className="welcome-card">
         <h1 className="welcome-title">Margin</h1>
         <p className="welcome-tagline">

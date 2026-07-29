@@ -20,7 +20,9 @@ export interface Margin {
  * and the fake agent (so rounds are deterministic and no credentials or
  * network are involved).
  */
-export async function launch(opts: { open?: string } = {}): Promise<Margin> {
+export async function launch(
+  opts: { open?: string; env?: Record<string, string> } = {},
+): Promise<Margin> {
   const dir = mkdtempSync(path.join(tmpdir(), 'margin-e2e-'));
   const userData = path.join(dir, 'userData');
   const projectsDir = path.join(dir, 'projects');
@@ -31,7 +33,7 @@ export async function launch(opts: { open?: string } = {}): Promise<Margin> {
 
   const app = await electron.launch({
     args: ['.', `--user-data-dir=${userData}`, ...(opts.open ? [opts.open] : [])],
-    env: { ...process.env, MARGIN_FAKE_AGENT: '1' },
+    env: { ...process.env, MARGIN_FAKE_AGENT: '1', ...opts.env },
   });
   // launch() resolves before the renderer exists; every caller needs a window.
   const first = await app.firstWindow();
