@@ -1847,3 +1847,47 @@ update became available** — "offered for a week and never clicked" —
 rather than time since focus, because that measures the thing actually
 worth acting on rather than a proxy for it. The tripwire is noticing a
 stale version has been running for weeks.
+
+## 77. The engine outlives the app; hosts differ in what they can promise (#183)
+
+Margin may not be the only host of its review model. The concrete
+prompt was Obsidian — the assessment and the research live in #183 —
+but the decision recorded here is about this codebase, and it holds
+whether or not a plugin is ever built.
+
+**The durable value is host-independent.** The anchor engine, the
+review-state vocabulary, the sidecar schema, and the agent tool
+contract none of them know Electron exists, and the unit suites prove
+it — they compile `src/shared/` with esbuild and run it in bare Node.
+What the Electron app uniquely contributes is a *guarantee*: exactly
+two writers with a hard handoff, an editor locked read-only for the
+length of a round. A vault, a web host, or anyone else's editor cannot
+promise that; there the model degrades to snapshot-plus-reanchor, and
+orphaning becomes routine instead of exceptional. That degradation is
+acceptable — reanchoring on load is already how external edits are
+absorbed — but it is the *host's* posture, not the engine's.
+
+**So the boundary rule, effective now:** anywhere logic assumes the
+document could not have changed underneath it, that assumption belongs
+to the host. Shared code takes reanchoring as the contract and treats
+the lock as an optimization one particular host happens to offer.
+
+**§59 becomes host policy.** Claudian (the existing Claude-Code-in-
+Obsidian plugin) proves the SDK's JS bundles into a plugin with an
+`import.meta.url` patch, but the vendored CLI binary cannot ship that
+way — Claudian *discovers* an installed Claude Code and passes it via
+`pathToClaudeCodeExecutable`, the exact option §59 rejected for Margin.
+Both choices are right, for different hosts: an app that ships its own
+runtime pins for reproducibility; a plugin that cannot ship a binary
+discovers. Which is why executable resolution, spawn, `cleanEnv`, and
+everything else about *how a turn gets a process* stays out of the
+engine. The §72 port is the seam; keep it one.
+
+**Extraction is deliberate work for later, not a drift to start now.**
+The package boundary should be cut once, after the workspace model
+(#170–#173) settles — the project/root model is part of the engine's
+API surface, and a seam cut before it stabilizes gets cut twice. Until
+then the whole cost of keeping this option open is discipline the repo
+already has: `src/shared/` stays Electron-free, project state flows
+through the sidecar and the port, and host guarantees never leak into
+shared logic as assumptions.
