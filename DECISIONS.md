@@ -1825,3 +1825,25 @@ that silently does nothing is the same failure as the git button in
 reports `isPackaged === true`, so a fake reachable only in dev is a fake
 no journey can use — which is how the first version of this shipped
 untested.
+
+**Deliberately not: escalating to a dialog on its own.** The obvious
+follow-on is a rule that eventually does interrupt — say, on the window
+regaining focus after a long idle, with a clean editor and no round
+running. It is not built, for two reasons that only became clear once
+the chip existed.
+
+Regaining focus is the moment somebody sat down to *write*, which makes
+it close to the worst time to interrupt rather than the best. The
+genuinely idle moment is the one before the click, and it is unreachable
+precisely because the window is not focused.
+
+And with a persistent chip in place, escalation only buys the person who
+never looks at the toolbar. That may be worth something in an app with
+many users; it is worth very little in one whose user knows the chip is
+there.
+
+If it ever earns its place, the threshold should be **time since the
+update became available** — "offered for a week and never clicked" —
+rather than time since focus, because that measures the thing actually
+worth acting on rather than a proxy for it. The tripwire is noticing a
+stale version has been running for weeks.
